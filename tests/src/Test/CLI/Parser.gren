@@ -1,0 +1,12 @@
+module Test.CLI.Parser exposing (tests)
+
+import Expect
+import Test exposing (Test, describe, test)
+import CLI.Parser as Parser
+
+
+tests : Test
+tests =
+    describe "CLI Parser"
+        [ test "passing" <| \{} -> Expect.equal True False
+        ] 

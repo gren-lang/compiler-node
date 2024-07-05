@@ -1,0 +1,9 @@
+module CLI.Parser exposing (Parser, run)
+
+
+type Parser result = Parser result
+
+
+run : Parser result -> Array String -> Result {} result
+run parser args =
+    Err {}
