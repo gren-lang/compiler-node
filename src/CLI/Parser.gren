@@ -1,9 +1,97 @@
-module CLI.Parser exposing (Parser, run)
+module CLI.Parser exposing 
+    ( Command
+    , run
+    --
+    , ArgParser(..)
+    --
+    , FlagParser
+    , noFlags
+    , initFlags
+    , onOff
+    , flag
+    )
 
 
-type Parser result = Parser result
+import Dict exposing (Dict)
 
 
-run : Parser result -> Array String -> Result {} result
+-- COMMAND
+
+
+type alias Command args flags result =
+    { word : String
+    , arguments : ArgParser args
+    , flags : FlagParser flags
+    , commonDescription : Maybe String
+    , summary : String
+    , example : String
+    , builder : args -> flags -> Result {} result
+    }
+
+
+run : Command args flags result -> Array String -> Result {} result
 run parser args =
     Err {}
+
+
+-- ARGS
+
+
+type ArgParser val
+    = NoArgs ({} -> val)
+    | OneArg (String -> Result {} val)
+    | ZeroOrMoreArgs (Array String -> Result {} val)
+
+
+-- FLAGS
+
+
+type FlagParser val
+    = FlagParser (Dict String String) (Dict String String -> FlagParsingStep val)
+
+
+type FlagParsingStep val
+    = FlagParsingOk val
+    | FlagParsingErr
+
+
+noFlags : FlagParser {}
+noFlags =
+    FlagParser Dict.empty (\_ -> FlagParsingOk {})
+
+
+initFlags : a -> FlagParser a
+initFlags builder =
+    FlagParser Dict.empty (\_ -> FlagParsingOk builder)
+
+
+onOff : String -> String -> FlagParser ({} -> b) -> FlagParser b
+onOff key desc (FlagParser knownFlags previousSteps) =
+    FlagParser (Dict.set key desc knownFlags) <| \opts ->
+        case previousSteps opts of
+            FlagParsingOk next ->
+                case Dict.get key opts of
+                    Just val ->
+                        FlagParsingOk (next {})
+
+                    Nothing ->
+                        FlagParsingErr
+
+            FlagParsingErr ->
+                FlagParsingErr
+
+flag : String -> (Maybe String -> Maybe a) -> String -> FlagParser (a -> b) -> FlagParser b
+flag key valueParser desc (FlagParser knownFlags previousSteps) =
+    FlagParser (Dict.set key desc knownFlags) <| \opts ->
+        case previousSteps opts of
+            FlagParsingOk next ->
+                case valueParser <| Dict.get key opts of
+                    Just value ->
+                        FlagParsingOk (next value)
+
+                    Nothing ->
+                        FlagParsingErr
+
+            FlagParsingErr ->
+                FlagParsingErr
+

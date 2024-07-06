@@ -5,6 +5,34 @@ import Test exposing (Test, describe, test)
 import CLI.Parser as Parser
 
 
+dummyCmd =
+    { word =
+        "make"
+    , args =
+        Parser.ZeroOrMoreAargs Parser.grenFileParser
+    , flags =
+        Parser.initFlags 
+            (\debug output ->
+                { debug = debug
+                , output = output
+                }
+            )
+            |> Parser.onOff "debug" "debug desc"
+            |> Parser.flag "output" Parser.pathParser "output path"
+    , commonDescription =
+        Just "make your project"
+    , summary =
+        "Makey make make"
+    , example = "gren make src/Main.gren"
+    , builder =
+        \args flags ->
+            Ok
+                { word = "make"
+                , args = args
+                , flags = flags
+                }
+    }
+
 tests : Test
 tests =
     describe "CLI Parser"
