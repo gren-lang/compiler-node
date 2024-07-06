@@ -5,11 +5,11 @@ import Test exposing (Test, describe, test)
 import CLI.Parser as Parser
 
 
-dummyCmd =
+testCmd =
     { word =
         "make"
-    , args =
-        Parser.ZeroOrMoreArgs Parser.grenFileParser
+    , arguments =
+        Parser.zeroOrMoreArgs Parser.grenFileParser
     , flags =
         Parser.initFlags 
             (\debug output ->
@@ -33,8 +33,15 @@ dummyCmd =
                 }
     }
 
+
 tests : Test
 tests =
     describe "CLI Parser"
-        [ test "passing" <| \{} -> Expect.equal True False
+        [ test "Parses successfully" <| \{} -> 
+            case Parser.run testCmd [ "make", "--debug", "--output=out", "src/Main.gren" ] of
+                Err _ ->
+                    Expect.fail "Failed to parse"
+
+                Ok _ ->
+                    Expect.pass
         ] 

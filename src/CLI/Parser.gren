@@ -2,7 +2,10 @@ module CLI.Parser exposing
     ( Command
     , run
     --
-    , ArgParser(..)
+    , ArgParser
+    , noArgs
+    , oneArg
+    , zeroOrMoreArgs
     --
     , FlagParser
     , noFlags
@@ -16,7 +19,7 @@ module CLI.Parser exposing
 
 
 import Dict exposing (Dict)
-import FileSystem.Path exposing (Path)
+import FileSystem.Path as Path exposing (Path)
 
 
 -- COMMAND
@@ -29,22 +32,120 @@ type alias Command args flags result =
     , commonDescription : Maybe String
     , summary : String
     , example : String
-    , builder : args -> flags -> Result {} result
+    , builder : args -> flags -> result
     }
 
 
-run : Command args flags result -> Array String -> Result {} result
-run parser args =
-    Err {}
+type CommandError
+    = NoCommandGiven
+    | WrongCommand
+    | BadFlags
+    | BadArguments
+
+
+run : Command args flags result -> Array String -> Result CommandError result
+run spec tokens =
+    let
+        { trues = flags, falses = arguments } =
+            Array.partition (\word -> String.startsWith "--" word) tokens
+    in
+    case Array.popFirst arguments of
+        Just { first = command, rest = args } ->
+            if command /= spec.word then
+                Err WrongCommand
+
+            else
+                let
+                    (ArgParser parseArgs) =
+                        spec.arguments
+                    
+                    (FlagParser _ parseFlags) =
+                        spec.flags
+                in
+                case 
+                    { argResult = parseArgs args
+                    , flagResult = parseFlags (buildFlagDict flags)
+                    }
+                of
+                    { argResult = Ok argValue, flagResult = FlagParsingOk flagValues } ->
+                        Ok <| spec.builder argValue flagValues
+                    
+                    { argResult = Err _ } ->
+                        Err BadArguments
+                    
+                    { flagResult = FlagParsingErr } ->
+                        Err BadFlags
+
+        Nothing ->
+            Err NoCommandGiven
+
+
+buildFlagDict : Array String -> Dict String String
+buildFlagDict flags =
+    Array.foldl
+        (\rawFlag dict ->
+            let
+                flagParts =
+                    rawFlag
+                        |> String.dropLeft 2 -- the --prefix            
+                        |> String.split "="
+                        |> Array.takeFirst 2
+            in
+            case flagParts of
+                [ key ] ->
+                    Dict.set key "" dict
+
+                [ key, value ] ->
+                    Dict.set key value dict
+
+                _ ->
+                    dict
+        )
+        Dict.empty
+        flags
 
 
 -- ARGS
 
 
 type ArgParser val
-    = NoArgs ({} -> val)
-    | OneArg (String -> Result {} val)
-    | ZeroOrMoreArgs (String -> Result {} val)
+    = ArgParser (Array String -> Result {} val)
+
+
+noArgs : val -> ArgParser val
+noArgs value =
+    ArgParser <| \args ->
+        if Array.length args /= 0 then
+            Err {}
+
+        else
+            Ok value
+
+oneArg : (String -> Result {} val) -> ArgParser val
+oneArg builder =
+    ArgParser <| \args ->
+        case args of
+            [ arg ] ->
+                builder arg
+
+            _ ->
+                Err {}
+
+zeroOrMoreArgs : (String -> Result {} val) -> ArgParser (Array val)
+zeroOrMoreArgs builder =
+    ArgParser <| \args ->
+        let
+            parsedArgs =
+                Array.map builder args
+
+            successfulArgs =
+                Array.filterMap Result.toMaybe parsedArgs
+        in
+        if Array.length successfulArgs /= Array.length parsedArgs then
+            Err {}
+
+        else
+            Ok successfulArgs
 
 
 -- FLAGS
@@ -110,9 +211,17 @@ flag key valueParser desc (FlagParser knownFlags previousSteps) =
 
 pathParser : String -> Result {} Path
 pathParser input =
-    Err {}
+    Ok <| Path.fromPosixString input
+        
 
 
 grenFileParser : String -> Result {} Path
 grenFileParser input =
-    Err {}
+    pathParser input
+        |> Result.andThen
+            (\path ->
+                if path.extension /= "gren" then
+                    Err {}
+                else
+                    Ok path
+            )
