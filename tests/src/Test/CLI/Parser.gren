@@ -9,7 +9,7 @@ dummyCmd =
     { word =
         "make"
     , args =
-        Parser.ZeroOrMoreAargs Parser.grenFileParser
+        Parser.ZeroOrMoreArgs Parser.grenFileParser
     , flags =
         Parser.initFlags 
             (\debug output ->

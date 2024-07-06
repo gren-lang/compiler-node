@@ -9,10 +9,14 @@ module CLI.Parser exposing
     , initFlags
     , onOff
     , flag
+    --
+    , pathParser
+    , grenFileParser
     )
 
 
 import Dict exposing (Dict)
+import FileSystem.Path exposing (Path)
 
 
 -- COMMAND
@@ -40,7 +44,7 @@ run parser args =
 type ArgParser val
     = NoArgs ({} -> val)
     | OneArg (String -> Result {} val)
-    | ZeroOrMoreArgs (Array String -> Result {} val)
+    | ZeroOrMoreArgs (String -> Result {} val)
 
 
 -- FLAGS
@@ -80,14 +84,19 @@ onOff key desc (FlagParser knownFlags previousSteps) =
             FlagParsingErr ->
                 FlagParsingErr
 
-flag : String -> (Maybe String -> Maybe a) -> String -> FlagParser (a -> b) -> FlagParser b
+flag : String -> (String -> Result {} a) -> String -> FlagParser (a -> b) -> FlagParser b
 flag key valueParser desc (FlagParser knownFlags previousSteps) =
     FlagParser (Dict.set key desc knownFlags) <| \opts ->
         case previousSteps opts of
             FlagParsingOk next ->
-                case valueParser <| Dict.get key opts of
+                case Dict.get key opts of
                     Just value ->
-                        FlagParsingOk (next value)
+                        case valueParser value of
+                            Ok parsedValue ->
+                                FlagParsingOk (next parsedValue)
+
+                            Err _ ->
+                                FlagParsingErr
 
                     Nothing ->
                         FlagParsingErr
@@ -95,3 +104,15 @@ flag key valueParser desc (FlagParser knownFlags previousSteps) =
             FlagParsingErr ->
                 FlagParsingErr
 
+
+-- PARSERS
+
+
+pathParser : String -> Result {} Path
+pathParser input =
+    Err {}
+
+
+grenFileParser : String -> Result {} Path
+grenFileParser input =
+    Err {}
