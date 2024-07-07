@@ -1,8 +1,35 @@
 module Test.CLI.Parser exposing (tests)
 
-import Expect
+import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
 import CLI.Parser as Parser
+import FileSystem.Path as Path
+
+
+
+
+tests : Test
+tests =
+    describe "CLI Parser"
+        [ test "Parses successfully" <| \{} -> 
+            expectParseSuccess testCmd testArgs <| \cmd ->
+                Expect.equal (Path.fromPosixString "out") cmd.flags.output
+        ] 
+
+
+expectParseSuccess : Parser.Command args flags result -> Array String -> (result -> Expectation) -> Expectation
+expectParseSuccess cmd args next =
+    case Parser.run cmd args of
+        Err _ ->
+            Expect.fail "Failed to parse"
+
+        Ok result ->
+            next result
+
+
+testArgs : Array String
+testArgs =
+    [ "make", "--debug", "--output=out", "src/Main.gren" ]
 
 
 testCmd =
@@ -26,22 +53,7 @@ testCmd =
     , example = "gren make src/Main.gren"
     , builder =
         \args flags ->
-            Ok
-                { word = "make"
-                , args = args
-                , flags = flags
-                }
+            { args = args
+            , flags = flags
+            }
     }
-
-
-tests : Test
-tests =
-    describe "CLI Parser"
-        [ test "Parses successfully" <| \{} -> 
-            case Parser.run testCmd [ "make", "--debug", "--output=out", "src/Main.gren" ] of
-                Err _ ->
-                    Expect.fail "Failed to parse"
-
-                Ok _ ->
-                    Expect.pass
-        ] 
