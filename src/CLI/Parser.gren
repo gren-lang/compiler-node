@@ -188,7 +188,7 @@ onOff key desc (FlagParser knownFlags previousSteps) =
             FlagParsingErr ->
                 FlagParsingErr
 
-flag : String -> (String -> Result {} a) -> String -> FlagParser (a -> b) -> FlagParser b
+flag : String -> (String -> Result {} a) -> String -> FlagParser (Maybe a -> b) -> FlagParser b
 flag key valueParser desc (FlagParser knownFlags previousSteps) =
     FlagParser (Dict.set key desc knownFlags) <| \opts ->
         case previousSteps opts of
@@ -197,13 +197,13 @@ flag key valueParser desc (FlagParser knownFlags previousSteps) =
                     Just value ->
                         case valueParser value of
                             Ok parsedValue ->
-                                FlagParsingOk (next parsedValue)
+                                FlagParsingOk (next <| Just parsedValue)
 
                             Err _ ->
                                 FlagParsingErr
 
                     Nothing ->
-                        FlagParsingErr
+                        FlagParsingOk (next Nothing)
 
             FlagParsingErr ->
                 FlagParsingErr

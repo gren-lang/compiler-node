@@ -13,6 +13,10 @@ tests =
     describe "CLI Parser"
         [ test "Parses successfully" <| \{} -> 
             Expect.ok <| Parser.run testCmd testArgs
+        , test "This particular test case even succeeds without args or flags" <| \{} ->
+            Expect.ok <| Parser.run testCmd ["make"]
+        , test "The command name is required" <| \{} ->
+            Expect.err <| Parser.run testCmd []
         , describe "Args"
             [ test "Args in valid example is parsed correctly" <| \{} ->
                 expectParseSuccess testCmd testArgs <| \cmd ->
@@ -25,7 +29,7 @@ tests =
                 expectParseSuccess testCmd testArgs <| \cmd ->
                     Expect.equal 
                         { debug = True
-                        , output = Path.fromPosixString "out"
+                        , output = Just <| Path.fromPosixString "out"
                         }
                         cmd.flags
             , test "Leaving out a toggle flag means it's false" <| \{} -> 
