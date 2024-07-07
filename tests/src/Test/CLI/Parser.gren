@@ -25,7 +25,8 @@ tests =
                         cmd.args
             , test "Fails if passed arg fails the parser" <| \{} ->
                 Parser.run testCmdOneArg [ "make", "src/Main" ]
-                    |> Expect.equal (Err Parser.BadArguments)
+                    |> Expect.equal
+                        (Err <| Parser.BadArguments <| Parser.ArgumentParserInvalidArgument)
             , describe "No args"
                 [ test "Valid example parses to empty list when no args are passed" <| \{} ->
                     expectParseSuccess testCmd [ "make" ] <| \cmd ->
@@ -35,7 +36,12 @@ tests =
                         Expect.equal [] cmd.args
                 , test "Passing args when expecting none" <| \{} ->
                     Parser.run { testCmd | arguments = Parser.noArgs [] } testArgs
-                        |> Expect.equal (Err Parser.BadArguments)
+                        |> Expect.equal
+                            (Err <| Parser.BadArguments <| Parser.ArgumentParserWrongArity 
+                                { expected = 0
+                                , actual = 1
+                                }
+                            )
                 ]
             , describe "One arg" 
                 [ test "Passing one arg when one is expected" <| \{} ->
@@ -43,10 +49,20 @@ tests =
                         Expect.equal ( Path.fromPosixString "src/Main.gren" ) cmd.args
                 , test "Passing no args when one is expected" <| \{} ->
                     Parser.run testCmdOneArg [ "make" ]
-                        |> Expect.equal (Err Parser.BadArguments)
+                        |> Expect.equal
+                            (Err <| Parser.BadArguments <| Parser.ArgumentParserWrongArity 
+                                { expected = 1
+                                , actual = 0
+                                }
+                            )
                 , test "Passing multiple args when one is expected" <| \{} ->
                     Parser.run testCmdOneArg [ "make", "src/Main.gren", "Example.gren" ]
-                        |> Expect.equal (Err Parser.BadArguments)
+                        |> Expect.equal 
+                            (Err <| Parser.BadArguments <| Parser.ArgumentParserWrongArity 
+                                { expected = 1
+                                , actual = 2
+                                }
+                            )
                 ]
             , describe "Zero or more args" 
                 [ test "Multiple args" <| \{} ->
@@ -74,13 +90,13 @@ tests =
                     Expect.equal False cmd.flags.debug
             , test "Passing a toggle flag that is defined as value flag fails" <| \{} ->
                 Parser.run testCmd [ "make", "--output" ]
-                    |> Expect.equal (Err Parser.BadFlags)
+                    |> Expect.equal (Err <| Parser.BadFlags Parser.FlagParserMissingValue)
             , test "Passing a value flag without a set value fails" <| \{} ->
                 Parser.run testCmd [ "make", "--output=" ]
-                    |> Expect.equal (Err Parser.BadFlags)
+                    |> Expect.equal (Err <| Parser.BadFlags Parser.FlagParserMissingValue)
             , test "Passing a value flag where a toggle was expected fails" <| \{} ->
                 Parser.run testCmd [ "make", "--debug=true" ]
-                    |> Expect.equal (Err Parser.BadFlags)
+                    |> Expect.equal (Err <| Parser.BadFlags Parser.FlagParserFoundValueOnToggle)
             ]
         ] 
 
@@ -112,7 +128,7 @@ testCmd =
                 , output = output
                 }
             )
-            |> Parser.onOff "debug" "debug desc"
+            |> Parser.toggle "debug" "debug desc"
             |> Parser.flag "output" Parser.pathParser "output path"
     , commonDescription =
         Just "make your project"
@@ -138,7 +154,7 @@ testCmdOneArg =
                 , output = output
                 }
             )
-            |> Parser.onOff "debug" "debug desc"
+            |> Parser.toggle "debug" "debug desc"
             |> Parser.flag "output" Parser.pathParser "output path"
     , commonDescription =
         Just "make your project"

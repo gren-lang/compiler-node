@@ -3,15 +3,17 @@ module CLI.Parser exposing
     , CommandParseError(..)
     , run
     --
-    , ArgParser
+    , ArgumentParser
+    , ArgumentParserError(..)
     , noArgs
     , oneArg
     , zeroOrMoreArgs
     --
     , FlagParser
+    , FlagParserError(..)
     , noFlags
     , initFlags
-    , onOff
+    , toggle
     , flag
     --
     , pathParser
@@ -28,7 +30,7 @@ import FileSystem.Path as Path exposing (Path)
 
 type alias Command args flags result =
     { word : String
-    , arguments : ArgParser args
+    , arguments : ArgumentParser args
     , flags : FlagParser flags
     , commonDescription : Maybe String
     , summary : String
@@ -40,8 +42,8 @@ type alias Command args flags result =
 type CommandParseError
     = NoCommandGiven
     | WrongCommand
-    | BadFlags
-    | BadArguments
+    | BadFlags FlagParserError
+    | BadArguments ArgumentParserError
 
 
 run : Command args flags result -> Array String -> Result CommandParseError result
@@ -57,7 +59,7 @@ run spec tokens =
 
             else
                 let
-                    (ArgParser parseArgs) =
+                    (ArgumentParser parseArgs) =
                         spec.arguments
                     
                     (FlagParser _ parseFlags) =
@@ -68,14 +70,14 @@ run spec tokens =
                     , flagResult = parseFlags (buildFlagDict flags)
                     }
                 of
-                    { argResult = Ok argValue, flagResult = FlagParsingOk flagValues } ->
+                    { argResult = Ok argValue, flagResult = Ok flagValues } ->
                         Ok <| spec.builder argValue flagValues
                     
-                    { argResult = Err _ } ->
-                        Err BadArguments
+                    { argResult = Err err } ->
+                        Err <| BadArguments err
                     
-                    { flagResult = FlagParsingErr } ->
-                        Err BadFlags
+                    { flagResult = Err err } ->
+                        Err <| BadFlags err
 
         Nothing ->
             Err NoCommandGiven
@@ -109,126 +111,134 @@ buildFlagDict flags =
 -- ARGS
 
 
-type ArgParser val
-    = ArgParser (Array String -> Result {} val)
+type ArgumentParser val
+    = ArgumentParser (Array String -> Result ArgumentParserError val)
 
 
-noArgs : val -> ArgParser val
+type ArgumentParserError
+    = ArgumentParserWrongArity { expected : Int, actual : Int }
+    | ArgumentParserInvalidArgument
+
+
+noArgs : val -> ArgumentParser val
 noArgs value =
-    ArgParser <| \args ->
+    ArgumentParser <| \args ->
         if Array.length args /= 0 then
-            Err {}
+            Err <| ArgumentParserWrongArity { expected = 0, actual = (Array.length args) }
 
         else
             Ok value
 
-oneArg : (String -> Result {} val) -> ArgParser val
+
+oneArg : (String -> Maybe val) -> ArgumentParser val
 oneArg builder =
-    ArgParser <| \args ->
+    ArgumentParser <| \args ->
         case args of
             [ arg ] ->
                 builder arg
+                    |> Maybe.map Ok
+                    |> Maybe.withDefault (Err ArgumentParserInvalidArgument)
 
             _ ->
-                Err {}
+                Err <| ArgumentParserWrongArity { expected = 1, actual = Array.length args }
 
-zeroOrMoreArgs : (String -> Result {} val) -> ArgParser (Array val)
+
+zeroOrMoreArgs : (String -> Maybe val) -> ArgumentParser (Array val)
 zeroOrMoreArgs builder =
-    ArgParser <| \args ->
+    ArgumentParser <| \args ->
         let
             parsedArgs =
-                Array.map builder args
-
-            successfulArgs =
-                Array.filterMap Result.toMaybe parsedArgs
+                Array.filterMap builder args
         in
-        if Array.length successfulArgs /= Array.length parsedArgs then
-            Err {}
+        if Array.length args /= Array.length parsedArgs then
+            Err ArgumentParserInvalidArgument
 
         else
-            Ok successfulArgs
+            Ok parsedArgs
 
 
 -- FLAGS
 
 
 type FlagParser val
-    = FlagParser (Dict String String) (Dict String String -> FlagParsingStep val)
+    = FlagParser (Dict String String) (Dict String String -> Result FlagParserError val)
 
 
-type FlagParsingStep val
-    = FlagParsingOk val
-    | FlagParsingErr
+type FlagParserError
+    = FlagParserFoundValueOnToggle
+    | FlagParserMissingValue
+    | FlagParserInvalidValue
 
 
 noFlags : FlagParser {}
 noFlags =
-    FlagParser Dict.empty (\_ -> FlagParsingOk {})
+    FlagParser Dict.empty (\_ -> Ok {})
 
 
 initFlags : a -> FlagParser a
-initFlags builder =
-    FlagParser Dict.empty (\_ -> FlagParsingOk builder)
+initFlags value =
+    FlagParser Dict.empty (\_ -> Ok value)
 
 
-onOff : String -> String -> FlagParser (Bool -> b) -> FlagParser b
-onOff key desc (FlagParser knownFlags previousSteps) =
+toggle : String -> String -> FlagParser (Bool -> b) -> FlagParser b
+toggle key desc (FlagParser knownFlags previousSteps) =
     FlagParser (Dict.set key desc knownFlags) <| \opts ->
         case previousSteps opts of
-            FlagParsingOk next ->
+            Ok next ->
                 case Dict.get key opts of
                     Just "" ->
-                        FlagParsingOk (next True)
+                        Ok (next True)
 
                     Just _ ->
-                        FlagParsingErr
+                        Err FlagParserFoundValueOnToggle
 
                     Nothing ->
-                        FlagParsingOk (next False)
+                        Ok (next False)
 
-            FlagParsingErr ->
-                FlagParsingErr
+            Err err ->
+                Err err
 
-flag : String -> (String -> Result {} a) -> String -> FlagParser (Maybe a -> b) -> FlagParser b
+flag : String -> (String -> Maybe a) -> String -> FlagParser (Maybe a -> b) -> FlagParser b
 flag key valueParser desc (FlagParser knownFlags previousSteps) =
     FlagParser (Dict.set key desc knownFlags) <| \opts ->
         case previousSteps opts of
-            FlagParsingOk next ->
+            Ok next ->
                 case Dict.get key opts of
                     Just "" ->
-                        FlagParsingErr
+                        Err FlagParserMissingValue
                     
                     Just value ->
                         case valueParser value of
-                            Ok parsedValue ->
-                                FlagParsingOk (next <| Just parsedValue)
+                            Just parsedValue ->
+                                Ok (next <| Just parsedValue)
 
-                            Err _ ->
-                                FlagParsingErr
+                            Nothing ->
+                                Err FlagParserInvalidValue
 
                     Nothing ->
-                        FlagParsingOk (next Nothing)
+                        Ok (next Nothing)
 
-            FlagParsingErr ->
-                FlagParsingErr
+            Err err ->
+                Err err
 
 
 -- PARSERS
 
 
-pathParser : String -> Result {} Path
+pathParser : String -> Maybe Path
 pathParser input =
-    Ok <| Path.fromPosixString input
+    Just <| Path.fromPosixString input
         
 
 
-grenFileParser : String -> Result {} Path
+grenFileParser : String -> Maybe Path
 grenFileParser input =
     pathParser input
-        |> Result.andThen
+        |> Maybe.andThen
             (\path ->
                 if path.extension /= "gren" then
-                    Err {}
+                    Nothing
+                
                 else
-                    Ok path
+                    Just path
             )
