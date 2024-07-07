@@ -1,7 +1,12 @@
 module CLI.Parser exposing 
-    ( Command
-    , CommandParseError(..)
+    ( Group
+    , GroupParser
+    , defineGroup
+    , withCommand
     , run
+    --
+    , Command
+    , CommandParseError(..)
     --
     , ArgumentParser
     , ArgumentParserError(..)
@@ -25,59 +30,58 @@ import Dict exposing (Dict)
 import FileSystem.Path as Path exposing (Path)
 
 
--- COMMAND
+-- COMMAND GROUP (?)
 
 
-type alias Command args flags result =
-    { word : String
-    , arguments : ArgumentParser args
-    , flags : FlagParser flags
-    , commonDescription : Maybe String
-    , summary : String
-    , example : String
-    , builder : args -> flags -> result
-    }
+type Group result
+    = Group 
+        { name : Maybe String
+        , commands : GroupParser result
+        }
 
 
-type CommandParseError
-    = NoCommandGiven
-    | WrongCommand
-    | BadFlags FlagParserError
-    | BadArguments ArgumentParserError
+type GroupParser result
+    = GroupParser (String -> Array String -> Dict String String -> Result CommandParseError result)
 
 
-run : Command args flags result -> Array String -> Result CommandParseError result
-run spec tokens =
+defineGroup : Group result
+defineGroup =
+    Group
+        { name = Nothing
+        , commands = GroupParser <| \name _args _flags ->
+            Err <| UnknownCommand name
+        }
+
+
+withCommand : Command args flags result -> Group result -> Group result
+withCommand command (Group group) =
+    let
+        (GroupParser next) =
+            group.commands
+    in
+    Group 
+        { group | commands =
+            GroupParser <| \name args flags ->
+                if name /= command.word then
+                    next name args flags
+        
+                else
+                    runCommand args flags command
+        }
+
+
+run : Array String -> Group result -> Result CommandParseError result
+run tokens (Group group) =
     let
         { trues = flags, falses = arguments } =
             Array.partition (\word -> String.startsWith "--" word) tokens
+
+        (GroupParser parse) =
+            group.commands
     in
     case Array.popFirst arguments of
         Just { first = command, rest = args } ->
-            if command /= spec.word then
-                Err WrongCommand
-
-            else
-                let
-                    (ArgumentParser parseArgs) =
-                        spec.arguments
-                    
-                    (FlagParser _ parseFlags) =
-                        spec.flags
-                in
-                case 
-                    { argResult = parseArgs args
-                    , flagResult = parseFlags (buildFlagDict flags)
-                    }
-                of
-                    { argResult = Ok argValue, flagResult = Ok flagValues } ->
-                        Ok <| spec.builder argValue flagValues
-                    
-                    { argResult = Err err } ->
-                        Err <| BadArguments err
-                    
-                    { flagResult = Err err } ->
-                        Err <| BadFlags err
+            parse command args (buildFlagDict flags)
 
         Nothing ->
             Err NoCommandGiven
@@ -106,6 +110,51 @@ buildFlagDict flags =
         )
         Dict.empty
         flags
+
+
+-- COMMAND
+
+
+type alias Command args flags result =
+    { word : String
+    , arguments : ArgumentParser args
+    , flags : FlagParser flags
+    , commonDescription : Maybe String
+    , summary : String
+    , example : String
+    , builder : args -> flags -> result
+    }
+
+
+type CommandParseError
+    = NoCommandGiven
+    | UnknownCommand String
+    | BadFlags FlagParserError
+    | BadArguments ArgumentParserError
+
+
+runCommand : Array String -> Dict String String -> Command args flags result -> Result CommandParseError result
+runCommand args flags spec =
+    let
+        (ArgumentParser parseArgs) =
+            spec.arguments
+    
+        (FlagParser _ parseFlags) =
+            spec.flags
+    in
+    case 
+        { argResult = parseArgs args
+        , flagResult = parseFlags flags
+        }
+    of
+        { argResult = Ok argValue, flagResult = Ok flagValues } ->
+            Ok <| spec.builder argValue flagValues
+    
+        { argResult = Err err } ->
+            Err <| BadArguments err
+    
+        { flagResult = Err err } ->
+            Err <| BadFlags err
 
 
 -- ARGS
