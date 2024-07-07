@@ -170,17 +170,20 @@ initFlags builder =
     FlagParser Dict.empty (\_ -> FlagParsingOk builder)
 
 
-onOff : String -> String -> FlagParser ({} -> b) -> FlagParser b
+onOff : String -> String -> FlagParser (Bool -> b) -> FlagParser b
 onOff key desc (FlagParser knownFlags previousSteps) =
     FlagParser (Dict.set key desc knownFlags) <| \opts ->
         case previousSteps opts of
             FlagParsingOk next ->
                 case Dict.get key opts of
-                    Just val ->
-                        FlagParsingOk (next {})
+                    Just "" ->
+                        FlagParsingOk (next True)
+
+                    Just _ ->
+                        FlagParsingErr
 
                     Nothing ->
-                        FlagParsingErr
+                        FlagParsingOk (next False)
 
             FlagParsingErr ->
                 FlagParsingErr

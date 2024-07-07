@@ -12,8 +12,26 @@ tests : Test
 tests =
     describe "CLI Parser"
         [ test "Parses successfully" <| \{} -> 
-            expectParseSuccess testCmd testArgs <| \cmd ->
-                Expect.equal (Path.fromPosixString "out") cmd.flags.output
+            Expect.ok <| Parser.run testCmd testArgs
+        , describe "Args"
+            [ test "Args in valid example is parsed correctly" <| \{} ->
+                expectParseSuccess testCmd testArgs <| \cmd ->
+                    Expect.equal
+                        [ Path.fromPosixString "src/Main.gren" ]
+                        cmd.args
+            ]
+        , describe "Flags"
+            [ test "Flags in valid example are parsed correctly" <| \{} -> 
+                expectParseSuccess testCmd testArgs <| \cmd ->
+                    Expect.equal 
+                        { debug = True
+                        , output = Path.fromPosixString "out"
+                        }
+                        cmd.flags
+            , test "Leaving out a toggle flag means it's false" <| \{} -> 
+                expectParseSuccess testCmd (Array.filter (\f -> f /= "--debug") testArgs) <| \cmd ->
+                    Expect.equal False cmd.flags.debug
+            ]
         ] 
 
 
