@@ -23,6 +23,40 @@ tests =
                     Expect.equal
                         [ Path.fromPosixString "src/Main.gren" ]
                         cmd.args
+            , test "Fails if passed arg fails the parser" <| \{} ->
+                Parser.run testCmdOneArg [ "make", "src/Main" ]
+                    |> Expect.equal (Err Parser.BadArguments)
+            , describe "No args"
+                [ test "Valid example parses to empty list when no args are passed" <| \{} ->
+                    expectParseSuccess testCmd [ "make" ] <| \cmd ->
+                        Expect.equal [] cmd.args
+                , test "Passing no args when expecting none" <| \{} ->
+                    expectParseSuccess { testCmd | arguments = Parser.noArgs [] } [ "make" ] <| \cmd ->
+                        Expect.equal [] cmd.args
+                , test "Passing args when expecting none" <| \{} ->
+                    Parser.run { testCmd | arguments = Parser.noArgs [] } testArgs
+                        |> Expect.equal (Err Parser.BadArguments)
+                ]
+            , describe "One arg" 
+                [ test "Passing one arg when one is expected" <| \{} ->
+                    expectParseSuccess testCmdOneArg testArgs <| \cmd ->
+                        Expect.equal ( Path.fromPosixString "src/Main.gren" ) cmd.args
+                , test "Passing no args when one is expected" <| \{} ->
+                    Parser.run testCmdOneArg [ "make" ]
+                        |> Expect.equal (Err Parser.BadArguments)
+                , test "Passing multiple args when one is expected" <| \{} ->
+                    Parser.run testCmdOneArg [ "make", "src/Main.gren", "Example.gren" ]
+                        |> Expect.equal (Err Parser.BadArguments)
+                ]
+            , describe "Zero or more args" 
+                [ test "Multiple args" <| \{} ->
+                    expectParseSuccess testCmd [ "make", "src/Main.gren", "src/Logic.gren" ] <| \cmd ->
+                        Expect.equal
+                            [ Path.fromPosixString "src/Main.gren"
+                            , Path.fromPosixString "src/Logic.gren"
+                            ]
+                            cmd.args
+                ]
             ]
         , describe "Flags"
             [ test "Flags in valid example are parsed correctly" <| \{} -> 
@@ -32,9 +66,21 @@ tests =
                         , output = Just <| Path.fromPosixString "out"
                         }
                         cmd.flags
+            , test "Leaving out a flag means it's Nothing" <| \{} ->
+                expectParseSuccess testCmd [ "make" ] <| \cmd ->
+                    Expect.equal Nothing cmd.flags.output
             , test "Leaving out a toggle flag means it's false" <| \{} -> 
                 expectParseSuccess testCmd (Array.filter (\f -> f /= "--debug") testArgs) <| \cmd ->
                     Expect.equal False cmd.flags.debug
+            , test "Passing a toggle flag that is defined as value flag fails" <| \{} ->
+                Parser.run testCmd [ "make", "--output" ]
+                    |> Expect.equal (Err Parser.BadFlags)
+            , test "Passing a value flag without a set value fails" <| \{} ->
+                Parser.run testCmd [ "make", "--output=" ]
+                    |> Expect.equal (Err Parser.BadFlags)
+            , test "Passing a value flag where a toggle was expected fails" <| \{} ->
+                Parser.run testCmd [ "make", "--debug=true" ]
+                    |> Expect.equal (Err Parser.BadFlags)
             ]
         ] 
 
@@ -59,6 +105,32 @@ testCmd =
         "make"
     , arguments =
         Parser.zeroOrMoreArgs Parser.grenFileParser
+    , flags =
+        Parser.initFlags 
+            (\debug output ->
+                { debug = debug
+                , output = output
+                }
+            )
+            |> Parser.onOff "debug" "debug desc"
+            |> Parser.flag "output" Parser.pathParser "output path"
+    , commonDescription =
+        Just "make your project"
+    , summary =
+        "Makey make make"
+    , example = "gren make src/Main.gren"
+    , builder =
+        \args flags ->
+            { args = args
+            , flags = flags
+            }
+    }
+
+testCmdOneArg =
+    { word =
+        "make"
+    , arguments =
+        Parser.oneArg Parser.grenFileParser
     , flags =
         Parser.initFlags 
             (\debug output ->

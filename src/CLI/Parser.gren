@@ -1,5 +1,6 @@
 module CLI.Parser exposing 
     ( Command
+    , CommandParseError(..)
     , run
     --
     , ArgParser
@@ -36,14 +37,14 @@ type alias Command args flags result =
     }
 
 
-type CommandError
+type CommandParseError
     = NoCommandGiven
     | WrongCommand
     | BadFlags
     | BadArguments
 
 
-run : Command args flags result -> Array String -> Result CommandError result
+run : Command args flags result -> Array String -> Result CommandParseError result
 run spec tokens =
     let
         { trues = flags, falses = arguments } =
@@ -194,6 +195,9 @@ flag key valueParser desc (FlagParser knownFlags previousSteps) =
         case previousSteps opts of
             FlagParsingOk next ->
                 case Dict.get key opts of
+                    Just "" ->
+                        FlagParsingErr
+                    
                     Just value ->
                         case valueParser value of
                             Ok parsedValue ->
