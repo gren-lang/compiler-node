@@ -1,0 +1,55 @@
+module Test.CLI.PrettyPrinter exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import CLI.PrettyPrinter as PP
+
+
+tests : Test
+tests =
+    describe "PrettyPrinter"
+        [ test "empty returns the empty string" <| \{} -> 
+            PP.empty
+                |> PP.print
+                |> Expect.equal ""
+        , test "text returns the provided text" <| \{} ->
+            PP.text "Hello, world!"
+                |> PP.print
+                |> Expect.equal "Hello, world!"
+        , test "colorized returns provided text with ansi escape sequence" <| \{} ->
+            PP.text "My green output"
+                |> PP.green
+                |> PP.print
+                |> Expect.equal "\u{001b}[32mMy green output\u{001b}[39m"
+        , test "indent adds leading whitespace" <| \{} ->
+            PP.text "My indented text"
+                |> PP.indent
+                |> PP.print
+                |> Expect.equal "    My indented text"
+        , test "blocks joins things together" <| \{} ->
+            PP.block
+                [ PP.text "First part"
+                , PP.text "Second part"
+                    |> PP.indent
+                , PP.text "Third part"
+                    |> PP.indent
+                ]
+                |> PP.print
+                |> Expect.equal "First part    Second part    Third part"
+        , test "blocks joins things together by newlines" <| \{} ->
+            PP.verticalBlock
+                [ PP.text "First part"
+                , PP.text "Second part"
+                    |> PP.indent
+                , PP.text "Third part"
+                    |> PP.indent
+                ]
+                |> PP.print
+                |> Expect.equal
+                    """
+                    First part
+                        Second part
+                        Third part
+                    """
+        ]
+        

@@ -1,0 +1,120 @@
+module CLI.PrettyPrinter exposing
+    ( Document
+    --
+    , empty
+    , text
+    , indent
+    , block
+    , verticalBlock
+    --
+    , Color
+    , plain
+    , green
+    --
+    , print
+    )
+
+
+type Document
+    = Empty
+    | Text String
+    | Colorized { color : Color, document : Document }
+    | Indented Document
+    | Block (Array Document)
+    | VerticalBlock (Array Document)
+
+
+empty : Document
+empty =
+    Empty
+
+
+text : String -> Document
+text str =
+    Text str
+
+
+indent : Document -> Document
+indent doc =
+    Indented doc
+
+
+block : Array Document -> Document
+block docs =
+    Block docs
+
+
+verticalBlock : Array Document -> Document
+verticalBlock docs =
+    VerticalBlock docs
+
+
+-- COLORS
+
+
+type Color
+    = Default
+    | Green
+
+
+plain : Document -> Document
+plain doc =
+    Colorized
+        { color = Default
+        , document = doc
+        }
+
+green : Document -> Document
+green doc =
+    Colorized
+        { color = Green
+        , document = doc
+        }
+
+
+ansiColorCode : Color -> String
+ansiColorCode color =
+    case color of
+        Default -> "39"
+        Green -> "32"
+
+
+ansiColorEscapePrefix : String
+ansiColorEscapePrefix =
+    "\u{001b}["
+
+
+-- RUN
+
+
+print : Document -> String
+print doc =
+    case doc of
+        Empty ->
+            ""
+            
+        Text str ->
+            str
+        
+        Colorized { color, document } ->
+            Block
+                [ Text <| ansiColorEscapePrefix ++ ansiColorCode color ++ "m"
+                , document
+                , Text <| ansiColorEscapePrefix ++ "39m"
+                ]
+            |> print
+        
+        Indented document ->
+            Block
+                [ Text "    "
+                , document
+                ]
+            |> print
+        
+        Block docs ->
+            Array.map print docs
+                |> String.join ""
+        
+        VerticalBlock docs ->
+            Array.map print docs
+                |> String.join "\n"

@@ -3,6 +3,7 @@ module Main exposing (main)
 import Test
 import Test.Runner.Node as TestRunner
 import Test.CLI.Parser as CLIParser
+import Test.CLI.PrettyPrinter as PrettyPrinter
 import Node exposing (Program)
 
 
@@ -11,4 +12,5 @@ main =
     TestRunner.run <|
         Test.describe "Gren Compiler Node tests"
             [ CLIParser.tests
+            , PrettyPrinter.tests
             ]
