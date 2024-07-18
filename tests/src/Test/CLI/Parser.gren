@@ -3,6 +3,7 @@ module Test.CLI.Parser exposing (tests)
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
 import CLI.Parser as Parser
+import CLI.PrettyPrinter as PP
 import FileSystem.Path as Path
 
 
@@ -145,7 +146,8 @@ testCmd =
         Just "make your project"
     , summary =
         "Makey make make"
-    , example = "gren make src/Main.gren"
+    , example = 
+        PP.text "gren make src/Main.gren"
     , builder =
         \args flags ->
             { args = args
@@ -171,7 +173,8 @@ testCmdOneArg =
         Just "make your project"
     , summary =
         "Makey make make"
-    , example = "gren make src/Main.gren"
+    , example =
+        PP.text "gren make src/Main.gren"
     , builder =
         \args flags ->
             { args = args

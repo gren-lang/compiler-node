@@ -28,6 +28,7 @@ module CLI.Parser exposing
 
 import Dict exposing (Dict)
 import FileSystem.Path as Path exposing (Path)
+import CLI.PrettyPrinter as PP
 
 
 -- COMMAND GROUP (?)
@@ -121,7 +122,7 @@ type alias Command args flags result =
     , flags : FlagParser flags
     , commonDescription : Maybe String
     , summary : String
-    , example : String
+    , example : PP.Document
     , builder : args -> flags -> result
     }
 
