@@ -13,15 +13,17 @@ tests : Test
 tests =
     describe "CLI Parser"
         [ test "Parses successfully" <| \{} -> 
-            Expect.ok <| runCommand testCmd testArgs
+            expectParseSuccess testCmd testArgs <| \_ ->
+                Expect.pass
         , test "This particular test case even succeeds without args or flags" <| \{} ->
-            Expect.ok <| runCommand testCmd ["make"]
+            expectParseSuccess testCmd ["make"] <| \_ ->
+                Expect.pass
         , test "The command name is required" <| \{} ->
             runCommand testCmd []
-                |> Expect.equal (Err Parser.NoCommandGiven)
+                |> Expect.equal (Parser.NoCommandGiven)
         , test "The command name must match" <| \{} ->
             runCommand testCmd ["macbeth"]
-                |> Expect.equal (Err <| Parser.UnknownCommand "macbeth")
+                |> Expect.equal (Parser.UnknownCommand "macbeth")
         , describe "Args"
             [ test "Args in valid example is parsed correctly" <| \{} ->
                 expectParseSuccess testCmd testArgs <| \cmd ->
@@ -31,7 +33,7 @@ tests =
             , test "Fails if passed arg fails the parser" <| \{} ->
                 runCommand testCmdOneArg [ "make", "src/Main" ]
                     |> Expect.equal
-                        (Err <| Parser.BadArguments <| Parser.ArgumentParserInvalidArgument)
+                        (Parser.BadArguments <| Parser.ArgumentParserInvalidArgument)
             , describe "No args"
                 [ test "Valid example parses to empty list when no args are passed" <| \{} ->
                     expectParseSuccess testCmd [ "make" ] <| \cmd ->
@@ -42,7 +44,7 @@ tests =
                 , test "Passing args when expecting none" <| \{} ->
                     runCommand { testCmd | arguments = Parser.noArgs [] } testArgs
                         |> Expect.equal
-                            (Err <| Parser.BadArguments <| Parser.ArgumentParserWrongArity 
+                            (Parser.BadArguments <| Parser.ArgumentParserWrongArity 
                                 { expected = 0
                                 , actual = 1
                                 }
@@ -55,7 +57,7 @@ tests =
                 , test "Passing no args when one is expected" <| \{} ->
                     runCommand testCmdOneArg [ "make" ]
                         |> Expect.equal
-                            (Err <| Parser.BadArguments <| Parser.ArgumentParserWrongArity 
+                            (Parser.BadArguments <| Parser.ArgumentParserWrongArity 
                                 { expected = 1
                                 , actual = 0
                                 }
@@ -63,7 +65,7 @@ tests =
                 , test "Passing multiple args when one is expected" <| \{} ->
                     runCommand testCmdOneArg [ "make", "src/Main.gren", "Example.gren" ]
                         |> Expect.equal 
-                            (Err <| Parser.BadArguments <| Parser.ArgumentParserWrongArity 
+                            (Parser.BadArguments <| Parser.ArgumentParserWrongArity 
                                 { expected = 1
                                 , actual = 2
                                 }
@@ -95,18 +97,35 @@ tests =
                     Expect.equal False cmd.flags.debug
             , test "Passing a toggle flag that is defined as value flag fails" <| \{} ->
                 runCommand testCmd [ "make", "--output" ]
-                    |> Expect.equal (Err <| Parser.BadFlags Parser.FlagParserMissingValue)
+                    |> Expect.equal (Parser.BadFlags Parser.FlagParserMissingValue)
             , test "Passing a value flag without a set value fails" <| \{} ->
                 runCommand testCmd [ "make", "--output=" ]
-                    |> Expect.equal (Err <| Parser.BadFlags Parser.FlagParserMissingValue)
+                    |> Expect.equal (Parser.BadFlags Parser.FlagParserMissingValue)
             , test "Passing a value flag where a toggle was expected fails" <| \{} ->
                 runCommand testCmd [ "make", "--debug=true" ]
-                    |> Expect.equal (Err <| Parser.BadFlags Parser.FlagParserFoundValueOnToggle)
+                    |> Expect.equal (Parser.BadFlags Parser.FlagParserFoundValueOnToggle)
+            , test "Passing a flag that isn't recognized will return the appropriate error" <| \{} ->
+                runCommand testCmd [ "make", "--hiya" ]
+                    |> Expect.equal (Parser.BadFlags <| Parser.FlagParserUnknownFlag "hiya")
+            , test "Passing --help will always output help text" <| \{} ->
+                case runCommand testCmd [ "make", "--help" ] of
+                    Parser.HelpText _ ->
+                        Expect.pass
+
+                    _ ->
+                        Expect.fail "Expected help text"
+            , test "Passing --help will output help text, even in the presence of other flags" <| \{} ->
+                case runCommand testCmd [ "make", "--debug", "--help" ] of
+                    Parser.HelpText _ ->
+                        Expect.pass
+
+                    _ ->
+                        Expect.fail "Expected help text"
             ]
         ] 
 
 
-runCommand : Parser.Command args flags result -> Array String -> Result Parser.CommandParseError result
+runCommand : Parser.Command args flags result -> Array String -> Parser.CommandParseResult result
 runCommand cmd args =
     Parser.defineGroup
         |> Parser.withCommand cmd
@@ -116,11 +135,11 @@ runCommand cmd args =
 expectParseSuccess : Parser.Command args flags result -> Array String -> (result -> Expectation) -> Expectation
 expectParseSuccess cmd args next =
     case runCommand cmd args of
-        Err _ ->
-            Expect.fail "Failed to parse"
-
-        Ok result ->
+        Parser.Success result ->
             next result
+        
+        _ ->
+            Expect.fail "Failed to parse"
 
 
 testArgs : Array String

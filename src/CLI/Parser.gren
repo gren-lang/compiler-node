@@ -6,7 +6,7 @@ module CLI.Parser exposing
     , run
     --
     , Command
-    , CommandParseError(..)
+    , CommandParseResult(..)
     --
     , ArgumentParser
     , ArgumentParserError(..)
@@ -42,7 +42,7 @@ type Group result
 
 
 type GroupParser result
-    = GroupParser (String -> Array String -> Dict String String -> Result CommandParseError result)
+    = GroupParser (String -> Array String -> Dict String String -> CommandParseResult result)
 
 
 defineGroup : Group result
@@ -50,7 +50,7 @@ defineGroup =
     Group
         { name = Nothing
         , commands = GroupParser <| \name _args _flags ->
-            Err <| UnknownCommand name
+            UnknownCommand name
         }
 
 
@@ -71,7 +71,7 @@ withCommand command (Group group) =
         }
 
 
-run : Array String -> Group result -> Result CommandParseError result
+run : Array String -> Group result -> CommandParseResult result
 run tokens (Group group) =
     let
         { trues = flags, falses = arguments } =
@@ -85,7 +85,7 @@ run tokens (Group group) =
             parse command args (buildFlagDict flags)
 
         Nothing ->
-            Err NoCommandGiven
+            NoCommandGiven
 
 
 buildFlagDict : Array String -> Dict String String
@@ -127,14 +127,16 @@ type alias Command args flags result =
     }
 
 
-type CommandParseError
+type CommandParseResult a
     = NoCommandGiven
     | UnknownCommand String
     | BadFlags FlagParserError
     | BadArguments ArgumentParserError
+    | HelpText PP.Document
+    | Success a
 
 
-runCommand : Array String -> Dict String String -> Command args flags result -> Result CommandParseError result
+runCommand : Array String -> Dict String String -> Command args flags result -> CommandParseResult result
 runCommand args flags spec =
     let
         (ArgumentParser parseArgs) =
@@ -149,13 +151,19 @@ runCommand args flags spec =
         }
     of
         { argResult = Ok argValue, flagResult = Ok flagValues } ->
-            Ok <| spec.builder argValue flagValues
+            Success <| spec.builder argValue flagValues
     
         { argResult = Err err } ->
-            Err <| BadArguments err
+            BadArguments err
     
         { flagResult = Err err } ->
-            Err <| BadFlags err
+            case err of
+                FlagParserUnknownFlag "help" ->
+                    -- TODO
+                    HelpText PP.empty
+
+                _ ->
+                    BadFlags err
 
 
 -- ARGS
@@ -218,22 +226,29 @@ type FlagParserError
     = FlagParserFoundValueOnToggle
     | FlagParserMissingValue
     | FlagParserInvalidValue
+    | FlagParserUnknownFlag String
 
 
 noFlags : FlagParser {}
 noFlags =
-    FlagParser Dict.empty (\_ -> Ok {})
+    initFlags {}
 
 
 initFlags : a -> FlagParser a
 initFlags value =
-    FlagParser Dict.empty (\_ -> Ok value)
+    FlagParser Dict.empty <| \remainingFlags -> 
+        case Dict.first remainingFlags of
+            Just unparsedFlag ->
+                Err <| FlagParserUnknownFlag unparsedFlag.key
+
+            Nothing ->
+                Ok value
 
 
 toggle : String -> String -> FlagParser (Bool -> b) -> FlagParser b
 toggle key desc (FlagParser knownFlags previousSteps) =
     FlagParser (Dict.set key desc knownFlags) <| \opts ->
-        case previousSteps opts of
+        case previousSteps (Dict.remove key opts) of
             Ok next ->
                 case Dict.get key opts of
                     Just "" ->
@@ -251,7 +266,7 @@ toggle key desc (FlagParser knownFlags previousSteps) =
 flag : String -> (String -> Maybe a) -> String -> FlagParser (Maybe a -> b) -> FlagParser b
 flag key valueParser desc (FlagParser knownFlags previousSteps) =
     FlagParser (Dict.set key desc knownFlags) <| \opts ->
-        case previousSteps opts of
+        case previousSteps (Dict.remove key opts) of
             Ok next ->
                 case Dict.get key opts of
                     Just "" ->
