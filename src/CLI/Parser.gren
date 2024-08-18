@@ -1,8 +1,11 @@
 module CLI.Parser exposing 
-    ( Group
+    ( App
+    , app
+    --
     , GroupParser
     , defineGroup
     , withCommand
+    , withPrefix
     , run
     --
     , Command
@@ -34,58 +37,75 @@ import CLI.PrettyPrinter as PP
 -- COMMAND GROUP (?)
 
 
-type Group result
-    = Group 
-        { name : Maybe String
+type App result
+    = App 
+        { version : String
+        , intro : PP.Document
+        , outro : PP.Document
         , commands : GroupParser result
         }
+
+
+app : { version : String, intro : PP.Document, outro : PP.Document, commands : GroupParser result } -> App result
+app =
+    App
 
 
 type GroupParser result
     = GroupParser (String -> Array String -> Dict String String -> CommandParseResult result)
 
 
-defineGroup : Group result
+defineGroup : GroupParser result
 defineGroup =
-    Group
-        { name = Nothing
-        , commands = GroupParser <| \name _args _flags ->
-            UnknownCommand name
-        }
+    GroupParser <| \name _args _flags ->
+        UnknownCommand name
 
 
-withCommand : Command args flags result -> Group result -> Group result
-withCommand command (Group group) =
+withCommand : Command args flags result -> GroupParser result -> GroupParser result
+withCommand command (GroupParser next) =
+    GroupParser <| \name args flags ->
+        if name /= command.word then
+            next name args flags
+
+        else
+            runCommand args flags command
+
+
+withPrefix : String -> GroupParser result -> GroupParser result -> GroupParser result
+withPrefix prefix prefixedCommands (GroupParser nextCommand) =
+    GroupParser <| \name args flags ->
+        if name /= prefix then
+            nextCommand name args flags
+
+        else
+            runPrefix args flags prefixedCommands
+
+
+run : Array String -> App result -> CommandParseResult result
+run tokens (App appDef) =
     let
-        (GroupParser next) =
-            group.commands
-    in
-    Group 
-        { group | commands =
-            GroupParser <| \name args flags ->
-                if name /= command.word then
-                    next name args flags
+        (GroupParser parse) =
+            appDef.commands
         
-                else
-                    runCommand args flags command
-        }
-
-
-run : Array String -> Group result -> CommandParseResult result
-run tokens (Group group) =
-    let
         { trues = flags, falses = arguments } =
             Array.partition (\word -> String.startsWith "--" word) tokens
-
-        (GroupParser parse) =
-            group.commands
     in
     case Array.popFirst arguments of
         Just { first = command, rest = args } ->
             parse command args (buildFlagDict flags)
 
         Nothing ->
-            NoCommandGiven
+            HelpText PP.empty
+
+
+runPrefix : Array String -> Dict String String -> GroupParser result -> CommandParseResult result
+runPrefix arguments flags (GroupParser parse) =
+    case Array.popFirst arguments of
+        Just { first = command, rest = args } ->
+            parse command args flags
+
+        Nothing ->
+            HelpText PP.empty
 
 
 buildFlagDict : Array String -> Dict String String
@@ -128,8 +148,7 @@ type alias Command args flags result =
 
 
 type CommandParseResult a
-    = NoCommandGiven
-    | UnknownCommand String
+    = UnknownCommand String
     | BadFlags FlagParserError
     | BadArguments ArgumentParserError
     | HelpText PP.Document

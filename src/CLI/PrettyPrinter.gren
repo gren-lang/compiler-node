@@ -9,9 +9,16 @@ module CLI.PrettyPrinter exposing
     --
     , Color
     , plain
+    , black
+    , red
     , green
+    , yellow
+    , blue
+    , magenta
+    , cyan
+    , white
     --
-    , print
+    , toString
     )
 
 
@@ -54,7 +61,14 @@ verticalBlock docs =
 
 type Color
     = Default
+    | Black
+    | Red
     | Green
+    | Yellow 
+    | Blue
+    | Magenta
+    | Cyan
+    | White
 
 
 plain : Document -> Document
@@ -64,6 +78,23 @@ plain doc =
         , document = doc
         }
 
+
+black : Document -> Document
+black doc =
+    Colorized
+        { color = Black
+        , document = doc
+        }
+
+
+red : Document -> Document
+red doc =
+    Colorized
+        { color = Red
+        , document = doc
+        }
+
+
 green : Document -> Document
 green doc =
     Colorized
@@ -72,11 +103,58 @@ green doc =
         }
 
 
+yellow : Document -> Document
+yellow doc =
+    Colorized
+        { color = Yellow
+        , document = doc
+        }
+
+
+blue : Document -> Document
+blue doc =
+    Colorized
+        { color = Blue
+        , document = doc
+        }
+
+
+magenta : Document -> Document
+magenta doc =
+    Colorized
+        { color = Magenta
+        , document = doc
+        }
+
+
+cyan : Document -> Document
+cyan doc =
+    Colorized
+        { color = Cyan
+        , document = doc
+        }
+
+
+white : Document -> Document
+white doc =
+    Colorized
+        { color = White
+        , document = doc
+        }
+
+
 ansiColorCode : Color -> String
 ansiColorCode color =
     case color of
         Default -> "39"
+        Black -> "30"
+        Red -> "31"
         Green -> "32"
+        Yellow -> "33"
+        Blue -> "34"
+        Magenta -> "35"
+        Cyan -> "36"
+        White -> "37"
 
 
 ansiColorEscapePrefix : String
@@ -87,8 +165,8 @@ ansiColorEscapePrefix =
 -- RUN
 
 
-print : Document -> String
-print doc =
+toString : Document -> String
+toString doc =
     case doc of
         Empty ->
             ""
@@ -102,19 +180,19 @@ print doc =
                 , document
                 , Text <| ansiColorEscapePrefix ++ "39m"
                 ]
-            |> print
+            |> toString
         
         Indented document ->
             Block
                 [ Text "    "
                 , document
                 ]
-            |> print
+            |> toString
         
         Block docs ->
-            Array.map print docs
+            Array.map toString docs
                 |> String.join ""
         
         VerticalBlock docs ->
-            Array.map print docs
+            Array.map toString docs
                 |> String.join "\n"
