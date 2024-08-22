@@ -18,9 +18,34 @@ tests =
         , test "This particular test case even succeeds without args or flags" <| \{} ->
             expectParseSuccess testCmd ["make"] <| \_ ->
                 Expect.pass
-        , test "The command name is required" <| \{} ->
-            runCommand testCmd []
-                |> Expect.equal (Parser.NoCommandGiven)
+        , test "Passing --version returns the app version" <| \{} ->
+            runCommand testCmd ["--version"]
+                |> Expect.equal (Parser.HelpText <| PP.text testApp.version)
+        , test "Passing --help prints help text" <| \{} ->
+            let
+                result =
+                    runCommand testCmd ["--help"]
+            in
+            case result of
+                Parser.HelpText prettyText ->
+                    let
+                        plainText =
+                            PP.toString prettyText
+                    in
+                    Expect.all
+                        [ \{} -> Expect.equal True (String.contains (PP.toString testApp.intro) plainText)
+                        , \{} -> Expect.equal True (String.contains testCmd.word plainText)
+                        , \{} -> Expect.equal True (String.contains (PP.toString testApp.outro) plainText)
+                        ]
+                        {}
+
+                _ ->
+                    Expect.fail "--help didn't print help text"
+
+        , test "If you don't pass a command, the help text is printed" <| \{} ->
+            Expect.equal
+                (runCommand testCmd [])
+                (runCommand testCmd ["--help"])
         , test "The command name must match" <| \{} ->
             runCommand testCmd ["macbeth"]
                 |> Expect.equal (Parser.UnknownCommand "macbeth")
@@ -125,11 +150,26 @@ tests =
         ] 
 
 
+testApp =
+    { name = "my-program"
+    , version = "1.1.0"
+    , intro = PP.text "intro"
+    , outro = PP.text "outro"
+    , commands = Parser.defineGroup
+    }
+
+
 runCommand : Parser.Command args flags result -> Array String -> Parser.CommandParseResult result
 runCommand cmd args =
-    Parser.defineGroup
-        |> Parser.withCommand cmd
-        |> Parser.run args
+    let
+        parser =
+            { testApp
+                | commands =
+                    Parser.defineGroup
+                        |> Parser.withCommand cmd
+            }
+    in
+    Parser.run args parser
 
 
 expectParseSuccess : Parser.Command args flags result -> Array String -> (result -> Expectation) -> Expectation

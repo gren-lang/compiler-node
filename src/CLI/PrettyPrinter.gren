@@ -147,7 +147,7 @@ ansiColorCode : Color -> String
 ansiColorCode color =
     case color of
         Default -> "39"
-        Black -> "30"
+        Black -> "90"
         Red -> "31"
         Green -> "32"
         Yellow -> "33"

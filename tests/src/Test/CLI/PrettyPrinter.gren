@@ -10,21 +10,21 @@ tests =
     describe "PrettyPrinter"
         [ test "empty returns the empty string" <| \{} -> 
             PP.empty
-                |> PP.print
+                |> PP.toString
                 |> Expect.equal ""
         , test "text returns the provided text" <| \{} ->
             PP.text "Hello, world!"
-                |> PP.print
+                |> PP.toString
                 |> Expect.equal "Hello, world!"
         , test "colorized returns provided text with ansi escape sequence" <| \{} ->
             PP.text "My green output"
                 |> PP.green
-                |> PP.print
+                |> PP.toString
                 |> Expect.equal "\u{001b}[32mMy green output\u{001b}[39m"
         , test "indent adds leading whitespace" <| \{} ->
             PP.text "My indented text"
                 |> PP.indent
-                |> PP.print
+                |> PP.toString
                 |> Expect.equal "    My indented text"
         , test "blocks joins things together" <| \{} ->
             PP.block
@@ -34,7 +34,7 @@ tests =
                 , PP.text "Third part"
                     |> PP.indent
                 ]
-                |> PP.print
+                |> PP.toString
                 |> Expect.equal "First part    Second part    Third part"
         , test "blocks joins things together by newlines" <| \{} ->
             PP.verticalBlock
@@ -44,7 +44,7 @@ tests =
                 , PP.text "Third part"
                     |> PP.indent
                 ]
-                |> PP.print
+                |> PP.toString
                 |> Expect.equal
                     """
                     First part

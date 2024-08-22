@@ -1,6 +1,5 @@
 module CLI.Parser exposing 
     ( App
-    , app
     --
     , GroupParser
     , defineGroup
@@ -34,36 +33,30 @@ import FileSystem.Path as Path exposing (Path)
 import CLI.PrettyPrinter as PP
 
 
--- COMMAND GROUP (?)
-
-
-type App result
-    = App 
-        { version : String
-        , intro : PP.Document
-        , outro : PP.Document
-        , commands : GroupParser result
-        }
-
-
-app : { version : String, intro : PP.Document, outro : PP.Document, commands : GroupParser result } -> App result
-app =
-    App
+type alias App result =
+    { name : String
+    , version : String
+    , intro : PP.Document
+    , outro : PP.Document
+    , commands : GroupParser result
+    }
 
 
 type GroupParser result
-    = GroupParser (String -> Array String -> Dict String String -> CommandParseResult result)
+    = GroupParser 
+        (Dict String (Maybe String))
+        (String -> Array String -> Dict String String -> CommandParseResult result)
 
 
 defineGroup : GroupParser result
 defineGroup =
-    GroupParser <| \name _args _flags ->
+    GroupParser Dict.empty <| \name _args _flags ->
         UnknownCommand name
 
 
 withCommand : Command args flags result -> GroupParser result -> GroupParser result
-withCommand command (GroupParser next) =
-    GroupParser <| \name args flags ->
+withCommand command (GroupParser knownCommands next) =
+    GroupParser (Dict.set command.word command.commonDescription knownCommands) <| \name args flags ->
         if name /= command.word then
             next name args flags
 
@@ -72,8 +65,8 @@ withCommand command (GroupParser next) =
 
 
 withPrefix : String -> GroupParser result -> GroupParser result -> GroupParser result
-withPrefix prefix prefixedCommands (GroupParser nextCommand) =
-    GroupParser <| \name args flags ->
+withPrefix prefix prefixedCommands (GroupParser knownCommands nextCommand) =
+    GroupParser (Dict.set prefix Nothing knownCommands) <| \name args flags ->
         if name /= prefix then
             nextCommand name args flags
 
@@ -82,24 +75,97 @@ withPrefix prefix prefixedCommands (GroupParser nextCommand) =
 
 
 run : Array String -> App result -> CommandParseResult result
-run tokens (App appDef) =
+run tokens appDef =
     let
-        (GroupParser parse) =
+        (GroupParser _ parse) =
             appDef.commands
         
         { trues = flags, falses = arguments } =
             Array.partition (\word -> String.startsWith "--" word) tokens
     in
-    case Array.popFirst arguments of
-        Just { first = command, rest = args } ->
-            parse command args (buildFlagDict flags)
+    case flags of
+        [ "--version" ] ->
+            HelpText <| PP.text appDef.version
+        
+        _ ->
+            case Array.popFirst arguments of
+                Just { first = command, rest = args } ->
+                    parse command args (buildFlagDict flags)
 
-        Nothing ->
-            HelpText PP.empty
+                Nothing ->
+                    HelpText <| appHelpText appDef
+
+
+appHelpText : App result -> PP.Document
+appHelpText appDef =
+    let
+        (GroupParser knownCommands _) =
+            appDef.commands
+        
+        commonCommands =
+            knownCommands
+                |> Dict.filterMap (\_name commonDescription -> commonDescription)
+
+        knownCommandsDocument =
+            PP.verticalBlock
+                [ knownCommands
+                    |> Dict.keys
+                    |> Array.map (\command -> PP.text <| appDef.name ++ " " ++ command)
+                    |> PP.verticalBlock
+                    |> PP.indent
+                    |> PP.cyan
+                , PP.empty
+                , PP.block
+                    [ PP.text "Adding the "
+                    , PP.green <| PP.text "--help"
+                    , PP.text " flag gives you more details about a specific command."
+                    ]
+                ]
+
+        commandBlock =
+            if Dict.isEmpty commonCommands then
+                PP.verticalBlock
+                    [ PP.text "In order to do something useful, you need to give me a command. Here's a full list:"
+                    , PP.empty
+                    , knownCommandsDocument
+                    ]
+            else
+                PP.verticalBlock
+                    [ PP.text "The most common commands are:"
+                    , PP.empty
+                    , commonCommands
+                        |> Dict.foldl
+                            (\name description acc ->
+                                Array.pushLast
+                                    (PP.verticalBlock
+                                        [ PP.cyan <| PP.text (appDef.name ++ " " ++ name)
+                                        , PP.indent <|
+                                            PP.text description
+                                        ]
+                                    )
+                                    acc
+                            )
+                            []
+                        |> PP.verticalBlock
+                        |> PP.indent
+                    , PP.empty
+                    , PP.text "There are a bunch of other commands as well though. Here is a full list:"
+                    , PP.empty
+                    , knownCommandsDocument
+                    ]
+    in
+    PP.verticalBlock
+        [ appDef.intro
+        , PP.empty
+        , commandBlock
+        , PP.empty
+        , appDef.outro
+        , PP.empty
+        ]
 
 
 runPrefix : Array String -> Dict String String -> GroupParser result -> CommandParseResult result
-runPrefix arguments flags (GroupParser parse) =
+runPrefix arguments flags (GroupParser _ parse) =
     case Array.popFirst arguments of
         Just { first = command, rest = args } ->
             parse command args flags
