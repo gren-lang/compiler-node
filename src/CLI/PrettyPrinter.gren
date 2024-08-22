@@ -183,11 +183,26 @@ toString doc =
             |> toString
         
         Indented document ->
-            Block
-                [ Text "    "
-                , document
-                ]
-            |> toString
+            let
+                indentStr =
+                    String.repeat 4 " "
+            in
+            case document of
+                Empty ->
+                    toString Empty
+
+                VerticalBlock docs ->
+                    docs
+                        |> Array.map (\line -> Block [ Text indentStr, line ])
+                        |> VerticalBlock
+                        |> toString
+
+                _ ->
+                    Block
+                        [ Text indentStr
+                        , document
+                        ]
+                        |> toString
         
         Block docs ->
             Array.map toString docs
@@ -196,3 +211,4 @@ toString doc =
         VerticalBlock docs ->
             Array.map toString docs
                 |> String.join "\n"
+
