@@ -9,9 +9,9 @@
         "CLI.Parser",
         "CLI.PrettyPrinter"
     ],
-    "gren-version": "0.4.4 <= v < 0.5.0",
+    "gren-version": "0.4.0 <= v < 0.5.0",
     "dependencies": {
-        "gren-lang/core": "5.0.1 <= v < 6.0.0",
-        "gren-lang/node": "4.1.1 <= v < 5.0.0"
+        "gren-lang/core": "5.1.0 <= v < 6.0.0",
+        "gren-lang/node": "4.2.0 <= v < 5.0.0"
     }
 }
