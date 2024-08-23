@@ -30,13 +30,30 @@ tests =
             PP.block
                 [ PP.text "First part"
                 , PP.text "Second part"
+                , PP.text "Third part"
+                ]
+                |> PP.toString
+                |> Expect.equal "First partSecond partThird part"
+        , test "blocks joins things together into a single line, indents do nothing" <| \{} ->
+            PP.block
+                [ PP.text "First part"
+                , PP.text "Second part"
                     |> PP.indent
                 , PP.text "Third part"
                     |> PP.indent
                 ]
                 |> PP.toString
-                |> Expect.equal "First part    Second part    Third part"
-        , test "blocks joins things together by newlines" <| \{} ->
+                |> Expect.equal "First partSecond partThird part"
+        , test "except for the first line" <| \{} ->
+            PP.block
+                [ PP.text "First part"
+                    |> PP.indent
+                , PP.text "Second part"
+                , PP.text "Third part"
+                ]
+                |> PP.toString
+                |> Expect.equal "    First partSecond partThird part"
+        , test "vertical blocks joins things together by newlines" <| \{} ->
             PP.verticalBlock
                 [ PP.text "First part"
                 , PP.text "Second part"
@@ -68,5 +85,50 @@ tests =
                         Second part
                             Third part
                     """
+        , test "nested indents work correctly through nested blocks" <| \{} ->
+            PP.verticalBlock
+                [ PP.text "First part"
+                , PP.indent <|
+                    PP.verticalBlock
+                        [ PP.verticalBlock
+                            [ PP.text "Second part"
+                            , PP.indent <|
+                                PP.text "Third part"
+                            ]
+                        ]
+                ]
+                |> PP.toString
+                |> Expect.equal
+                    """
+                    First part
+                        Second part
+                            Third part
+                    """
+        , test "nested indents work correctly through regular blocks" <| \{} ->
+            PP.verticalBlock
+                [ PP.text "First part"
+                , PP.indent <|
+                    PP.verticalBlock
+                        [ PP.block
+                            [ PP.text "Second part"
+                            , PP.text "Third part"
+                            ]
+                        ]
+                ]
+                |> PP.toString
+                |> Expect.equal
+                    """
+                    First part
+                        Second partThird part
+                    """
+        , test "indents work correctly through colorized block" <| \{} ->
+            PP.verticalBlock
+                [ PP.text "First part"
+                ]
+                |> PP.indent
+                |> PP.cyan
+                |> PP.toString
+                |> Expect.equal
+                    "\u{001b}[36m    First part\u{001b}[39m"
         ]
         
