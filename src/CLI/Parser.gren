@@ -113,11 +113,11 @@ appHelpText appDef =
                     |> Array.map (\command -> PP.text <| appDef.name ++ " " ++ command)
                     |> PP.verticalBlock
                     |> PP.indent
-                    |> PP.cyan
+                    |> PP.intenseColor PP.Cyan
                 , PP.empty
                 , PP.block
                     [ PP.text "Adding the "
-                    , PP.green <| PP.text "--help"
+                    , PP.color PP.Green <| PP.text "--help"
                     , PP.text " flag gives you more details about a specific command."
                     ]
                 ]
@@ -138,7 +138,7 @@ appHelpText appDef =
                             (\name description acc ->
                                 Array.pushLast
                                     (PP.verticalBlock
-                                        [ PP.cyan <| PP.text (appDef.name ++ " " ++ name)
+                                        [ PP.color PP.Cyan <| PP.text (appDef.name ++ " " ++ name)
                                         , PP.indent <|
                                             PP.text description
                                         ]

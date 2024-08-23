@@ -18,9 +18,14 @@ tests =
                 |> Expect.equal "Hello, world!"
         , test "colorized returns provided text with ansi escape sequence" <| \{} ->
             PP.text "My green output"
-                |> PP.green
+                |> PP.color PP.Green
                 |> PP.toString
                 |> Expect.equal "\u{001b}[32mMy green output\u{001b}[39m"
+        , test "intenseColor returns provided text with ansi escape sequence" <| \{} ->
+            PP.text "My very green output"
+                |> PP.intenseColor PP.Green
+                |> PP.toString
+                |> Expect.equal "\u{001b}[92mMy very green output\u{001b}[39m"
         , test "indent adds leading whitespace" <| \{} ->
             PP.text "My indented text"
                 |> PP.indent
@@ -126,7 +131,7 @@ tests =
                 [ PP.text "First part"
                 ]
                 |> PP.indent
-                |> PP.cyan
+                |> PP.color PP.Cyan
                 |> PP.toString
                 |> Expect.equal
                     "\u{001b}[36m    First part\u{001b}[39m"

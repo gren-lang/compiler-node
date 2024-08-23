@@ -7,16 +7,9 @@ module CLI.PrettyPrinter exposing
     , block
     , verticalBlock
     --
-    , Color
-    , plain
-    , black
-    , red
-    , green
-    , yellow
-    , blue
-    , magenta
-    , cyan
-    , white
+    , Color(..)
+    , color
+    , intenseColor
     --
     , toString
     )
@@ -25,7 +18,7 @@ module CLI.PrettyPrinter exposing
 type Document
     = Empty
     | Text String
-    | Colorized { color : Color, document : Document }
+    | Colorized { color : Color, intense : Bool, document : Document }
     | Indented Document
     | Block (Array Document)
     | VerticalBlock (Array Document)
@@ -60,8 +53,7 @@ verticalBlock docs =
 
 
 type Color
-    = Default
-    | Black
+    = Black
     | Red
     | Green
     | Yellow 
@@ -71,90 +63,46 @@ type Color
     | White
 
 
-plain : Document -> Document
-plain doc =
+color : Color -> Document -> Document
+color clr doc =
     Colorized
-        { color = Default
+        { color = clr
+        , intense = False
         , document = doc
         }
 
 
-black : Document -> Document
-black doc =
+intenseColor : Color -> Document -> Document
+intenseColor clr doc =
     Colorized
-        { color = Black
+        { color = clr
+        , intense = True
         , document = doc
         }
 
 
-red : Document -> Document
-red doc =
-    Colorized
-        { color = Red
-        , document = doc
-        }
+ansiColorCode : Color -> Bool -> String
+ansiColorCode clr intense =
+    let
+        baseValue =
+            case clr of
+                Black -> 30
+                Red -> 31
+                Green -> 32
+                Yellow -> 33
+                Blue -> 34
+                Magenta -> 35
+                Cyan -> 36
+                White -> 37
 
+        appliedIntensity =
+            if intense then
+                baseValue + 60
 
-green : Document -> Document
-green doc =
-    Colorized
-        { color = Green
-        , document = doc
-        }
-
-
-yellow : Document -> Document
-yellow doc =
-    Colorized
-        { color = Yellow
-        , document = doc
-        }
-
-
-blue : Document -> Document
-blue doc =
-    Colorized
-        { color = Blue
-        , document = doc
-        }
-
-
-magenta : Document -> Document
-magenta doc =
-    Colorized
-        { color = Magenta
-        , document = doc
-        }
-
-
-cyan : Document -> Document
-cyan doc =
-    Colorized
-        { color = Cyan
-        , document = doc
-        }
-
-
-white : Document -> Document
-white doc =
-    Colorized
-        { color = White
-        , document = doc
-        }
-
-
-ansiColorCode : Color -> String
-ansiColorCode color =
-    case color of
-        Default -> "39"
-        Black -> "90"
-        Red -> "31"
-        Green -> "32"
-        Yellow -> "33"
-        Blue -> "34"
-        Magenta -> "35"
-        Cyan -> "36"
-        White -> "37"
+            else
+                baseValue
+    in
+    String.fromInt appliedIntensity
 
 
 ansiColorEscapePrefix : String
@@ -182,9 +130,9 @@ toStringHelper indentPrefix nextIndent doc =
         Text str ->
             indentPrefix ++ str
         
-        Colorized { color, document } ->
+        Colorized { color = clr, intense, document } ->
             String.join "" <|
-                [ ansiColorEscapePrefix ++ ansiColorCode color ++ "m"
+                [ ansiColorEscapePrefix ++ ansiColorCode clr intense ++ "m"
                 , toStringHelper indentPrefix nextIndent document
                 , ansiColorEscapePrefix ++ "39m"
                 ]
