@@ -26,6 +26,22 @@ tests =
                 |> PP.intenseColor PP.Green
                 |> PP.toString
                 |> Expect.equal "\u{001b}[92mMy very green output\u{001b}[39m"
+        , test "Colors can be stripped" <| \{} ->
+            PP.verticalBlock
+                [ PP.text "one"
+                , PP.color PP.Green <| PP.text "two"
+                , PP.text "three"
+                ]
+                |> PP.stripColor
+                |> PP.toString
+                |> Expect.equal
+                    ( PP.verticalBlock
+                        [ PP.text "one"
+                        , PP.text "two"
+                        , PP.text "three"
+                        ]
+                        |> PP.toString
+                    )
         , test "indent adds leading whitespace" <| \{} ->
             PP.text "My indented text"
                 |> PP.indent

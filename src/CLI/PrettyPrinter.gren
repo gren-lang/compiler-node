@@ -10,6 +10,7 @@ module CLI.PrettyPrinter exposing
     , Color(..)
     , color
     , intenseColor
+    , stripColor
     --
     , toString
     )
@@ -79,6 +80,28 @@ intenseColor clr doc =
         , intense = True
         , document = doc
         }
+
+
+stripColor : Document -> Document
+stripColor doc =
+    case doc of
+        Empty ->
+            doc
+            
+        Text _ ->
+            doc
+        
+        Colorized { document = colorizedDocument } ->
+            colorizedDocument
+        
+        Indented document ->
+            Indented <| stripColor document
+        
+        Block docs ->
+            Block <| Array.map stripColor docs
+                
+        VerticalBlock docs ->
+            VerticalBlock <| Array.map stripColor docs
 
 
 ansiColorCode : Color -> Bool -> String
