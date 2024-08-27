@@ -64,10 +64,10 @@ tests =
                     expectParseSuccess testCmd [ "make" ] <| \cmd ->
                         Expect.equal [] cmd.args
                 , test "Passing no args when expecting none" <| \{} ->
-                    expectParseSuccess { testCmd | arguments = Parser.noArgs [] } [ "make" ] <| \cmd ->
-                        Expect.equal [] cmd.args
+                    expectParseSuccess testCmdNoArgs [ "make" ] <| \cmd ->
+                        Expect.equal {} cmd.args
                 , test "Passing args when expecting none" <| \{} ->
-                    runCommand { testCmd | arguments = Parser.noArgs [] } testArgs
+                    runCommand testCmdNoArgs testArgs
                         |> Expect.equal
                             (Parser.BadArguments <| Parser.ArgumentParserWrongArity 
                                 { expected = 0
@@ -192,6 +192,33 @@ testCmd =
         "make"
     , arguments =
         Parser.zeroOrMoreArgs Parser.grenFileParser
+    , flags =
+        Parser.initFlags 
+            (\debug output ->
+                { debug = debug
+                , output = output
+                }
+            )
+            |> Parser.toggle "debug" "debug desc"
+            |> Parser.flag "output" Parser.pathParser "output path"
+    , commonDescription =
+        Just "make your project"
+    , summary =
+        "Makey make make"
+    , example = 
+        PP.text "gren make src/Main.gren"
+    , builder =
+        \args flags ->
+            { args = args
+            , flags = flags
+            }
+    }
+
+testCmdNoArgs =
+    { word =
+        "make"
+    , arguments =
+        Parser.noArgs
     , flags =
         Parser.initFlags 
             (\debug output ->

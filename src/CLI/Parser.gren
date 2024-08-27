@@ -263,14 +263,14 @@ type ArgumentParserError
     | ArgumentParserInvalidArgument
 
 
-noArgs : val -> ArgumentParser val
-noArgs value =
+noArgs : ArgumentParser {}
+noArgs =
     ArgumentParser <| \args ->
         if Array.length args /= 0 then
             Err <| ArgumentParserWrongArity { expected = 0, actual = (Array.length args) }
 
         else
-            Ok value
+            Ok {}
 
 
 oneArg : (String -> Maybe val) -> ArgumentParser val
