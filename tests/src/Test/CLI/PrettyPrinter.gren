@@ -3,6 +3,7 @@ module Test.CLI.PrettyPrinter exposing (tests)
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
 import CLI.PrettyPrinter as PP
+import Math
 
 
 tests : Test
@@ -17,6 +18,12 @@ tests =
                 PP.text "Hello, world!"
                     |> PP.toString
                     |> Expect.equal "Hello, world!"
+            , test "text can be split by setting a max column" <| \{} ->
+                PP.text "Hello, world!"
+                    |> PP.toStringWithOptions
+                        { PP.defaultOptions | maxColumns = 5
+                        }
+                    |> Expect.equal "Hello\n, wor\nld!"
             ]
         , describe "color"
             [ test "colorized returns provided text with ansi escape sequence" <| \{} ->
@@ -96,6 +103,14 @@ tests =
                     |> PP.indent
                     |> PP.toString
                     |> Expect.equal "    My indented text"
+            , test "it's possible to adjust the number of spaces in an indentation" <| \{} ->
+                PP.text "My indented text"
+                    |> PP.indent
+                    |> PP.toStringWithOptions
+                        { maxColumns = Math.maxSafeInteger
+                        , indentationSize = 2
+                        }
+                    |> Expect.equal "  My indented text"
             , test "indents can be nested" <| \{} ->
                 PP.verticalBlock
                     [ PP.text "First part"
