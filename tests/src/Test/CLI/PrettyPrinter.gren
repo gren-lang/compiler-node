@@ -29,9 +29,17 @@ tests =
             , test "text can be split by setting a max column" <| \{} ->
                 PP.text "Hello, world!"
                     |> PP.toStringWithOptions
-                        { PP.defaultOptions | maxColumns = 5
-                        }
+                        { PP.defaultOptions | maxColumns = 5 }
                     |> Expect.equal "Hello\n, wor\nld!"
+            , test "words ignores spaces and newlines" <| \{} ->
+                PP.words "My      fancy\n words"
+                    |> PP.toString
+                    |> Expect.equal "My fancy words"
+            , test "setting a max column splits at word boundaries" <| \{} ->
+                PP.words "My fancy words"
+                    |> PP.toStringWithOptions
+                        { PP.defaultOptions | maxColumns = 5 }
+                    |> Expect.equal "My\nfancy\nwords"
             ]
         , describe "color"
             [ test "colorized returns provided text with ansi escape sequence" <| \{} ->

@@ -3,6 +3,7 @@ module CLI.PrettyPrinter exposing
     --
     , empty
     , text
+    , words
     , indent
     , block
     , verticalBlock
@@ -25,6 +26,7 @@ import Math
 type Document
     = Empty
     | Text String
+    | Words (Array String)
     | Colorized { color : Color, intense : Bool, document : Document }
     | Indented Document
     | Block (Array Document)
@@ -42,6 +44,11 @@ text str =
         |> String.replace "\r" ""
         |> String.replace "\n" " "
         |> Text
+
+
+words : String -> Document
+words str =
+    Words <| String.words str
 
 
 indent : Document -> Document
@@ -98,6 +105,9 @@ stripColor doc =
             doc
             
         Text _ ->
+            doc
+
+        Words _ ->
             doc
         
         Colorized { document = colorizedDocument } ->
@@ -193,6 +203,15 @@ toStringHelper indentPrefix nextIndent maxColumns newlineSeparator doc =
 
             else
                 indentedText
+
+        Words parts ->
+            let
+                wordSplitter =
+                    Array.foldl (addToWordSplitter maxColumns) emptyWordSplitter parts
+            in
+            Array.pushLast wordSplitter.currentLine wordSplitter.lines
+                |> Array.map (\line -> String.join " " line)
+                |> String.join newlineSeparator
         
         Colorized { color = clr, intense, document } ->
             String.join "" <|
@@ -237,3 +256,39 @@ splitByLengthHelper size str acc =
             rest = String.dropLeft size str
         in
         splitByLengthHelper size rest (Array.pushLast first acc)
+
+
+type alias WordSplitter =
+    { currentLine : Array String
+    , lines : Array (Array String)
+    }
+
+
+emptyWordSplitter : WordSplitter
+emptyWordSplitter =
+    { currentLine = []
+    , lines = []
+    }
+
+
+addToWordSplitter : Int -> String -> WordSplitter -> WordSplitter
+addToWordSplitter maxWidth str { currentLine, lines } =
+    if currentLine == [] then
+        { currentLine = [ str ]
+        , lines = lines
+        }
+    else
+        let
+            currentWidth =
+                String.join " " currentLine
+                    |> String.length
+        in
+        if String.length str + currentWidth > maxWidth then
+            addToWordSplitter maxWidth str
+                { currentLine = []
+                , lines = Array.pushLast currentLine lines
+                }
+        else
+            { currentLine = Array.pushLast str currentLine
+            , lines = lines
+            }
