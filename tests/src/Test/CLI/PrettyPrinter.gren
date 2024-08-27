@@ -18,6 +18,14 @@ tests =
                 PP.text "Hello, world!"
                     |> PP.toString
                     |> Expect.equal "Hello, world!"
+            , test "text replaces newlines with space, use vertical block for placing text on lines" <| \{} ->
+                PP.text "Hello\nworld!"
+                    |> PP.toString
+                    |> Expect.equal "Hello world!"
+            , test "text also replaces windows-style newlines" <| \{} ->
+                PP.text "Hello\r\nworld!"
+                    |> PP.toString
+                    |> Expect.equal "Hello world!"
             , test "text can be split by setting a max column" <| \{} ->
                 PP.text "Hello, world!"
                     |> PP.toStringWithOptions

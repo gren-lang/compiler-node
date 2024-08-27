@@ -38,7 +38,10 @@ empty =
 
 text : String -> Document
 text str =
-    Text str
+    str
+        |> String.replace "\r" ""
+        |> String.replace "\n" " "
+        |> Text
 
 
 indent : Document -> Document
