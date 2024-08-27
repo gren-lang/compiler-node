@@ -147,16 +147,13 @@ ansiColorEscapePrefix =
 
 toString : Document -> String
 toString doc =
-    toStringWithOptions
-        { maxColumns = Math.maxSafeInteger
-        , indentationSize = 4
-        }
-        doc
+    toStringWithOptions defaultOptions doc
 
 
 type alias ToStringOptions =
     { maxColumns : Int
     , indentationSize : Int
+    , newlineSeparator : String
     }
 
 
@@ -164,20 +161,22 @@ defaultOptions : ToStringOptions
 defaultOptions =
     { maxColumns = Math.maxSafeInteger
     , indentationSize = 4
+    , newlineSeparator = "\n"
     }
 
 
 toStringWithOptions : ToStringOptions -> Document -> String
-toStringWithOptions { maxColumns, indentationSize } doc =
+toStringWithOptions { maxColumns, indentationSize, newlineSeparator } doc =
     toStringHelper 
         "" 
         (\currentIndent -> String.repeat indentationSize " " ++ currentIndent) 
         maxColumns
+        newlineSeparator
         doc
 
 
-toStringHelper : String -> (String -> String) -> Int -> Document -> String
-toStringHelper indentPrefix nextIndent maxColumns doc =
+toStringHelper : String -> (String -> String) -> Int -> String -> Document -> String
+toStringHelper indentPrefix nextIndent maxColumns newlineSeparator doc =
     case doc of
         Empty ->
             ""
@@ -190,7 +189,7 @@ toStringHelper indentPrefix nextIndent maxColumns doc =
             if String.length indentedText > maxColumns then
                 indentedText
                     |> splitByLength maxColumns
-                    |> String.join "\n"
+                    |> String.join newlineSeparator
 
             else
                 indentedText
@@ -198,12 +197,12 @@ toStringHelper indentPrefix nextIndent maxColumns doc =
         Colorized { color = clr, intense, document } ->
             String.join "" <|
                 [ ansiColorEscapePrefix ++ ansiColorCode clr intense ++ "m"
-                , toStringHelper indentPrefix nextIndent maxColumns document
+                , toStringHelper indentPrefix nextIndent maxColumns newlineSeparator document
                 , ansiColorEscapePrefix ++ "39m"
                 ]
         
         Indented document ->
-            toStringHelper (nextIndent indentPrefix) nextIndent maxColumns document
+            toStringHelper (nextIndent indentPrefix) nextIndent maxColumns newlineSeparator document
         
         Block docs ->
             case Array.popFirst docs of
@@ -212,14 +211,14 @@ toStringHelper indentPrefix nextIndent maxColumns doc =
 
                 Just { first, rest } ->
                     Array.pushFirst 
-                        (toStringHelper indentPrefix nextIndent maxColumns first)
-                        (Array.map (toStringHelper "" identity maxColumns) rest)
+                        (toStringHelper indentPrefix nextIndent maxColumns newlineSeparator first)
+                        (Array.map (toStringHelper "" identity maxColumns newlineSeparator) rest)
                         |> String.join ""
         
         VerticalBlock docs ->
             docs
-                |> Array.map (toStringHelper indentPrefix nextIndent maxColumns)
-                |> String.join "\n"
+                |> Array.map (toStringHelper indentPrefix nextIndent maxColumns newlineSeparator)
+                |> String.join newlineSeparator
 
 
 splitByLength : Int -> String -> Array String
