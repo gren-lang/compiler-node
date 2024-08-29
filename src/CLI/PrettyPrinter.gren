@@ -206,11 +206,14 @@ toStringHelper indentPrefix nextIndent maxColumns newlineSeparator doc =
 
         Words parts ->
             let
+                maxColumnsAfterIndent = 
+                    maxColumns - String.length indentPrefix
+                
                 wordSplitter =
-                    Array.foldl (addToWordSplitter maxColumns) emptyWordSplitter parts
+                    Array.foldl (addToWordSplitter maxColumnsAfterIndent) emptyWordSplitter parts
             in
             Array.pushLast wordSplitter.currentLine wordSplitter.lines
-                |> Array.map (\line -> String.join " " line)
+                |> Array.map (\line -> indentPrefix ++ String.join " " line)
                 |> String.join newlineSeparator
         
         Colorized { color = clr, intense, document } ->

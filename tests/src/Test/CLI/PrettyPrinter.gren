@@ -137,6 +137,12 @@ tests =
                     |> PP.toStringWithOptions
                         { PP.defaultOptions | indentationSize = 2 }
                     |> Expect.equal "  My indented text"
+            , test "indents work with words" <| \{} ->
+                PP.words "my lengthy description with words"
+                    |> PP.indent
+                    |> PP.toStringWithOptions
+                        { PP.defaultOptions | maxColumns = 15}
+                    |> Expect.equal "    my lengthy\n    description\n    with words"
             , test "indents can be nested" <| \{} ->
                 PP.verticalBlock
                     [ PP.text "First part"
