@@ -125,13 +125,13 @@ appHelpText appDef =
         commandBlock =
             if Dict.isEmpty commonCommands then
                 PP.verticalBlock
-                    [ PP.text "In order to do something useful, you need to give me a command. Here's a full list:"
+                    [ PP.words "In order to do something useful, you need to give me a command. Here's a full list:"
                     , PP.empty
                     , knownCommandsDocument
                     ]
             else
                 PP.verticalBlock
-                    [ PP.text "The most common commands are:"
+                    [ PP.words "The most common commands are:"
                     , PP.empty
                     , commonCommands
                         |> Dict.foldl
@@ -140,7 +140,8 @@ appHelpText appDef =
                                     (PP.verticalBlock
                                         [ PP.intenseColor PP.Cyan <| PP.text (appDef.name ++ " " ++ name)
                                         , PP.indent <|
-                                            PP.text description
+                                            PP.words description
+                                        , PP.empty
                                         ]
                                     )
                                     acc
@@ -148,8 +149,7 @@ appHelpText appDef =
                             []
                         |> PP.verticalBlock
                         |> PP.indent
-                    , PP.empty
-                    , PP.text "There are a bunch of other commands as well though. Here is a full list:"
+                    , PP.words "There are a bunch of other commands as well though. Here is a full list:"
                     , PP.empty
                     , knownCommandsDocument
                     ]
