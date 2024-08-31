@@ -10,6 +10,8 @@ module CLI.Parser exposing
     , Command
     , CommandParseResult(..)
     --
+    , ValueParser
+    --
     , ArgumentParser
     , ArgumentParserError(..)
     , noArgs
@@ -45,33 +47,33 @@ type alias App result =
 type GroupParser result
     = GroupParser 
         (Dict String (Maybe String))
-        (String -> Array String -> Dict String String -> CommandParseResult result)
+        (String -> String -> Array String -> Dict String String -> CommandParseResult result)
 
 
 defineGroup : GroupParser result
 defineGroup =
-    GroupParser Dict.empty <| \name _args _flags ->
+    GroupParser Dict.empty <| \_appName name _args _flags ->
         UnknownCommand name
 
 
 withCommand : Command args flags result -> GroupParser result -> GroupParser result
 withCommand command (GroupParser knownCommands next) =
-    GroupParser (Dict.set command.word command.commonDescription knownCommands) <| \name args flags ->
+    GroupParser (Dict.set command.word command.commonDescription knownCommands) <| \appName name args flags ->
         if name /= command.word then
-            next name args flags
+            next appName name args flags
 
         else
-            runCommand args flags command
+            runCommand appName args flags command
 
 
 withPrefix : String -> GroupParser result -> GroupParser result -> GroupParser result
 withPrefix prefix prefixedCommands (GroupParser knownCommands nextCommand) =
-    GroupParser (Dict.set prefix Nothing knownCommands) <| \name args flags ->
+    GroupParser (Dict.set prefix Nothing knownCommands) <| \appName name args flags ->
         if name /= prefix then
-            nextCommand name args flags
+            nextCommand appName name args flags
 
         else
-            runPrefix args flags prefixedCommands
+            runPrefix appName args flags prefixedCommands
 
 
 run : Array String -> App result -> CommandParseResult result
@@ -90,7 +92,7 @@ run tokens appDef =
         _ ->
             case Array.popFirst arguments of
                 Just { first = command, rest = args } ->
-                    parse command args (buildFlagDict flags)
+                    parse appDef.name command args (buildFlagDict flags)
 
                 Nothing ->
                     HelpText <| appHelpText appDef
@@ -164,11 +166,11 @@ appHelpText appDef =
         ]
 
 
-runPrefix : Array String -> Dict String String -> GroupParser result -> CommandParseResult result
-runPrefix arguments flags (GroupParser _ parse) =
+runPrefix : String -> Array String -> Dict String String -> GroupParser result -> CommandParseResult result
+runPrefix appName arguments flags (GroupParser _ parse) =
     case Array.popFirst arguments of
         Just { first = command, rest = args } ->
-            parse command args flags
+            parse appName command args flags
 
         Nothing ->
             HelpText PP.empty
@@ -221,10 +223,10 @@ type CommandParseResult a
     | Success a
 
 
-runCommand : Array String -> Dict String String -> Command args flags result -> CommandParseResult result
-runCommand args flags spec =
+runCommand : String -> Array String -> Dict String String -> Command args flags result -> CommandParseResult result
+runCommand appName args flags spec =
     let
-        (ArgumentParser parseArgs) =
+        (ArgumentParser _ parseArgs) =
             spec.arguments
     
         (FlagParser _ parseFlags) =
@@ -244,18 +246,79 @@ runCommand args flags spec =
         { flagResult = Err err } ->
             case err of
                 FlagParserUnknownFlag "help" ->
-                    -- TODO
-                    HelpText PP.empty
+                    HelpText <| commandHelpText appName spec
 
                 _ ->
                     BadFlags err
+
+
+commandHelpText : String -> Command args flags result -> PP.Document
+commandHelpText appName spec =
+    let
+        (ArgumentParser argumentType _) =
+            spec.arguments
+        
+        (FlagParser knownFlags _) =
+            spec.flags
+
+        flagDocument =
+            Dict.foldl
+                (\flagName flagDescription acc ->
+                    let
+                        flagSuffix =
+                            if flagDescription.title == "" then
+                                ""
+
+                            else
+                                "=<" ++ flagDescription.title ++ ">"
+                    in
+                    Array.prepend acc
+                        [ PP.text ("--" ++ flagName ++ flagSuffix)
+                            |> PP.color PP.Cyan
+                        , PP.words flagDescription.description
+                            |> PP.indent
+                        , PP.empty
+                        ]
+                )
+                []
+                knownFlags
+                |> PP.verticalBlock
+                |> PP.indent
+
+        commandSuffix =
+            if argumentType == "" then
+                ""
+
+            else
+                " <" ++ argumentType ++ ">"
+    in
+    PP.verticalBlock
+        [ PP.words spec.summary
+        , PP.empty
+        , PP.words (appName ++ " " ++ spec.word ++ commandSuffix)
+            |> PP.indent
+            |> PP.color PP.Cyan
+        , PP.empty
+        , spec.example
+        , PP.empty
+        , PP.words "You can customize this command with the following flags:"
+        , PP.empty
+        , flagDocument
+        ]
 
 
 -- ARGS
 
 
 type ArgumentParser val
-    = ArgumentParser (Array String -> Result ArgumentParserError val)
+    = ArgumentParser String (Array String -> Result ArgumentParserError val)
+
+
+type alias ValueParser val =
+    { singular : String
+    , plural : String
+    , fn : (String -> Maybe val)
+    }
 
 
 type ArgumentParserError
@@ -265,7 +328,7 @@ type ArgumentParserError
 
 noArgs : ArgumentParser {}
 noArgs =
-    ArgumentParser <| \args ->
+    ArgumentParser "" <| \args ->
         if Array.length args /= 0 then
             Err <| ArgumentParserWrongArity { expected = 0, actual = (Array.length args) }
 
@@ -273,12 +336,12 @@ noArgs =
             Ok {}
 
 
-oneArg : (String -> Maybe val) -> ArgumentParser val
-oneArg builder =
-    ArgumentParser <| \args ->
+oneArg : ValueParser val -> ArgumentParser val
+oneArg parseFn =
+    ArgumentParser parseFn.singular <| \args ->
         case args of
             [ arg ] ->
-                builder arg
+                parseFn.fn arg
                     |> Maybe.map Ok
                     |> Maybe.withDefault (Err ArgumentParserInvalidArgument)
 
@@ -286,12 +349,12 @@ oneArg builder =
                 Err <| ArgumentParserWrongArity { expected = 1, actual = Array.length args }
 
 
-zeroOrMoreArgs : (String -> Maybe val) -> ArgumentParser (Array val)
-zeroOrMoreArgs builder =
-    ArgumentParser <| \args ->
+zeroOrMoreArgs : ValueParser val -> ArgumentParser (Array val)
+zeroOrMoreArgs parseFn =
+    ArgumentParser parseFn.plural <| \args ->
         let
             parsedArgs =
-                Array.filterMap builder args
+                Array.filterMap parseFn.fn args
         in
         if Array.length args /= Array.length parsedArgs then
             Err ArgumentParserInvalidArgument
@@ -304,7 +367,13 @@ zeroOrMoreArgs builder =
 
 
 type FlagParser val
-    = FlagParser (Dict String String) (Dict String String -> Result FlagParserError val)
+    = FlagParser (Dict String FlagParserDescription) (Dict String String -> Result FlagParserError val)
+
+
+type alias FlagParserDescription =
+    { title : String
+    , description : String
+    }
 
 
 type FlagParserError
@@ -332,7 +401,13 @@ initFlags value =
 
 toggle : String -> String -> FlagParser (Bool -> b) -> FlagParser b
 toggle key desc (FlagParser knownFlags previousSteps) =
-    FlagParser (Dict.set key desc knownFlags) <| \opts ->
+    let
+        descriptor =
+            { title = ""
+            , description = desc
+            }
+    in
+    FlagParser (Dict.set key descriptor knownFlags) <| \opts ->
         case previousSteps (Dict.remove key opts) of
             Ok next ->
                 case Dict.get key opts of
@@ -348,9 +423,15 @@ toggle key desc (FlagParser knownFlags previousSteps) =
             Err err ->
                 Err err
 
-flag : String -> (String -> Maybe a) -> String -> FlagParser (Maybe a -> b) -> FlagParser b
-flag key valueParser desc (FlagParser knownFlags previousSteps) =
-    FlagParser (Dict.set key desc knownFlags) <| \opts ->
+flag : String -> ValueParser a -> String -> FlagParser (Maybe a -> b) -> FlagParser b
+flag key valueParserFn desc (FlagParser knownFlags previousSteps) =
+    let
+        descriptor =
+            { title = valueParserFn.singular
+            , description = desc
+            }
+    in
+    FlagParser (Dict.set key descriptor knownFlags) <| \opts ->
         case previousSteps (Dict.remove key opts) of
             Ok next ->
                 case Dict.get key opts of
@@ -358,7 +439,7 @@ flag key valueParser desc (FlagParser knownFlags previousSteps) =
                         Err FlagParserMissingValue
                     
                     Just value ->
-                        case valueParser value of
+                        case valueParserFn.fn value of
                             Just parsedValue ->
                                 Ok (next <| Just parsedValue)
 
@@ -375,20 +456,26 @@ flag key valueParser desc (FlagParser knownFlags previousSteps) =
 -- PARSERS
 
 
-pathParser : String -> Maybe Path
-pathParser input =
-    Just <| Path.fromPosixString input
-        
+pathParser : ValueParser Path
+pathParser =
+    { singular = "path"
+    , plural = "paths"
+    , fn = Just << Path.fromPosixString
+    }
 
 
-grenFileParser : String -> Maybe Path
-grenFileParser input =
-    pathParser input
-        |> Maybe.andThen
-            (\path ->
-                if path.extension /= "gren" then
-                    Nothing
+grenFileParser : ValueParser Path
+grenFileParser =
+    { singular = "gren file"
+    , plural = "gren files"
+    , fn = \input ->
+        pathParser.fn input
+            |> Maybe.andThen
+                (\path ->
+                    if path.extension /= "gren" then
+                        Nothing
                 
-                else
-                    Just path
-            )
+                    else
+                        Just path
+                )
+    }

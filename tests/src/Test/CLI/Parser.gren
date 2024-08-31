@@ -33,15 +33,36 @@ tests =
                             PP.toString prettyText
                     in
                     Expect.all
-                        [ \{} -> Expect.equal True (String.contains (PP.toString testApp.intro) plainText)
-                        , \{} -> Expect.equal True (String.contains testCmd.word plainText)
-                        , \{} -> Expect.equal True (String.contains (PP.toString testApp.outro) plainText)
+                        [ \{} -> expectStringContains (PP.toString testApp.intro) plainText
+                        , \{} -> expectStringContains testCmd.word plainText
+                        , \{} -> expectStringContains (PP.toString testApp.outro) plainText
                         ]
                         {}
 
                 _ ->
                     Expect.fail "--help didn't print help text"
+        , test "Passing --help after a command prints help text for that specific command" <| \{} ->
+            let
+                result =
+                    runCommand testCmd ["make", "--help"]
+            in
+            case result of
+                Parser.HelpText prettyText ->
+                    let
+                        plainText =
+                            PP.toString prettyText
+                    in
+                    Expect.all
+                        [ \{} -> expectStringContains testCmd.word plainText
+                        , \{} -> expectStringContains testCmd.summary plainText
+                        , \{} -> expectStringContains (PP.toString testCmd.example) plainText
+                        , \{} -> expectStringContains "--debug" plainText
+                        , \{} -> expectStringContains "--output=<path>" plainText
+                        ]
+                        {}
 
+                _ ->
+                    Expect.fail "--help didn't print help text"
         , test "If you don't pass a command, the help text is printed" <| \{} ->
             Expect.equal
                 (runCommand testCmd [])
@@ -148,6 +169,15 @@ tests =
                         Expect.fail "Expected help text"
             ]
         ] 
+
+
+expectStringContains : String -> String -> Expectation
+expectStringContains subStr str =
+    if String.contains subStr str then
+        Expect.pass
+
+    else
+        Expect.fail <| "Expected to find '" ++ subStr ++ "' in text."
 
 
 testApp =
