@@ -73,7 +73,7 @@ withPrefix prefix prefixedCommands (GroupParser knownCommands nextCommand) =
             nextCommand appName name args flags
 
         else
-            runPrefix appName args flags prefixedCommands
+            runPrefix appName prefix args flags prefixedCommands
 
 
 run : Array String -> App result -> CommandParseResult result
@@ -166,15 +166,41 @@ appHelpText appDef =
         ]
 
 
-runPrefix : String -> Array String -> Dict String String -> GroupParser result -> CommandParseResult result
-runPrefix appName arguments flags (GroupParser _ parse) =
+runPrefix : String -> String -> Array String -> Dict String String -> GroupParser result -> CommandParseResult result
+runPrefix appName prefixName arguments flags ((GroupParser _ parse) as groupParser) =
     case Array.popFirst arguments of
         Just { first = command, rest = args } ->
             parse appName command args flags
 
         Nothing ->
-            HelpText PP.empty
+            HelpText <| prefixHelpText appName prefixName groupParser
 
+
+prefixHelpText : String -> String -> GroupParser result -> PP.Document
+prefixHelpText appName prefixName (GroupParser knownCommands _) =
+    let
+        knownCommandsDocument =
+            PP.verticalBlock
+                [ knownCommands
+                    |> Dict.keys
+                    |> Array.map (\command -> PP.text <| appName ++ " " ++ prefixName ++ " " ++ command)
+                    |> PP.verticalBlock
+                    |> PP.indent
+                    |> PP.color PP.Cyan
+                , PP.empty
+                , PP.block
+                    [ PP.text "Adding the "
+                    , PP.color PP.Cyan <| PP.text "--help"
+                    , PP.text " flag gives you more details about a specific command."
+                    ]
+                ]
+    in
+    PP.verticalBlock
+        [ PP.words "This is just a prefix. In order to do something useful, you need to give me a command. Here's a full list:"
+        , PP.empty
+        , knownCommandsDocument
+        , PP.empty
+        ]
 
 buildFlagDict : Array String -> Dict String String
 buildFlagDict flags =
