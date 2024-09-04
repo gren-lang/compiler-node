@@ -7,7 +7,8 @@
     "version": "1.0.0",
     "exposed-modules": [
         "CLI.Parser",
-        "CLI.PrettyPrinter"
+        "CLI.PrettyPrinter",
+        "SemanticVersion"
     ],
     "gren-version": "0.4.0 <= v < 0.5.0",
     "dependencies": {

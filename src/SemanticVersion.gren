@@ -1,0 +1,33 @@
+module SemanticVersion exposing 
+    ( SemanticVersion
+    , fromString
+    )
+
+
+type alias SemanticVersion = 
+    { major : Int
+    , minor : Int
+    , patch : Int
+    }
+
+
+fromString : String -> Maybe SemanticVersion
+fromString str =
+    let
+        parts =
+            str
+            |> String.split "."
+            |> Array.filterMap String.toInt
+            |> Array.filter (\num -> num >= 0)
+    in
+    case parts of
+        [ major, minor, patch ] ->
+            Just
+                { major = major
+                , minor = minor
+                , patch = patch
+                }
+
+        _ ->
+            Nothing
+            

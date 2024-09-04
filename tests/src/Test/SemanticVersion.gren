@@ -1,0 +1,58 @@
+module Test.SemanticVersion exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import SemanticVersion as SV
+
+
+positiveInt : Fuzzer Int
+positiveInt =
+    Fuzz.intRange 0 10000
+
+
+tests : Test
+tests =
+    describe "SemanticVersion"
+        [ describe "fromString"
+            [ Test.fuzz3 positiveInt positiveInt positiveInt "valid version" <| \num1 num2 num3 -> 
+                let
+                    constructedVersion =
+                        [ num1, num2, num3 ]
+                            |> Array.map String.fromInt 
+                            |> String.join "."
+                in
+                case SV.fromString constructedVersion of
+                    Just version ->
+                        Expect.equal
+                            { major = num1
+                            , minor = num2
+                            , patch = num3
+                            }
+                            version
+
+                    Nothing ->
+                        Expect.fail "Expected fromString to pass"
+            ,  test "too many parts" <| \{} -> 
+                case SV.fromString "1.2.3.4" of
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
+            ,  test "too few parts" <| \{} -> 
+                case SV.fromString "1.2" of
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
+            ,  test "numbers must be positive" <| \{} -> 
+                case SV.fromString "1.-2.0" of
+                    Just version ->
+                        Expect.fail "This should have failed"
+
+                    Nothing ->
+                        Expect.pass
+            ]
+        ]
