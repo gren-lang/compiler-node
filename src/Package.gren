@@ -1,0 +1,66 @@
+module Package exposing
+    ( Package
+    , author
+    , name
+    , fromString
+    )
+
+
+type Package
+    = Package 
+        { author : String
+        , name : String
+        }
+
+
+author : Package -> String
+author (Package fields) =
+    fields.author
+
+
+name : Package -> String
+name (Package fields) =
+    fields.name
+
+
+fromString : String -> Maybe Package
+fromString str =
+    case String.split "/" str of
+        [ authorStr, nameStr ] ->
+            let
+                validAuthor =
+                    (not <| String.isEmpty authorStr)
+                        && (not <| String.startsWith "-" authorStr)
+                        && (not <| String.endsWith "-" authorStr)
+                        && (not <| String.contains "--" authorStr)
+                        && String.all (\c -> c == '-' || Char.isAlphaNum c) authorStr
+                    
+                validName =
+                    (not <| String.isEmpty nameStr)
+                        && (not <| String.startsWith "-" nameStr)
+                        && (not <| String.endsWith "-"  nameStr)
+                        && (not <| String.contains "--"  nameStr)
+                        && String.all (\c -> Char.isDigit c || Char.isLower c || c == '-') nameStr
+            in
+            if validAuthor && validName then
+                case String.uncons nameStr of
+                    Just { first = firstChar } ->
+                        if Char.isAlpha firstChar then
+                            Just <|
+                                Package
+                                    { author = authorStr
+                                    , name = nameStr
+                                    }
+
+                        else
+                            Nothing
+
+                    Nothing ->
+                        Nothing
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+

@@ -1,0 +1,95 @@
+module Test.Package exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import Package as Pkg
+
+
+tests : Test
+tests =
+    describe "Package"
+        [ describe "fromString"
+            [ test "valid name" <| \{} ->
+                let
+                    parseResult =
+                        Pkg.fromString "gren-lang/core2"
+                    
+                    author =
+                        parseResult
+                            |> Maybe.map Pkg.author
+                            |> Maybe.withDefault ""
+                    
+                    name =
+                        parseResult
+                            |> Maybe.map Pkg.name
+                            |> Maybe.withDefault ""
+                in
+                Expect.all
+                    [ \{} -> Expect.equal "gren-lang" author
+                    , \{} -> Expect.equal "core2" name
+                    ]
+                    {}
+            , test "Pkg name cannot contain more than two parts" <| \{} ->
+                expectFailure "gren-lang/core2/three"
+            , test "Pkg name cannot contain less than two parts" <| \{} ->
+                expectFailure "gren-lang"
+            , test "Parts cannot be empty" <| \{} ->
+                expectFailure "gren-lang/"
+            , describe "Author name"
+                [ test "can contain upper case and digits" <| \{} ->
+                    case Pkg.fromString "grENLang3/core2" of
+                        Just pkg ->
+                            Pkg.author pkg
+                                |> Expect.equal "grENLang3"
+
+
+                        Nothing ->
+                            Expect.fail "Expected to parse author name"
+                , test "cannot contain special characters" <| \{} ->
+                    expectFailure "gren-l{an}g/core2"
+                , test "cannot contain whitespace" <| \{} ->
+                    expectFailure "gren lang/core2"
+                , test "cannot contain start with -" <| \{} ->
+                    expectFailure "-gren-lang/core2"
+                , test "cannot end with -" <| \{} ->
+                    expectFailure "gren-lang-/core2"
+                , test "cannot contain double -" <| \{} ->
+                    expectFailure "gren--lang/core2"
+                ]
+            , describe "Project name"
+                [ test "can only contain lower-case ascii and digits" <| \{} ->
+                    case Pkg.fromString "gren-lang/core-2" of
+                        Just pkg ->
+                            Pkg.name pkg
+                                |> Expect.equal "core-2"
+
+                        Nothing ->
+                            Expect.fail "Expected to parse pkg name"
+                , test "cannot contain special characters" <| \{} ->
+                    expectFailure "gren-lang/core]2"
+                , test "cannot contain whitespace" <| \{} ->
+                    expectFailure "gren-lang/core 2"
+                , test "cannot contain start with -" <| \{} ->
+                    expectFailure "gren-lang/-core2"
+                , test "cannot end with -" <| \{} ->
+                    expectFailure "gren-lang-/core2-"
+                , test "cannot contain double -" <| \{} ->
+                    expectFailure "gren-lang/core--2"
+                , test "cannot start with upper case" <| \{} ->
+                    expectFailure "gren-lang/Core-2"
+                , test "cannot start with digit" <| \{} ->
+                    expectFailure "gren-lang/2core"
+                ]
+            ]
+        ]
+
+
+expectFailure : String -> Expectation
+expectFailure str =
+    case Pkg.fromString str of
+        Just pkg ->
+            Expect.fail "Expected to fail parsing"
+
+        Nothing ->
+            Expect.pass
