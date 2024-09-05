@@ -16,7 +16,11 @@ module CLI.Parser exposing
     , ArgumentParserError(..)
     , noArgs
     , oneArg
+    , twoArgs
+    , threeArgs
     , zeroOrMoreArgs
+    , mapArgs
+    , oneOfArgs
     --
     , FlagParser
     , FlagParserError(..)
@@ -375,6 +379,47 @@ oneArg parseFn =
                 Err <| ArgumentParserWrongArity { expected = 1, actual = Array.length args }
 
 
+twoArgs : (a -> b -> c) -> ValueParser a -> ValueParser b -> ArgumentParser c
+twoArgs combine firstValue secondValue =
+    ArgumentParser (firstValue.singular ++ "-" ++ secondValue.singular) <| \args ->
+        case args of
+            [ first, second ] ->
+                case { first = firstValue.fn first, second = secondValue.fn second } of
+                    { first = Just firstOk, second = Just secondOk } ->
+                        Ok <| combine firstOk secondOk
+
+                    { first = Nothing } ->
+                        Err ArgumentParserInvalidArgument
+                    
+                    { second = Nothing } ->
+                        Err ArgumentParserInvalidArgument
+
+            _ ->
+                Err <| ArgumentParserWrongArity { expected = 2, actual = Array.length args }
+
+
+threeArgs : (a -> b -> c -> d) -> ValueParser a -> ValueParser b -> ValueParser c -> ArgumentParser d
+threeArgs combine firstValue secondValue thirdValue =
+    ArgumentParser (String.join "-" [firstValue.singular, secondValue.singular, thirdValue.singular]) <| \args ->
+        case args of
+            [ first, second, third ] ->
+                case { first = firstValue.fn first, second = secondValue.fn second, third = thirdValue.fn third } of
+                    { first = Just firstOk, second = Just secondOk, third = Just thirdOk } ->
+                        Ok <| combine firstOk secondOk thirdOk
+
+                    { first = Nothing } ->
+                        Err ArgumentParserInvalidArgument
+                    
+                    { second = Nothing } ->
+                        Err ArgumentParserInvalidArgument
+
+                    { third = Nothing } ->
+                        Err ArgumentParserInvalidArgument
+
+            _ ->
+                Err <| ArgumentParserWrongArity { expected = 3, actual = Array.length args }
+
+
 zeroOrMoreArgs : ValueParser val -> ArgumentParser (Array val)
 zeroOrMoreArgs parseFn =
     ArgumentParser parseFn.plural <| \args ->
@@ -387,6 +432,33 @@ zeroOrMoreArgs parseFn =
 
         else
             Ok parsedArgs
+
+
+mapArgs : (a -> b) -> ArgumentParser a -> ArgumentParser b
+mapArgs mapper (ArgumentParser desc fn) =
+    ArgumentParser desc <| \args ->
+        case fn args of
+            Ok val ->
+                Ok (mapper val)
+
+            Err err ->
+                Err err
+
+
+oneOfArgs : Array (ArgumentParser val) -> ArgumentParser val
+oneOfArgs argParsers =
+    ArgumentParser "<one-of>" <| \args ->
+        let
+            parseResults =
+                Array.map (\(ArgumentParser _ fn) -> fn args) argParsers
+        in
+        case Result.firstOk parseResults of
+            Just result ->
+                Ok result
+
+            Nothing ->
+                Array.first parseResults
+                    |> Maybe.withDefault (Err ArgumentParserInvalidArgument)
 
 
 -- FLAGS
