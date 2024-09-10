@@ -24,10 +24,16 @@ tests =
                         parseResult
                             |> Maybe.map Pkg.name
                             |> Maybe.withDefault ""
+
+                    string =
+                        parseResult
+                            |> Maybe.map Pkg.toString
+                            |> Maybe.withDefault ""
                 in
                 Expect.all
                     [ \{} -> Expect.equal "gren-lang" author
                     , \{} -> Expect.equal "core2" name
+                    , \{} -> Expect.equal "gren-lang/core2" string
                     ]
                     {}
             , test "Pkg name cannot contain more than two parts" <| \{} ->

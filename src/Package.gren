@@ -3,6 +3,7 @@ module Package exposing
     , author
     , name
     , fromString
+    , toString
     )
 
 
@@ -64,3 +65,7 @@ fromString str =
         _ ->
             Nothing
 
+
+toString : Package -> String
+toString package =
+    author package ++ "/" ++ name package

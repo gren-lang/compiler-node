@@ -1,6 +1,7 @@
 module SemanticVersion exposing 
     ( SemanticVersion
     , fromString
+    , toString
     )
 
 
@@ -30,4 +31,8 @@ fromString str =
 
         _ ->
             Nothing
-            
+
+
+toString : SemanticVersion -> String
+toString { major, minor, patch } =
+    String.fromInt major ++ "." ++ String.fromInt minor ++ "." ++ String.fromInt patch
