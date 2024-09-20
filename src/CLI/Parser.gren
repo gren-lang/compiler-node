@@ -14,6 +14,7 @@ module CLI.Parser exposing
     --
     , ArgumentParser
     , ArgumentParserError(..)
+    , argumentErrorPrettified
     , noArgs
     , oneArg
     , twoArgs
@@ -24,6 +25,7 @@ module CLI.Parser exposing
     --
     , FlagParser
     , FlagParserError(..)
+    , flagErrorPrettified
     , noFlags
     , initFlags
     , toggle
@@ -259,12 +261,12 @@ runCommand appName args flags spec =
         (ArgumentParser _ parseArgs) =
             spec.arguments
     
-        (FlagParser _ parseFlags) =
+        (FlagParser knownFlags parseFlags) =
             spec.flags
     in
     case 
         { argResult = parseArgs args
-        , flagResult = parseFlags flags
+        , flagResult = parseFlags knownFlags flags
         }
     of
         { argResult = Ok argValue, flagResult = Ok flagValues } ->
@@ -275,7 +277,7 @@ runCommand appName args flags spec =
     
         { flagResult = Err err } ->
             case err of
-                FlagParserUnknownFlag "help" ->
+                FlagParserUnknownFlag _ "help" ->
                     HelpText <| commandHelpText appName spec
 
                 _ ->
@@ -348,12 +350,51 @@ type alias ValueParser val =
     { singular : String
     , plural : String
     , fn : (String -> Maybe val)
+    , examples : Array String
     }
 
 
 type ArgumentParserError
     = ArgumentParserWrongArity { expected : Int, actual : Int }
-    | ArgumentParserInvalidArgument
+    | ArgumentParserInvalidArgument { argument : String, title : String, examples : Array String }
+
+
+argumentErrorPrettified : ArgumentParserError -> PP.Document
+argumentErrorPrettified err =
+    case err of
+        ArgumentParserWrongArity info ->
+            PP.verticalBlock
+                [ PP.words <| 
+                    "I was expecting "
+                        ++ String.fromInt info.expected
+                        ++ " arguments, but seem to have received "
+                        ++ String.fromInt info.actual
+                        ++ "."
+                , PP.empty
+                ]
+
+        ArgumentParserInvalidArgument info ->
+            PP.verticalBlock
+                [ PP.words "I'm having trouble with this argument:"
+                , PP.empty
+                , PP.text info.argument
+                    |> PP.color PP.Red
+                    |> PP.indent
+                , PP.empty
+                , PP.block
+                    [ PP.words "It's supposed to be a"
+                    , PP.text (" <" ++ info.title ++ "> ")
+                        |> PP.color PP.Yellow
+                    , PP.words "value, like one of these:"
+                    ]
+                , PP.empty
+                , info.examples
+                    |> Array.map PP.text
+                    |> PP.verticalBlock
+                    |> PP.color PP.Green
+                    |> PP.indent
+                , PP.empty
+                ]
 
 
 noArgs : ArgumentParser {}
@@ -373,7 +414,14 @@ oneArg parseFn =
             [ arg ] ->
                 parseFn.fn arg
                     |> Maybe.map Ok
-                    |> Maybe.withDefault (Err ArgumentParserInvalidArgument)
+                    |> Maybe.withDefault 
+                        (Err <| 
+                            ArgumentParserInvalidArgument
+                                { argument = arg
+                                , title = parseFn.singular
+                                , examples = parseFn.examples
+                                }
+                        )
 
             _ ->
                 Err <| ArgumentParserWrongArity { expected = 1, actual = Array.length args }
@@ -389,10 +437,18 @@ twoArgs combine firstValue secondValue =
                         Ok <| combine firstOk secondOk
 
                     { first = Nothing } ->
-                        Err ArgumentParserInvalidArgument
+                        Err <| ArgumentParserInvalidArgument
+                            { argument = first
+                            , title = firstValue.singular
+                            , examples = firstValue.examples
+                            }
                     
                     { second = Nothing } ->
-                        Err ArgumentParserInvalidArgument
+                        Err <| ArgumentParserInvalidArgument
+                            { argument = second
+                            , title = secondValue.singular
+                            , examples = secondValue.examples
+                            }
 
             _ ->
                 Err <| ArgumentParserWrongArity { expected = 2, actual = Array.length args }
@@ -408,13 +464,25 @@ threeArgs combine firstValue secondValue thirdValue =
                         Ok <| combine firstOk secondOk thirdOk
 
                     { first = Nothing } ->
-                        Err ArgumentParserInvalidArgument
+                        Err <| ArgumentParserInvalidArgument
+                            { argument = first
+                            , title = firstValue.singular
+                            , examples = firstValue.examples
+                            }
                     
                     { second = Nothing } ->
-                        Err ArgumentParserInvalidArgument
+                        Err <| ArgumentParserInvalidArgument
+                            { argument = second
+                            , title = secondValue.singular
+                            , examples = secondValue.examples
+                            }
 
                     { third = Nothing } ->
-                        Err ArgumentParserInvalidArgument
+                        Err <| ArgumentParserInvalidArgument
+                            { argument = third
+                            , title = thirdValue.singular
+                            , examples = thirdValue.examples
+                            }
 
             _ ->
                 Err <| ArgumentParserWrongArity { expected = 3, actual = Array.length args }
@@ -428,7 +496,11 @@ zeroOrMoreArgs parseFn =
                 Array.filterMap parseFn.fn args
         in
         if Array.length args /= Array.length parsedArgs then
-            Err ArgumentParserInvalidArgument
+            Err <| ArgumentParserInvalidArgument
+                { argument = String.join " " args
+                , title = parseFn.plural
+                , examples = parseFn.examples
+                }
 
         else
             Ok parsedArgs
@@ -458,27 +530,142 @@ oneOfArgs argParsers =
 
             Nothing ->
                 Array.first parseResults
-                    |> Maybe.withDefault (Err ArgumentParserInvalidArgument)
+                    |> Maybe.withDefault 
+                        (Err <| ArgumentParserInvalidArgument
+                            { argument = String.join " " args
+                            , title = "<one-of>" 
+                            , examples = []
+                            }
+                        )
 
 
 -- FLAGS
 
 
 type FlagParser val
-    = FlagParser (Dict String FlagParserDescription) (Dict String String -> Result FlagParserError val)
+    = FlagParser KnownFlags (KnownFlags -> Dict String String -> Result FlagParserError val)
+
+
+type alias KnownFlags =
+    Dict String FlagParserDescription
 
 
 type alias FlagParserDescription =
     { title : String
     , description : String
+    , examples : Array String
     }
 
 
 type FlagParserError
-    = FlagParserFoundValueOnToggle
-    | FlagParserMissingValue
-    | FlagParserInvalidValue
-    | FlagParserUnknownFlag String
+    = FlagParserFoundValueOnToggle KnownFlags String
+    | FlagParserMissingValue KnownFlags String
+    | FlagParserInvalidValue KnownFlags String
+    | FlagParserUnknownFlag KnownFlags String
+
+
+flagErrorPrettified : FlagParserError -> PP.Document
+flagErrorPrettified err =
+    case err of
+        FlagParserFoundValueOnToggle knownFlags flagName ->
+            PP.verticalBlock
+                [ PP.words "This flag doesn't take a value:"
+                , PP.empty
+                , PP.text ("--" ++ flagName)
+                    |> PP.color PP.Red
+                    |> PP.indent
+                , PP.empty
+                , PP.words "Try removing the value."
+                , PP.empty
+                ]
+
+        FlagParserMissingValue knownFlags flagName ->
+            PP.verticalBlock
+                [ PP.words "This flag needs more information:"
+                , PP.empty
+                , PP.text ("--" ++ flagName)
+                    |> PP.color PP.Red
+                    |> PP.indent
+                , describeFlagUse knownFlags flagName
+                ]
+        
+        FlagParserInvalidValue knownFlags flagName ->
+            PP.verticalBlock
+                [ PP.words "This flag was passed an invalid value:"
+                , PP.empty
+                , PP.text ("--" ++ flagName)
+                    |> PP.color PP.Red
+                    |> PP.indent
+                , describeFlagUse knownFlags flagName
+                ]
+        
+        FlagParserUnknownFlag knownFlags flagName ->
+            let
+                otherFlags =
+                    Dict.foldl
+                        (\name desc doc ->
+                            if desc.title == "" then
+                                Array.pushLast (PP.text <| "--" ++ name) doc
+
+                            else
+                                Array.pushLast 
+                                    (PP.text <| "--" ++ name ++ "=<" ++ desc.title ++ ">")
+                                    doc
+                        )
+                        []
+                        knownFlags
+
+                suffix =
+                    if Array.length otherFlags == 0 then
+                        PP.empty
+
+                    else
+                        PP.verticalBlock
+                            [ PP.empty
+                            , PP.words "Maybe you meant one of these?"
+                            , PP.empty
+                            , PP.verticalBlock otherFlags
+                                |> PP.indent
+                                |> PP.color PP.Green
+                            , PP.empty
+                            ]
+            in
+            PP.verticalBlock
+                [ PP.words "I don't recognize this flag:"
+                , PP.empty
+                , PP.text ("--" ++ flagName)
+                    |> PP.color PP.Red
+                    |> PP.indent
+                , suffix
+                ]
+
+
+describeFlagUse : KnownFlags -> String -> PP.Document
+describeFlagUse knownFlags flagName =
+    case Dict.get flagName knownFlags of
+        Just flagDescription ->
+            let
+                examples =
+                    flagDescription.examples
+                        |> Array.map (\exampleStr -> PP.text <| "--" ++ flagName ++ "=" ++ exampleStr)
+            in
+            PP.verticalBlock
+                [ PP.empty
+                , PP.block 
+                    [ PP.words ("It neeeds a")
+                    , PP.text (" <" ++ flagDescription.title ++ "> ")
+                        |> PP.color PP.Yellow
+                    , PP.words " like this:"
+                    ]
+                , PP.empty
+                , PP.verticalBlock examples
+                    |> PP.color PP.Green
+                    |> PP.indent
+                , PP.empty
+                ]
+
+        Nothing ->
+            PP.empty
 
 
 noFlags : FlagParser {}
@@ -488,10 +675,10 @@ noFlags =
 
 initFlags : a -> FlagParser a
 initFlags value =
-    FlagParser Dict.empty <| \remainingFlags -> 
+    FlagParser Dict.empty <| \knownFlags remainingFlags -> 
         case Dict.first remainingFlags of
             Just unparsedFlag ->
-                Err <| FlagParserUnknownFlag unparsedFlag.key
+                Err <| FlagParserUnknownFlag knownFlags unparsedFlag.key
 
             Nothing ->
                 Ok value
@@ -503,17 +690,18 @@ toggle key desc (FlagParser knownFlags previousSteps) =
         descriptor =
             { title = ""
             , description = desc
+            , examples = []
             }
     in
-    FlagParser (Dict.set key descriptor knownFlags) <| \opts ->
-        case previousSteps (Dict.remove key opts) of
+    FlagParser (Dict.set key descriptor knownFlags) <| \flagDescriptions opts ->
+        case previousSteps flagDescriptions (Dict.remove key opts) of
             Ok next ->
                 case Dict.get key opts of
                     Just "" ->
                         Ok (next True)
 
                     Just _ ->
-                        Err FlagParserFoundValueOnToggle
+                        Err <| FlagParserFoundValueOnToggle flagDescriptions key
 
                     Nothing ->
                         Ok (next False)
@@ -527,14 +715,15 @@ flag key valueParserFn desc (FlagParser knownFlags previousSteps) =
         descriptor =
             { title = valueParserFn.singular
             , description = desc
+            , examples = valueParserFn.examples
             }
     in
-    FlagParser (Dict.set key descriptor knownFlags) <| \opts ->
-        case previousSteps (Dict.remove key opts) of
+    FlagParser (Dict.set key descriptor knownFlags) <| \flagDescriptions opts ->
+        case previousSteps flagDescriptions (Dict.remove key opts) of
             Ok next ->
                 case Dict.get key opts of
                     Just "" ->
-                        Err FlagParserMissingValue
+                        Err <| FlagParserMissingValue flagDescriptions key
                     
                     Just value ->
                         case valueParserFn.fn value of
@@ -542,7 +731,7 @@ flag key valueParserFn desc (FlagParser knownFlags previousSteps) =
                                 Ok (next <| Just parsedValue)
 
                             Nothing ->
-                                Err FlagParserInvalidValue
+                                Err <| FlagParserInvalidValue flagDescriptions key
 
                     Nothing ->
                         Ok (next Nothing)
@@ -559,13 +748,17 @@ pathParser =
     { singular = "path"
     , plural = "paths"
     , fn = Just << Path.fromPosixString
+    , examples =
+        [ "folder"
+        , "folder/file.md"
+        ]
     }
 
 
 grenFileParser : ValueParser Path
 grenFileParser =
-    { singular = "gren file"
-    , plural = "gren files"
+    { singular = "gren-file"
+    , plural = "gren-files"
     , fn = \input ->
         pathParser.fn input
             |> Maybe.andThen
@@ -576,4 +769,8 @@ grenFileParser =
                     else
                         Just path
                 )
+    , examples = 
+        [ "MyModule.gren"
+        , "src/Main.gren"
+        ]
     }

@@ -5,8 +5,7 @@ import Test exposing (Test, describe, test)
 import CLI.Parser as Parser
 import CLI.PrettyPrinter as PP
 import FileSystem.Path as Path
-
-
+import Dict
 
 
 tests : Test
@@ -155,7 +154,12 @@ tests =
                 , test "Passing invalid arg" <| \{} ->
                     runCommand testCmdTwoArgs [ "make", "src/Dist", "src/Dest" ]
                         |> Expect.equal
-                            (Parser.BadArguments <| Parser.ArgumentParserInvalidArgument)
+                            (Parser.BadArguments <| Parser.ArgumentParserInvalidArgument
+                                { argument = "src/Dest"
+                                , title = Parser.grenFileParser.singular
+                                , examples = Parser.grenFileParser.examples
+                                }
+                            )
                 , test "Passing no args when two is expected" <| \{} ->
                     runCommand testCmdTwoArgs [ "make" ]
                         |> Expect.equal
@@ -208,7 +212,12 @@ tests =
                 , test "Passing invalid arg" <| \{} ->
                     runCommand testCmdThreeArgs [ "make", "src/Dist", "src/Dest", "test/Test" ]
                         |> Expect.equal
-                            (Parser.BadArguments <| Parser.ArgumentParserInvalidArgument)
+                            (Parser.BadArguments <| Parser.ArgumentParserInvalidArgument
+                                { argument = "src/Dest"
+                                , title = Parser.grenFileParser.singular
+                                , examples = Parser.grenFileParser.examples
+                                }
+                            )
                 , test "Passing no args when three is expected" <| \{} ->
                     runCommand testCmdThreeArgs [ "make" ]
                         |> Expect.equal
@@ -321,16 +330,16 @@ tests =
                     Expect.equal False cmd.flags.debug
             , test "Passing a toggle flag that is defined as value flag fails" <| \{} ->
                 runCommand testCmd [ "make", "--output" ]
-                    |> Expect.equal (Parser.BadFlags Parser.FlagParserMissingValue)
+                    |> expectBadFlag (Parser.FlagParserMissingValue Dict.empty "output")
             , test "Passing a value flag without a set value fails" <| \{} ->
                 runCommand testCmd [ "make", "--output=" ]
-                    |> Expect.equal (Parser.BadFlags Parser.FlagParserMissingValue)
+                    |> expectBadFlag (Parser.FlagParserMissingValue Dict.empty "output")
             , test "Passing a value flag where a toggle was expected fails" <| \{} ->
                 runCommand testCmd [ "make", "--debug=true" ]
-                    |> Expect.equal (Parser.BadFlags Parser.FlagParserFoundValueOnToggle)
+                    |> expectBadFlag (Parser.FlagParserFoundValueOnToggle Dict.empty "debug")
             , test "Passing a flag that isn't recognized will return the appropriate error" <| \{} ->
                 runCommand testCmd [ "make", "--hiya" ]
-                    |> Expect.equal (Parser.BadFlags <| Parser.FlagParserUnknownFlag "hiya")
+                    |> expectBadFlag (Parser.FlagParserUnknownFlag Dict.empty "hiya")
             , test "Passing --help will always output help text" <| \{} ->
                 case runCommand testCmd [ "make", "--help" ] of
                     Parser.HelpText _ ->
@@ -388,6 +397,34 @@ expectParseSuccess cmd args next =
         
         _ ->
             Expect.fail "Failed to parse"
+
+
+expectBadFlag : Parser.FlagParserError -> Parser.CommandParseResult a-> Expectation
+expectBadFlag expected actualError =
+    case actualError of
+        Parser.BadFlags err ->
+            err
+                |> stripFlagDescriptions
+                |> Expect.equal expected
+        
+        _ ->
+            Expect.fail "Expected parsing to fail with BadFlag error"
+
+
+stripFlagDescriptions : Parser.FlagParserError -> Parser.FlagParserError
+stripFlagDescriptions error =
+    case error of
+        Parser.FlagParserFoundValueOnToggle _ key ->
+            Parser.FlagParserFoundValueOnToggle Dict.empty key
+        
+        Parser.FlagParserMissingValue _ key ->
+            Parser.FlagParserMissingValue Dict.empty key
+        
+        Parser.FlagParserInvalidValue _ key ->
+            Parser.FlagParserInvalidValue Dict.empty key
+        
+        Parser.FlagParserUnknownFlag _ key ->
+            Parser.FlagParserUnknownFlag Dict.empty key
 
 
 testArgs : Array String
