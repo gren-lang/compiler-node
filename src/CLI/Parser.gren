@@ -264,23 +264,23 @@ runCommand appName args flags spec =
         (FlagParser knownFlags parseFlags) =
             spec.flags
     in
-    case 
-        { argResult = parseArgs args
-        , flagResult = parseFlags knownFlags flags
-        }
-    of
-        { argResult = Ok argValue, flagResult = Ok flagValues } ->
-            Success <| spec.builder argValue flagValues
-    
-        { argResult = Err err } ->
-            BadArguments err
-    
-        { flagResult = Err err } ->
-            case err of
-                FlagParserUnknownFlag _ "help" ->
-                    HelpText <| commandHelpText appName spec
+    case Dict.get "help" flags of
+        Just "" ->
+            HelpText <| commandHelpText appName spec
 
-                _ ->
+        _ ->
+            case
+                { argResult = parseArgs args
+                , flagResult = parseFlags knownFlags flags
+                }
+            of
+                { argResult = Ok argValue, flagResult = Ok flagValues } ->
+                    Success <| spec.builder argValue flagValues
+    
+                { argResult = Err err } ->
+                    BadArguments err
+    
+                { flagResult = Err err } ->
                     BadFlags err
 
 

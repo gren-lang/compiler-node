@@ -76,20 +76,20 @@ tests =
                         [ Path.fromPosixString "src/Main.gren" ]
                         cmd.args
             , test "Fails if passed arg fails the parser" <| \{} ->
-                runCommand (cmdBuilder Parser.noArgs) [ "make", "src/Main" ]
+                runCommand (cmdBuilder Parser.noArgs testFlags) [ "make", "src/Main" ]
                     |> Expect.equal 
                         (Parser.BadArguments <| Parser.ArgumentParserWrongArity { expected = 0, actual = 1})
             , test "Can map arg parser" <| \{} ->
                 let
                     cmd =
-                        cmdBuilder <| Parser.mapArgs (\_ -> []) Parser.noArgs
+                        cmdBuilder (Parser.mapArgs (\_ -> []) Parser.noArgs) testFlags
                 in
                 expectParseSuccess cmd [ "make" ] <| \exec ->
                     Expect.equal [] exec.args
             , describe "No args" <|
                 let
                     testCmdNoArgs =
-                        cmdBuilder <| Parser.noArgs
+                        cmdBuilder (Parser.noArgs) testFlags
                 in
                 [ test "Valid example parses to empty list when no args are passed" <| \{} ->
                     expectParseSuccess testCmd [ "make" ] <| \cmd ->
@@ -109,7 +109,7 @@ tests =
             , describe "One arg" <|
                 let
                     testCmdOneArg =
-                        cmdBuilder <| Parser.oneArg Parser.grenFileParser
+                        cmdBuilder (Parser.oneArg Parser.grenFileParser) testFlags
                 in
                 [ test "Passing one arg when one is expected" <| \{} ->
                     expectParseSuccess testCmdOneArg testArgs <| \cmd ->
@@ -134,11 +134,13 @@ tests =
             , describe "Two args" <|
                 let
                     testCmdTwoArgs =
-                        cmdBuilder <|
-                            Parser.twoArgs
+                        cmdBuilder 
+                            (Parser.twoArgs
                                 (\path file -> { path = path, file = file })
                                 Parser.pathParser
                                 Parser.grenFileParser
+                            )
+                            testFlags
 
                     testTwoArgs =
                         [ "make", "src/Dest", "src/MyMain.gren" ]
@@ -188,14 +190,16 @@ tests =
             , describe "Three args" <|
                 let
                     testCmdThreeArgs =
-                        cmdBuilder <|
-                            Parser.threeArgs
+                        cmdBuilder
+                            (Parser.threeArgs
                                 (\path file path2 -> 
                                     { path = path, file = file, path2 = path2 }
                                 )
                                 Parser.pathParser
                                 Parser.grenFileParser
                                 Parser.pathParser
+                            )
+                            testFlags
 
                     testThreeArgs =
                         [ "make", "src/Dest", "src/MyMain.gren", "test/Test" ]
@@ -266,8 +270,8 @@ tests =
             , describe "oneOfArgs" <|
                 let
                     testCmdOneOfArgs =
-                        cmdBuilder <|
-                            Parser.oneOfArgs
+                        cmdBuilder
+                            (Parser.oneOfArgs
                                 [ Parser.twoArgs
                                     (\path file -> 
                                         { path = path, file = file }
@@ -281,6 +285,8 @@ tests =
                                             }
                                         )
                                 ]
+                            )
+                            testFlags
 
                     firstTest =
                         [ "make" ]
@@ -349,6 +355,13 @@ tests =
                         Expect.fail "Expected help text"
             , test "Passing --help will output help text, even in the presence of other flags" <| \{} ->
                 case runCommand testCmd [ "make", "--debug", "--help" ] of
+                    Parser.HelpText _ ->
+                        Expect.pass
+
+                    _ ->
+                        Expect.fail "Expected help text"
+            , test "Passing --help will output help text even when command takes no flags and requires args" <| \{} ->
+                case runCommand (cmdBuilder (Parser.oneArg Parser.pathParser) Parser.noFlags) [ "make", "--help" ] of
                     Parser.HelpText _ ->
                         Expect.pass
 
@@ -433,24 +446,28 @@ testArgs =
 
 
 testCmd =
-    cmdBuilder <| Parser.zeroOrMoreArgs Parser.grenFileParser
+    cmdBuilder testArgParser testFlags
 
 
+testArgParser =
+    (Parser.zeroOrMoreArgs Parser.grenFileParser)
 
-cmdBuilder argParser =
-    { word =
-        "make"
-    , arguments =
-        argParser
-    , flags =
-        Parser.initFlags 
-            (\debug output ->
-                { debug = debug
-                , output = output
-                }
-            )
-            |> Parser.toggle "debug" "debug desc"
-            |> Parser.flag "output" Parser.pathParser "output path"
+
+testFlags =
+    Parser.initFlags 
+                (\debug output ->
+                    { debug = debug
+                    , output = output
+                    }
+                )
+                |> Parser.toggle "debug" "debug desc"
+                |> Parser.flag "output" Parser.pathParser "output path"
+
+
+cmdBuilder argParser flagParser =
+    { word = "make"
+    , arguments = argParser
+    , flags = flagParser
     , commonDescription =
         Just "make your project"
     , summary =
