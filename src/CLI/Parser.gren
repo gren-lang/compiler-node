@@ -316,18 +316,11 @@ commandHelpText appName spec =
                 knownFlags
                 |> PP.verticalBlock
                 |> PP.indent
-
-        commandSuffix =
-            if argumentType == "" then
-                ""
-
-            else
-                " <" ++ argumentType ++ ">"
     in
     PP.verticalBlock
         [ PP.words spec.summary
         , PP.empty
-        , PP.words (appName ++ " " ++ spec.word ++ commandSuffix)
+        , PP.words (appName ++ " " ++ spec.word ++ " " ++ argumentType)
             |> PP.indent
             |> PP.color PP.Cyan
         , PP.empty
@@ -409,7 +402,7 @@ noArgs =
 
 oneArg : ValueParser val -> ArgumentParser val
 oneArg parseFn =
-    ArgumentParser parseFn.singular <| \args ->
+    ArgumentParser ("<" ++ parseFn.singular ++ ">") <| \args ->
         case args of
             [ arg ] ->
                 parseFn.fn arg
@@ -429,7 +422,7 @@ oneArg parseFn =
 
 twoArgs : (a -> b -> c) -> ValueParser a -> ValueParser b -> ArgumentParser c
 twoArgs combine firstValue secondValue =
-    ArgumentParser (firstValue.singular ++ "-" ++ secondValue.singular) <| \args ->
+    ArgumentParser ("<" ++ firstValue.singular ++ "> <" ++ secondValue.singular ++ ">") <| \args ->
         case args of
             [ first, second ] ->
                 case { first = firstValue.fn first, second = secondValue.fn second } of
@@ -456,7 +449,7 @@ twoArgs combine firstValue secondValue =
 
 threeArgs : (a -> b -> c -> d) -> ValueParser a -> ValueParser b -> ValueParser c -> ArgumentParser d
 threeArgs combine firstValue secondValue thirdValue =
-    ArgumentParser (String.join "-" [firstValue.singular, secondValue.singular, thirdValue.singular]) <| \args ->
+    ArgumentParser ("<" ++ String.join "> <" [firstValue.singular, secondValue.singular, thirdValue.singular] ++ ">") <| \args ->
         case args of
             [ first, second, third ] ->
                 case { first = firstValue.fn first, second = secondValue.fn second, third = thirdValue.fn third } of
