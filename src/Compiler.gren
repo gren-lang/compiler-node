@@ -5,8 +5,11 @@ module Compiler exposing
     , InitFlags
     , ReplFlags
     , MakeFlags
+    , MakeOutput(..)
     , DocsFlags
-    , DiffArgs
+    , DocsOutput(..)
+    , DiffArgs(..)
+    , Platform(..)
     , run
     --
     , UnsupportedPlatform(..)
@@ -42,7 +45,6 @@ type Command
     = Init InitFlags
     | Repl ReplFlags
     | Make MakeFlags (Array Path)
-    | MakeStatic StaticOpts
     | Docs DocsFlags
     | PackageInstall (Maybe Package)
     | PackageUninstall Package
@@ -83,12 +85,6 @@ type MakeOutput
     | Html String
     | Js String
     | Exe String
-
-
-type alias StaticOpts =
-    { output : Path
-    , source : Path
-    }
 
 
 type alias DocsFlags =
@@ -170,16 +166,6 @@ commandEncoder interactive pathToString command =
                 , { key = "report-json", value = maybeToBool flags.report }
                 , { key = "paths", value = Json.array (pathToString >> Json.string) paths }
                 ]
-        
-        MakeStatic opts ->
-            commandEncoder interactive pathToString <|
-                Make
-                    { optimize = True
-                    , sourcemaps = False
-                    , output = Just (Exe <| pathToString opts.output)
-                    , report = Nothing
-                    }
-                    [ opts.source ]
         
         Docs flags ->
             Json.object
