@@ -1,0 +1,428 @@
+module Compiler exposing 
+    ( version
+    --
+    , Command(..)
+    , InitFlags
+    , ReplFlags
+    , MakeFlags
+    , DocsFlags
+    , DiffArgs
+    , run
+    --
+    , UnsupportedPlatform(..)
+    , binaryDownloadUrl
+    , binaryCachePath
+    , isBinaryCached
+    , downloadBinary
+    )
+
+
+import Node
+import FileSystem
+import FileSystem.Path as Path exposing (Path)
+import Package exposing (Package)
+import SemanticVersion exposing (SemanticVersion)
+import ChildProcess
+import Json.Encode as Json
+import Dict exposing (Dict)
+import Task exposing (Task)
+import Bytes exposing (Bytes)
+import HttpClient
+
+
+version : String
+version =
+    "0.4.5"
+
+
+-- Compiler Commands
+
+
+type Command
+    = Init InitFlags
+    | Repl ReplFlags
+    | Make MakeFlags (Array Path)
+    | MakeStatic StaticOpts
+    | Docs DocsFlags
+    | PackageInstall (Maybe Package)
+    | PackageUninstall Package
+    | PackageOutdated
+    | PackageValidate
+    | PackageBump
+    | PackageDiff DiffArgs
+
+
+type alias InitFlags =
+    { package : Bool
+    , platform : Platform
+    }
+
+
+type Platform
+    = Common
+    | Browser
+    | Node
+
+
+type alias ReplFlags =
+    { interpreter : Maybe String
+    }
+
+
+type alias MakeFlags =
+    { optimize : Bool
+    , sourcemaps : Bool
+    , output : Maybe MakeOutput
+    , report : Maybe {}
+    }
+
+
+type MakeOutput
+    = StdOut
+    | DevNull
+    | Html String
+    | Js String
+    | Exe String
+
+
+type alias StaticOpts =
+    { output : Path
+    , source : Path
+    }
+
+
+type alias DocsFlags =
+    { output : Maybe DocsOutput
+    , report : Maybe {}
+    }
+
+
+type DocsOutput
+    = DocsStdOut
+    | DocsDevNull
+    | DocsJson String
+
+
+type DiffArgs
+    = DiffLatest
+    | DiffVersion SemanticVersion
+    | DiffRange SemanticVersion SemanticVersion
+    | DiffGlobal Package SemanticVersion SemanticVersion
+
+
+type alias RunOptions msg =
+    { command : Command
+    , interactiveSession : Bool
+    , useColor : Bool
+    , compilerPath : Path
+    , pathToString : (Path -> String)
+    , onComplete : (Int -> msg)
+    }
+
+run : ChildProcess.Permission -> RunOptions msg -> Cmd msg
+run permission options =
+    let
+        commandAsJson =
+            options.command
+                |> commandEncoder options.interactiveSession options.pathToString
+                |> Json.encode 0
+
+        escapedCommand =
+            "'" ++ commandAsJson ++ "'"
+       
+        colorEnvVar =
+            if options.useColor then
+                Dict.singleton "FORCE_COLOR" "1"
+            else
+                Dict.singleton "NO_COLOR" "1"
+    in
+    ChildProcess.spawnAndNotifyOnExit permission options.onComplete (options.pathToString options.compilerPath) [ escapedCommand ] <|
+        { ChildProcess.defaultSpawnOptions
+            | environmentVariables = 
+                ChildProcess.MergeWithEnvironmentVariables colorEnvVar
+        }
+
+
+
+commandEncoder : Bool -> (Path -> String) -> Command -> Json.Value
+commandEncoder interactive pathToString command =
+    case command of
+        Init flags ->
+            Json.object
+                [ { key = "command", value = Json.string "init" }
+                , { key = "interactive", value = Json.bool interactive }
+                , { key = "package", value = Json.bool flags.package }
+                , { key = "platform", value = platformEncoder flags.platform }
+                ]
+        
+        Repl flags ->
+            Json.object
+                [ { key = "command", value = Json.string "repl" }
+                , { key = "intepreter" , value = maybeEncoder Json.string flags.interpreter }
+                ]
+        
+        Make flags paths ->
+            Json.object
+                [ { key = "command", value = Json.string "make" }
+                , { key = "optimize", value = Json.bool flags.optimize }
+                , { key = "sourcemaps", value = Json.bool flags.sourcemaps }
+                , { key = "output", value = maybeEncoder makeOutputEncoder flags.output }
+                , { key = "report-json", value = maybeToBool flags.report }
+                , { key = "paths", value = Json.array (pathToString >> Json.string) paths }
+                ]
+        
+        MakeStatic opts ->
+            commandEncoder interactive pathToString <|
+                Make
+                    { optimize = True
+                    , sourcemaps = False
+                    , output = Just (Exe <| pathToString opts.output)
+                    , report = Nothing
+                    }
+                    [ opts.source ]
+        
+        Docs flags ->
+            Json.object
+                [ { key = "command", value = Json.string "docs" }
+                , { key = "output", value = maybeEncoder docsOutputEncoder flags.output }
+                , { key = "report-json", value = maybeToBool flags.report }
+                ]
+        
+        PackageInstall maybePackage ->
+            Json.object
+                [ { key = "command", value = Json.string "packageInstall" }
+                , { key = "interactive", value = Json.bool interactive }
+                , { key = "package", value = maybeEncoder Package.toJson maybePackage }
+                ]
+        
+        PackageUninstall package ->
+            Json.object
+                [ { key = "command", value = Json.string "packageUninstall" }
+                , { key = "interactive", value = Json.bool interactive }
+                , { key = "package", value = Package.toJson package }
+                ]
+        
+        PackageOutdated ->
+            Json.object
+                [ { key = "command", value = Json.string "packageOutdated" }
+                ]
+        
+        PackageValidate ->
+            Json.object
+                [ { key = "command", value = Json.string "packageValidate" }
+                ]
+        
+        PackageBump ->
+            Json.object
+                [ { key = "command", value = Json.string "packageBump" }
+                , { key = "interactive", value = Json.bool interactive }
+                ]
+        
+        PackageDiff args ->
+            case args of
+                DiffLatest ->
+                    Json.object
+                        [ { key = "command", value = Json.string "packageDiffLatest" }
+                        ]
+                
+                DiffVersion ver ->
+                    Json.object
+                        [ { key = "command", value = Json.string "packageDiffVersion" }
+                        , { key = "version", value = SemanticVersion.toJson ver }
+                        ]
+                
+                DiffRange ver1 ver2 ->
+                    Json.object
+                        [ { key = "command", value = Json.string "packageDiffRange" }
+                        , { key = "from", value = SemanticVersion.toJson ver1 }
+                        , { key = "to", value = SemanticVersion.toJson ver2 }
+                        ]
+                
+                DiffGlobal package ver1 ver2 ->
+                    Json.object
+                        [ { key = "command", value = Json.string "packageDiffGlobal" }
+                        , { key = "package", value = Package.toJson package }
+                        , { key = "from", value = SemanticVersion.toJson ver1 }
+                        , { key = "to", value = SemanticVersion.toJson ver2 }
+                        ]
+
+
+maybeEncoder : (a -> Json.Value) -> Maybe a -> Json.Value
+maybeEncoder enc maybeVal =
+    case maybeVal of
+        Just val ->
+            enc val
+
+        Nothing ->
+            Json.null
+
+
+maybeToBool : Maybe a -> Json.Value
+maybeToBool maybeVal =
+    case maybeVal of
+        Just val ->
+            Json.bool True
+
+        Nothing ->
+            Json.bool False
+
+
+platformEncoder : Platform -> Json.Value
+platformEncoder platform =
+    case platform of
+        Common -> Json.string "common"
+        Browser -> Json.string "browser"
+        Node -> Json.string "node"
+
+
+makeOutputEncoder : MakeOutput -> Json.Value
+makeOutputEncoder output =
+    case output of
+        StdOut -> 
+            Json.object
+                [ { key = "type", value = Json.string "stdout" }
+                ]
+        
+        DevNull ->
+            Json.object
+                [ { key = "type", value = Json.string "null" }
+                ]
+        
+        Html path ->
+            Json.object
+                [ { key = "type", value = Json.string "html" }
+                , { key = "path", value = Json.string path }
+                ]
+        
+        Js path ->
+            Json.object
+                [ { key = "type", value = Json.string "js" }
+                , { key = "path", value = Json.string path }
+                ]
+        
+        Exe path ->
+            Json.object
+                [ { key = "type", value = Json.string "exe" }
+                , { key = "path", value = Json.string path }
+                ]
+
+
+docsOutputEncoder : DocsOutput -> Json.Value
+docsOutputEncoder output =
+    case output of
+        DocsStdOut -> 
+            Json.object
+                [ { key = "type", value = Json.string "stdout" }
+                ]
+        
+        DocsDevNull ->
+            Json.object
+                [ { key = "type", value = Json.string "null" }
+                ]
+        
+        DocsJson path ->
+            Json.object
+                [ { key = "type", value = Json.string "json" }
+                , { key = "path", value = Json.string path }
+                ]
+
+
+-- Binary
+
+
+type UnsupportedPlatform
+    = UnsupportedPlatform
+
+
+binaryDownloadUrl : Node.Platform -> Node.CpuArchitecture -> Result UnsupportedPlatform String
+binaryDownloadUrl platform cpuArch =
+    let
+        maybeFilename =
+            case { platform = platform, cpuArch = cpuArch } of
+                { platform = Node.Win32, cpuArch = Node.X64 } ->
+                    Just "gren.exe"
+                
+                { platform = Node.Darwin, cpuArch = Node.X64 } ->
+                    Just "gren_mac"
+                
+                { platform = Node.Darwin, cpuArch = Node.Arm64 } ->
+                    Just "gren_mac_aarch64"
+                
+                { platform = Node.Linux, cpuArch = Node.X64 } ->
+                    Just "gren_linux"
+
+                _ ->
+                    Nothing
+    in
+    case maybeFilename of
+        Just filename ->
+            Ok <|
+                String.join "/"
+                    [ "https://github.com/gren-lang/compiler/releases/download"
+                    , version
+                    , filename
+                    ]
+
+        Nothing ->
+            Err UnsupportedPlatform
+
+
+binaryCachePath : Node.Platform -> Dict String String -> Path -> Path
+binaryCachePath platform envVars homeDir =
+    let
+        startPath =
+            case platform of
+                Node.Win32 ->
+                    envVars
+                        |> Dict.get "LOCALAPPDATA"
+                        |> Maybe.map Path.fromWin32String
+                        |> Maybe.withDefault (
+                            "AppData/Local"
+                                |> Path.fromPosixString
+                                |> Path.prepend homeDir
+                            )
+
+                Node.Darwin ->
+                    "Library/Caches"
+                        |> Path.fromPosixString
+                        |> Path.prepend homeDir
+
+                _ ->
+                    envVars
+                        |> Dict.get "XDG_CACHE_HOME"
+                        |> Maybe.map Path.fromPosixString
+                        |> Maybe.withDefault (Path.append (Path.fromPosixString ".cache") homeDir)
+
+        filename =
+            case platform of
+                Node.Win32 ->
+                    "gren.exe"
+
+                _ ->
+                    "gren"
+        
+        endPath =
+            [ "gren"
+            , version
+            , "bin"
+            , filename
+            ]
+                |> String.join "/"
+                |> Path.fromPosixString
+    in
+    Path.prepend startPath endPath
+
+
+isBinaryCached : FileSystem.Permission -> Node.Platform -> Dict String String -> Path -> Task x Bool
+isBinaryCached permission platform envVars homeDir =
+    binaryCachePath platform envVars homeDir
+        |> FileSystem.checkAccess permission []
+        |> Task.map (\_ -> True)
+        |> Task.onError (\_ -> Task.succeed False)
+
+
+downloadBinary : HttpClient.Permission -> String -> Task (HttpClient.Error Bytes) (HttpClient.Response Bytes)
+downloadBinary permission url =
+    HttpClient.get url
+        |> HttpClient.expectBytes
+        |> HttpClient.send permission

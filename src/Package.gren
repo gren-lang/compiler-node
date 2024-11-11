@@ -3,8 +3,14 @@ module Package exposing
     , author
     , name
     , fromString
+    , cliParser
     , toString
+    , toJson
     )
+
+
+import CLI.Parser
+import Json.Encode as Json
 
 
 type Package
@@ -66,6 +72,25 @@ fromString str =
             Nothing
 
 
+cliParser : CLI.Parser.ValueParser Package
+cliParser =
+    { singular = "package"
+    , plural = "packages"
+    , fn = fromString
+    , examples =
+        [ "gren-lang/core"
+        , "robheghan/string-diff"
+        ]
+    }
+
+
 toString : Package -> String
 toString package =
     author package ++ "/" ++ name package
+
+
+toJson: Package -> Json.Value
+toJson package =
+    Json.string <| toString package
+
+

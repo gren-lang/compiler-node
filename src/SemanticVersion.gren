@@ -1,8 +1,14 @@
 module SemanticVersion exposing 
     ( SemanticVersion
     , fromString
+    , cliParser
     , toString
+    , toJson
     )
+
+
+import CLI.Parser
+import Json.Encode as Json
 
 
 type alias SemanticVersion = 
@@ -33,6 +39,25 @@ fromString str =
             Nothing
 
 
+cliParser : CLI.Parser.ValueParser SemanticVersion
+cliParser =
+    { singular = "version"
+    , plural = "versions"
+    , fn = fromString
+    , examples =
+        [ "1.0.0"
+        , "1.2.3"
+        , "5.1.0"
+        ]
+    }
+
+
 toString : SemanticVersion -> String
 toString { major, minor, patch } =
     String.fromInt major ++ "." ++ String.fromInt minor ++ "." ++ String.fromInt patch
+
+
+toJson : SemanticVersion -> Json.Value
+toJson semver =
+    Json.string <| toString semver
+
