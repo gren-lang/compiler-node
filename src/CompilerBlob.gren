@@ -1,4 +1,4 @@
-module Compiler exposing 
+module CompilerBlob exposing 
     ( version
     --
     , Command(..)
@@ -35,7 +35,7 @@ import HttpClient
 
 version : String
 version =
-    "0.4.5"
+    "0.5.0"
 
 
 -- Compiler Commands
