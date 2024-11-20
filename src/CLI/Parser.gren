@@ -1,14 +1,14 @@
 module CLI.Parser exposing 
     ( App
+    , CommandParseResult(..)
+    , run
     --
     , GroupParser
     , defineGroup
     , withCommand
     , withPrefix
-    , run
     --
     , Command
-    , CommandParseResult(..)
     --
     , ValueParser
     --
@@ -36,32 +36,83 @@ module CLI.Parser exposing
     )
 
 
+{-| A module for parsing arguments from the command line. With this you can turn the following
+
+   mycmd greet --overwrite file.txt
+
+Into a data structure.
+
+* `mycmd` is the [Application](#App)
+* `greet` is the [Command](#Command)
+* `--overwrite` is a [Flag](#FlagParser)
+* `file.txt` is an [Argument](#ArgumentParser)
+
+## Application
+
+@docs App, run
+
+## Groups
+
+@docs GroupParser, Command, CommandParseResult, defineGroup, withCommand, withPrefix
+
+## Arguments
+
+@docs ValueParser, ArgumentParser, ArgumentParserError, argumentErrorPrettified, noArgs, oneArg, twoArgs, threeArgs, zeroOrMoreArgs, mapArgs, oneOfArgs
+
+## Flags
+
+@docs FlagParser, FlagParserError, flagErrorPrettified, noFlags, initFlags, toggle, flag
+
+## Common parsers
+
+@docs pathParser, grenFileParser
+-}
+
+
 import Dict exposing (Dict)
 import FileSystem.Path as Path exposing (Path)
 import CLI.PrettyPrinter as PP
 
 
+{-| Defines a command line application.
+
+* `name` is the name of the application
+* `version` is the application version
+* `commands` is a group of commands that this application recognizes
+* `intro` and `outro` is used when the user calls the application without
+any arguments. They define what text comes before and after the list of
+supported commands.
+-}
 type alias App result =
     { name : String
     , version : String
+    , commands : GroupParser result
     , intro : PP.Document
     , outro : PP.Document
-    , commands : GroupParser result
     }
 
 
+{-| A parser for a group, or collection, of commands.
+-}
 type GroupParser result
     = GroupParser 
         (Dict String (Maybe String))
         (String -> String -> Array String -> Dict String String -> CommandParseResult result)
 
 
+{-| Defines an empty group of commands. To add commands to this group, you'll
+need to use [withCommand](#withCommand) and [withPrefix](#withPrefix).
+-}
 defineGroup : GroupParser result
 defineGroup =
     GroupParser Dict.empty <| \_appName name _args _flags ->
         UnknownCommand name
 
 
+{-| Returns a new group that contains the given command. If there are multiple
+commands in the group with the same `word`, then the last registered command
+wins.
+-}
 withCommand : Command args flags result -> GroupParser result -> GroupParser result
 withCommand command (GroupParser knownCommands next) =
     GroupParser (Dict.set command.word command.commonDescription knownCommands) <| \appName name args flags ->
@@ -72,6 +123,8 @@ withCommand command (GroupParser knownCommands next) =
             runCommand appName args flags command
 
 
+{-| Embeds a group of commands into an existing group, accessible by the given prefix.
+-}
 withPrefix : String -> GroupParser result -> GroupParser result -> GroupParser result
 withPrefix prefix prefixedCommands (GroupParser knownCommands nextCommand) =
     GroupParser (Dict.set prefix Nothing knownCommands) <| \appName name args flags ->
@@ -82,6 +135,9 @@ withPrefix prefix prefixedCommands (GroupParser knownCommands nextCommand) =
             runPrefix appName prefix args flags prefixedCommands
 
 
+{-| Takes input from the user in the form of an `Array` of `String`, and parses it according
+to the given `App` definition.
+-}
 run : Array String -> App result -> CommandParseResult result
 run tokens appDef =
     let
@@ -236,6 +292,8 @@ buildFlagDict flags =
 -- COMMAND
 
 
+{-| Definition of a command.
+-}
 type alias Command args flags result =
     { word : String
     , arguments : ArgumentParser args
@@ -247,6 +305,8 @@ type alias Command args flags result =
     }
 
 
+{-| The result of parsing user input.
+-}
 type CommandParseResult a
     = UnknownCommand String
     | BadFlags FlagParserError
@@ -335,10 +395,16 @@ commandHelpText appName spec =
 -- ARGS
 
 
+{-| Arguments are values that a [Command](#Command) requires to function. An `ArgumentParser`
+is a way of converting an arbitrary number of `String` inputs into Gren values.
+-}
 type ArgumentParser val
     = ArgumentParser String (Array String -> Result ArgumentParserError val)
 
 
+{-| Defines an argument value. The `fn` property is the function that parses
+the `String` representation of an argument into its final form.
+-}
 type alias ValueParser val =
     { singular : String
     , plural : String
@@ -347,11 +413,16 @@ type alias ValueParser val =
     }
 
 
+{-| There are mainly two things that can go wrong when parsing arguments. You can either get an
+unexpected number of arguments or one or more of those arguments may fail to parse.
+-}
 type ArgumentParserError
     = ArgumentParserWrongArity { expected : Int, actual : Int }
     | ArgumentParserInvalidArgument { argument : String, title : String, examples : Array String }
 
 
+{-| Turns an [ArgumentParserError](#ArgumentParserError) into a prettified `String`.
+-}
 argumentErrorPrettified : ArgumentParserError -> PP.Document
 argumentErrorPrettified err =
     case err of
@@ -390,6 +461,9 @@ argumentErrorPrettified err =
                 ]
 
 
+{-| Some [Command](#Command)s doesn't require arguments. This parser checks that exactly 0
+arguments were provided.
+-}
 noArgs : ArgumentParser {}
 noArgs =
     ArgumentParser "" <| \args ->
@@ -400,6 +474,8 @@ noArgs =
             Ok {}
 
 
+{-| Parses exactly one argument.
+-}
 oneArg : ValueParser val -> ArgumentParser val
 oneArg parseFn =
     ArgumentParser ("<" ++ parseFn.singular ++ ">") <| \args ->
@@ -420,6 +496,8 @@ oneArg parseFn =
                 Err <| ArgumentParserWrongArity { expected = 1, actual = Array.length args }
 
 
+{-| Parses exactly two arguments.
+-}
 twoArgs : (a -> b -> c) -> ValueParser a -> ValueParser b -> ArgumentParser c
 twoArgs combine firstValue secondValue =
     ArgumentParser ("<" ++ firstValue.singular ++ "> <" ++ secondValue.singular ++ ">") <| \args ->
@@ -447,6 +525,8 @@ twoArgs combine firstValue secondValue =
                 Err <| ArgumentParserWrongArity { expected = 2, actual = Array.length args }
 
 
+{-| Parses exactly three arguments.
+-}
 threeArgs : (a -> b -> c -> d) -> ValueParser a -> ValueParser b -> ValueParser c -> ArgumentParser d
 threeArgs combine firstValue secondValue thirdValue =
     ArgumentParser ("<" ++ String.join "> <" [firstValue.singular, secondValue.singular, thirdValue.singular] ++ ">") <| \args ->
@@ -481,6 +561,8 @@ threeArgs combine firstValue secondValue thirdValue =
                 Err <| ArgumentParserWrongArity { expected = 3, actual = Array.length args }
 
 
+{-| Parses zero or more arguments of a single type.
+-}
 zeroOrMoreArgs : ValueParser val -> ArgumentParser (Array val)
 zeroOrMoreArgs parseFn =
     ArgumentParser parseFn.plural <| \args ->
@@ -499,6 +581,8 @@ zeroOrMoreArgs parseFn =
             Ok parsedArgs
 
 
+{-| Maps a successfully parsed set of arguments into something else.
+-}
 mapArgs : (a -> b) -> ArgumentParser a -> ArgumentParser b
 mapArgs mapper (ArgumentParser desc fn) =
     ArgumentParser desc <| \args ->
@@ -510,6 +594,9 @@ mapArgs mapper (ArgumentParser desc fn) =
                 Err err
 
 
+{-| A list of parsers that will be tried one after another until one
+succeeds.
+-}
 oneOfArgs : Array (ArgumentParser val) -> ArgumentParser val
 oneOfArgs argParsers =
     ArgumentParser "<one-of>" <| \args ->
@@ -535,6 +622,8 @@ oneOfArgs argParsers =
 -- FLAGS
 
 
+{-| Flags are prefixed with `--` and are meant to customize a command.
+-}
 type FlagParser val
     = FlagParser KnownFlags (KnownFlags -> Dict String String -> Result FlagParserError val)
 
@@ -543,6 +632,8 @@ type alias KnownFlags =
     Dict String FlagParserDescription
 
 
+{-| Definition of a single flag.
+-}
 type alias FlagParserDescription =
     { title : String
     , description : String
@@ -550,6 +641,13 @@ type alias FlagParserDescription =
     }
 
 
+{-| There are several things that can go wrong when parsing flags:
+
+* The parser can find an associated value for a flag that requires none.
+* The parser might not find an associated value for a flag that does require one.
+* The associated value might fail to parse.
+* The flag might be unknown.
+-}
 type FlagParserError
     = FlagParserFoundValueOnToggle KnownFlags String
     | FlagParserMissingValue KnownFlags String
@@ -557,6 +655,8 @@ type FlagParserError
     | FlagParserUnknownFlag KnownFlags String
 
 
+{-| Returns a prettified error message for the given [FlagParserError](#FlagParserError).
+-}
 flagErrorPrettified : FlagParserError -> PP.Document
 flagErrorPrettified err =
     case err of
@@ -661,11 +761,16 @@ describeFlagUse knownFlags flagName =
             PP.empty
 
 
+{-| A parser that verifies that no flags have been provided.
+-}
 noFlags : FlagParser {}
 noFlags =
     initFlags {}
 
 
+{-| Defines an empty group of flags. You'll need to register flags using the
+[toggle](#toggle) and [flag](#flag) functions.
+-}
 initFlags : a -> FlagParser a
 initFlags value =
     FlagParser Dict.empty <| \knownFlags remainingFlags -> 
@@ -677,6 +782,9 @@ initFlags value =
                 Ok value
 
 
+{-| Defines a flag that doesn't require an associated value. We're simply checking
+if the flag is present or not.
+-}
 toggle : String -> String -> FlagParser (Bool -> b) -> FlagParser b
 toggle key desc (FlagParser knownFlags previousSteps) =
     let
@@ -702,6 +810,9 @@ toggle key desc (FlagParser knownFlags previousSteps) =
             Err err ->
                 Err err
 
+
+{-| Defines a flag that requires an associated value.
+-}
 flag : String -> ValueParser a -> String -> FlagParser (Maybe a -> b) -> FlagParser b
 flag key valueParserFn desc (FlagParser knownFlags previousSteps) =
     let
@@ -736,6 +847,8 @@ flag key valueParserFn desc (FlagParser knownFlags previousSteps) =
 -- PARSERS
 
 
+{-| Parses a `String` into a `FileSystem.Path`.
+-}
 pathParser : ValueParser Path
 pathParser =
     { singular = "path"
@@ -748,6 +861,8 @@ pathParser =
     }
 
 
+{-| Like [pathParser](#pathParser), but verifies that the file extension is `.gren`.
+-}
 grenFileParser : ValueParser Path
 grenFileParser =
     { singular = "gren-file"

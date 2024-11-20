@@ -20,9 +20,21 @@ module CLI.PrettyPrinter exposing
     )
 
 
+{-| This module lets you define how text should be formatted before printing
+it to the terminal.
+
+@docs Document
+@docs empty, text, words, indent, block, verticalBlock
+@docs Color, color, intenseColor, stripColor
+@docs toString, ToStringOptions, defaultOptions, toStringWithOptions
+-}
+
+
 import Math
 
 
+{-| A `Document` represents formatted text.
+-}
 type Document
     = Empty
     | Text String
@@ -33,11 +45,20 @@ type Document
     | VerticalBlock (Array Document)
 
 
+{-| The empty [Document](#Document) takes up no space. It's analogous to the
+empty `String`.
+-}
 empty : Document
 empty =
     Empty
 
 
+{-| Turn a `String` into a [Document](#Document). Newlines are not respected,
+if you want to spread text over multiple lines, use [verticalBlock](#verticalBlock).
+
+Word boundaries are also not respected. If that's important to you, you might want
+to use [words](#words)
+-}
 text : String -> Document
 text str =
     str
@@ -46,21 +67,32 @@ text str =
         |> Text
 
 
+{-| Similar to [text](#text), but word boundaries are respected if the `String` has
+to be broken up over multiple lines. Whitespace between words are reduced to a single
+space.
+-}
 words : String -> Document
 words str =
     Words <| String.words str
 
 
+{-| The contents of the [Document](#Document) is indented one level.
+-}
 indent : Document -> Document
 indent doc =
     Indented doc
 
 
+{-| This joins multiple [Documents](#Document) into one. If possible, everything
+will be placed on a single line.
+-}
 block : Array Document -> Document
 block docs =
     Block docs
 
 
+{-| Like [block](#block), but each [Document](#Document) is placed on a seperate line.
+-}
 verticalBlock : Array Document -> Document
 verticalBlock docs =
     VerticalBlock docs
@@ -69,6 +101,8 @@ verticalBlock docs =
 -- COLORS
 
 
+{-| Supported text colors
+-}
 type Color
     = Black
     | Red
@@ -80,6 +114,8 @@ type Color
     | White
 
 
+{-| Colorize the text in the given [Document](#Document).
+-}
 color : Color -> Document -> Document
 color clr doc =
     Colorized
@@ -89,6 +125,8 @@ color clr doc =
         }
 
 
+{-| Like [color](#color), but intensifies the given color.
+-}
 intenseColor : Color -> Document -> Document
 intenseColor clr doc =
     Colorized
@@ -98,6 +136,8 @@ intenseColor clr doc =
         }
 
 
+{-| This removes all colorized text in a [Document](#Document).
+-}
 stripColor : Document -> Document
 stripColor doc =
     case doc of
@@ -155,11 +195,20 @@ ansiColorEscapePrefix =
 -- RUN
 
 
+{-| Convert a [Document](#Document) into a `String` that's ready to be written
+to the terminal.
+-}
 toString : Document -> String
 toString doc =
     toStringWithOptions defaultOptions doc
 
 
+{-| Different settings when converting a [Document](#Document) into `String`.
+
+* `maxColumns` defines the maximum number of characters in a line.
+* `indentationSize` defines the number of spaces per indentation level.
+* `newlineSeparator` defines the `String` used for representing newlines.
+-}
 type alias ToStringOptions =
     { maxColumns : Int
     , indentationSize : Int
@@ -167,6 +216,8 @@ type alias ToStringOptions =
     }
 
 
+{-| A default set of options for converting [Document](#Document) into `String`.
+-}
 defaultOptions : ToStringOptions
 defaultOptions =
     { maxColumns = Math.maxSafeInteger
@@ -175,6 +226,8 @@ defaultOptions =
     }
 
 
+{-| Like [toString](#toString), but allows you to override the default options.
+-}
 toStringWithOptions : ToStringOptions -> Document -> String
 toStringWithOptions { maxColumns, indentationSize, newlineSeparator } doc =
     toStringHelper 
