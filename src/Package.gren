@@ -1,18 +1,37 @@
 module Package exposing
     ( Package
+    --
     , author
     , name
+    --
     , fromString
     , cliParser
+    --
     , toString
     , toJson
     )
+
+
+{-| Functions for working with package identifiers.
+
+@docs Package, author, name, fromString, cliParser, toString, toJson
+-}
 
 
 import CLI.Parser
 import Json.Encode as Json
 
 
+{-| A package is identified by a string in the following format:
+
+    author/name
+
+Where `author` represents the person, or organization, that built the package, and
+`name` is... well, a name. A name should ideally describe the purpose of the package.
+
+Both `author` and `name` can contain alphanumeric characters and a single dash as a seperator,
+but no other characters.
+-}
 type Package
     = Package 
         { author : String
@@ -20,16 +39,22 @@ type Package
         }
 
 
+{-| Retrieve the package author.
+-}
 author : Package -> String
 author (Package fields) =
     fields.author
 
 
+{-| Retrieve the package name.
+-}
 name : Package -> String
 name (Package fields) =
     fields.name
 
 
+{-| Attempt to convert a `String` into [Package](#Package).
+-}
 fromString : String -> Maybe Package
 fromString str =
     case String.split "/" str of
@@ -72,6 +97,8 @@ fromString str =
             Nothing
 
 
+{-| A parser for use with [CLI.Parser](#CLI.Parser).
+-}
 cliParser : CLI.Parser.ValueParser Package
 cliParser =
     { singular = "package"
@@ -84,11 +111,15 @@ cliParser =
     }
 
 
+{-| Turn [Package](#Package) into a `String`.
+-}
 toString : Package -> String
 toString package =
     author package ++ "/" ++ name package
 
 
+{-| Turn [Package](#Package) into `Json`.
+-}
 toJson: Package -> Json.Value
 toJson package =
     Json.string <| toString package

@@ -7,10 +7,25 @@ module SemanticVersion exposing
     )
 
 
+{-| Semantic versions consist of three numbers, each having a specific
+meaning. This module makes no attempt to enforce the semantic versioning
+rules.
+
+@docs SemanticVersion, fromString, cliParser, toString, toJson
+-}
+
+
 import CLI.Parser
 import Json.Encode as Json
 
 
+{-| A semantic version has three numbers, separated by a period.
+
+* `major` signifies API compatibility. Two version with different `major` numbers, are likely
+incompatible.
+* `minor` represents additions. `1.0.0` should be compatible with `1.1.0`, but not the other way around.
+* `patch` represents bug fixes. `1.0.0` and `1.0.1` has the same API, but the latter might be more stable.
+-}
 type alias SemanticVersion = 
     { major : Int
     , minor : Int
@@ -18,6 +33,8 @@ type alias SemanticVersion =
     }
 
 
+{-| Convert a `String` into a [SemanticVersion](#SemanticVersion).
+-}
 fromString : String -> Maybe SemanticVersion
 fromString str =
     let
@@ -39,6 +56,8 @@ fromString str =
             Nothing
 
 
+{-| A parser for use with [CLI.Parser](#CLI.Parser).
+-}
 cliParser : CLI.Parser.ValueParser SemanticVersion
 cliParser =
     { singular = "version"
@@ -52,11 +71,15 @@ cliParser =
     }
 
 
+{-| Turn a [SemanticVersion](#SemanticVersion) into a `String`.
+-}
 toString : SemanticVersion -> String
 toString { major, minor, patch } =
     String.fromInt major ++ "." ++ String.fromInt minor ++ "." ++ String.fromInt patch
 
 
+{-| Turn a [SemanticVersion](#SemanticVersion) into `Json`.
+-}
 toJson : SemanticVersion -> Json.Value
 toJson semver =
     Json.string <| toString semver
