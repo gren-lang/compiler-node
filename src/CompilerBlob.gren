@@ -13,11 +13,22 @@ module CompilerBlob exposing
     , run
     --
     , UnsupportedPlatform(..)
-    , binaryDownloadUrl
-    , binaryCachePath
-    , isBinaryCached
-    , downloadBinary
+    , downloadUrl
+    , download
+    , cachePath
+    , isCached
     )
+
+
+{-| Functions for working with the Haskell-based Gren compiler.
+
+@docs version
+
+@docs UnsupportedPlatform, downloadUrl, download, cachePath, isCached
+
+@docs Command, InitFlags, ReplFlags, MakeFlags, MakeOutput, DocsFlags, DocsOutput, DiffArgs, Platform, run
+
+-}
 
 
 import Node
@@ -33,14 +44,144 @@ import Bytes exposing (Bytes)
 import HttpClient
 
 
+{-| Version of the compiler blob. This might not match the version of the Gren compiler as a whole,
+as the Haskell- and Gren-parts are versioned seperatly.
+-}
 version : String
 version =
     "0.5.0"
 
 
+-- Binary
+
+
+{-| Type used to signal that the given platform isn't supported. Meaning that there doesn't exist
+a pre-built compiler blob.
+-}
+type UnsupportedPlatform
+    = UnsupportedPlatform
+
+
+{-| Construct a URL from which you can download a compiler blob compatible with the given
+platform and cpu architecture.
+-}
+downloadUrl : Node.Platform -> Node.CpuArchitecture -> Result UnsupportedPlatform String
+downloadUrl platform cpuArch =
+    let
+        maybeFilename =
+            case { platform = platform, cpuArch = cpuArch } of
+                { platform = Node.Win32, cpuArch = Node.X64 } ->
+                    Just "gren.exe"
+                
+                { platform = Node.Darwin, cpuArch = Node.X64 } ->
+                    Just "gren_mac"
+                
+                { platform = Node.Darwin, cpuArch = Node.Arm64 } ->
+                    Just "gren_mac_aarch64"
+                
+                { platform = Node.Linux, cpuArch = Node.X64 } ->
+                    Just "gren_linux"
+
+                _ ->
+                    Nothing
+    in
+    case maybeFilename of
+        Just filename ->
+            Ok <|
+                String.join "/"
+                    [ "https://github.com/gren-lang/compiler/releases/download"
+                    , version
+                    , filename
+                    ]
+
+        Nothing ->
+            Err UnsupportedPlatform
+
+
+{-| Downlod the compiler blob.
+-}
+download : HttpClient.Permission -> String -> Task (HttpClient.Error Bytes) (HttpClient.Response Bytes)
+download permission url =
+    HttpClient.get url
+        |> HttpClient.expectBytes
+        |> HttpClient.send permission
+
+
+{-| Construct a `Path` where we'd expect to find the compiler blob if it has been downloaded
+previously.
+-}
+cachePath : Node.Platform -> Dict String String -> Path -> Path
+cachePath platform envVars homeDir =
+    let
+        startPath =
+            case platform of
+                Node.Win32 ->
+                    envVars
+                        |> Dict.get "LOCALAPPDATA"
+                        |> Maybe.map Path.fromWin32String
+                        |> Maybe.withDefault (
+                            "AppData/Local"
+                                |> Path.fromPosixString
+                                |> Path.prepend homeDir
+                            )
+
+                Node.Darwin ->
+                    "Library/Caches"
+                        |> Path.fromPosixString
+                        |> Path.prepend homeDir
+
+                _ ->
+                    envVars
+                        |> Dict.get "XDG_CACHE_HOME"
+                        |> Maybe.map Path.fromPosixString
+                        |> Maybe.withDefault (Path.append (Path.fromPosixString ".cache") homeDir)
+
+        filename =
+            case platform of
+                Node.Win32 ->
+                    "gren.exe"
+
+                _ ->
+                    "gren"
+        
+        endPath =
+            [ "gren"
+            , version
+            , "bin"
+            , filename
+            ]
+                |> String.join "/"
+                |> Path.fromPosixString
+    in
+    Path.prepend startPath endPath
+
+
+{-| Checks if the compiler blob exist on this system.
+-}
+isCached : FileSystem.Permission -> Node.Platform -> Dict String String -> Path -> Task x Bool
+isCached permission platform envVars homeDir =
+    cachePath platform envVars homeDir
+        |> FileSystem.checkAccess permission []
+        |> Task.map (\_ -> True)
+        |> Task.onError (\_ -> Task.succeed False)
+
+
 -- Compiler Commands
 
 
+{-| Commands supported by the compiler blob.
+
+* `Init`: generate a gren.json and src directory in the current directory.
+* `Repl`: run a REPL.
+* `Make`: compile a project
+* `Docs`: generate a docs.json file
+* `PackageInstall`: install dependencies
+* `PackageUninstall`: remove a dependency
+* `PackageOutdated`: get a list of outdated dependencies
+* `PackageValide`: check if this package is ready to be deployed
+* `PackageBump`: bump package version to next compatible semantic version
+* `PackageDiff`: calculate the API-difference between this package and another version.
+-}
 type Command
     = Init InitFlags
     | Repl ReplFlags
@@ -54,23 +195,27 @@ type Command
     | PackageDiff DiffArgs
 
 
+{-|-}
 type alias InitFlags =
     { package : Bool
     , platform : Platform
     }
 
 
+{-|-}
 type Platform
     = Common
     | Browser
     | Node
 
 
+{-|-}
 type alias ReplFlags =
     { interpreter : Maybe String
     }
 
 
+{-|-}
 type alias MakeFlags =
     { optimize : Bool
     , sourcemaps : Bool
@@ -79,6 +224,7 @@ type alias MakeFlags =
     }
 
 
+{-|-}
 type MakeOutput
     = StdOut
     | DevNull
@@ -87,18 +233,21 @@ type MakeOutput
     | Exe String
 
 
+{-|-}
 type alias DocsFlags =
     { output : Maybe DocsOutput
     , report : Maybe {}
     }
 
 
+{-|-}
 type DocsOutput
     = DocsStdOut
     | DocsDevNull
     | DocsJson String
 
 
+{-|-}
 type DiffArgs
     = DiffLatest
     | DiffVersion SemanticVersion
@@ -106,6 +255,7 @@ type DiffArgs
     | DiffGlobal Package SemanticVersion SemanticVersion
 
 
+{-|-}
 type alias RunOptions msg =
     { command : Command
     , interactiveSession : Bool
@@ -115,6 +265,10 @@ type alias RunOptions msg =
     , onComplete : (Int -> msg)
     }
 
+
+{-| Execute the compiler blob. The blob will write to stdout and stderr. There's currently no way
+to redirect what is written to these streams.
+-}
 run : ChildProcess.Permission -> RunOptions msg -> Cmd msg
 run permission options =
     let
@@ -311,104 +465,3 @@ docsOutputEncoder output =
                 [ { key = "type", value = Json.string "json" }
                 , { key = "path", value = Json.string path }
                 ]
-
-
--- Binary
-
-
-type UnsupportedPlatform
-    = UnsupportedPlatform
-
-
-binaryDownloadUrl : Node.Platform -> Node.CpuArchitecture -> Result UnsupportedPlatform String
-binaryDownloadUrl platform cpuArch =
-    let
-        maybeFilename =
-            case { platform = platform, cpuArch = cpuArch } of
-                { platform = Node.Win32, cpuArch = Node.X64 } ->
-                    Just "gren.exe"
-                
-                { platform = Node.Darwin, cpuArch = Node.X64 } ->
-                    Just "gren_mac"
-                
-                { platform = Node.Darwin, cpuArch = Node.Arm64 } ->
-                    Just "gren_mac_aarch64"
-                
-                { platform = Node.Linux, cpuArch = Node.X64 } ->
-                    Just "gren_linux"
-
-                _ ->
-                    Nothing
-    in
-    case maybeFilename of
-        Just filename ->
-            Ok <|
-                String.join "/"
-                    [ "https://github.com/gren-lang/compiler/releases/download"
-                    , version
-                    , filename
-                    ]
-
-        Nothing ->
-            Err UnsupportedPlatform
-
-
-binaryCachePath : Node.Platform -> Dict String String -> Path -> Path
-binaryCachePath platform envVars homeDir =
-    let
-        startPath =
-            case platform of
-                Node.Win32 ->
-                    envVars
-                        |> Dict.get "LOCALAPPDATA"
-                        |> Maybe.map Path.fromWin32String
-                        |> Maybe.withDefault (
-                            "AppData/Local"
-                                |> Path.fromPosixString
-                                |> Path.prepend homeDir
-                            )
-
-                Node.Darwin ->
-                    "Library/Caches"
-                        |> Path.fromPosixString
-                        |> Path.prepend homeDir
-
-                _ ->
-                    envVars
-                        |> Dict.get "XDG_CACHE_HOME"
-                        |> Maybe.map Path.fromPosixString
-                        |> Maybe.withDefault (Path.append (Path.fromPosixString ".cache") homeDir)
-
-        filename =
-            case platform of
-                Node.Win32 ->
-                    "gren.exe"
-
-                _ ->
-                    "gren"
-        
-        endPath =
-            [ "gren"
-            , version
-            , "bin"
-            , filename
-            ]
-                |> String.join "/"
-                |> Path.fromPosixString
-    in
-    Path.prepend startPath endPath
-
-
-isBinaryCached : FileSystem.Permission -> Node.Platform -> Dict String String -> Path -> Task x Bool
-isBinaryCached permission platform envVars homeDir =
-    binaryCachePath platform envVars homeDir
-        |> FileSystem.checkAccess permission []
-        |> Task.map (\_ -> True)
-        |> Task.onError (\_ -> Task.succeed False)
-
-
-downloadBinary : HttpClient.Permission -> String -> Task (HttpClient.Error Bytes) (HttpClient.Response Bytes)
-downloadBinary permission url =
-    HttpClient.get url
-        |> HttpClient.expectBytes
-        |> HttpClient.send permission
