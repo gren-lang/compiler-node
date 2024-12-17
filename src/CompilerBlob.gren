@@ -49,7 +49,7 @@ as the Haskell- and Gren-parts are versioned seperatly.
 -}
 version : String
 version =
-    "0.5.0"
+    "0.5.2"
 
 
 -- Binary
@@ -90,7 +90,7 @@ downloadUrl platform cpuArch =
             Ok <|
                 String.join "/"
                     [ "https://github.com/gren-lang/compiler/releases/download"
-                    , version
+                    , "blob-" ++ version
                     , filename
                     ]
 
