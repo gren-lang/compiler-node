@@ -96,8 +96,9 @@ type alias App result =
 -}
 type GroupParser result
     = GroupParser 
-        (Dict String (Maybe String))
-        (String -> String -> Array String -> Dict String String -> CommandParseResult result)
+        { knownCommands : Dict String (Maybe String)
+        , parseFn : String -> String -> Array String -> Dict String String -> CommandParseResult result
+        }
 
 
 {-| Defines an empty group of commands. To add commands to this group, you'll
@@ -105,8 +106,11 @@ need to use [withCommand](#withCommand) and [withPrefix](#withPrefix).
 -}
 defineGroup : GroupParser result
 defineGroup =
-    GroupParser Dict.empty <| \_appName name _args _flags ->
-        UnknownCommand name
+    GroupParser
+        { knownCommands = Dict.empty 
+        , parseFn = \_appName name _args _flags ->
+            UnknownCommand name
+        }
 
 
 {-| Returns a new group that contains the given command. If there are multiple
@@ -114,25 +118,33 @@ commands in the group with the same `word`, then the last registered command
 wins.
 -}
 withCommand : Command args flags result -> GroupParser result -> GroupParser result
-withCommand command (GroupParser knownCommands next) =
-    GroupParser (Dict.set command.word command.commonDescription knownCommands) <| \appName name args flags ->
-        if name /= command.word then
-            next appName name args flags
+withCommand command (GroupParser { knownCommands, parseFn = next }) =
+    GroupParser 
+        { knownCommands = 
+            Dict.set command.word command.commonDescription knownCommands
+        , parseFn = \appName name args flags ->
+            if name /= command.word then
+                next appName name args flags
 
-        else
-            runCommand appName args flags command
+            else
+                runCommand appName args flags command
+        }
 
 
 {-| Embeds a group of commands into an existing group, accessible by the given prefix.
 -}
 withPrefix : String -> GroupParser result -> GroupParser result -> GroupParser result
-withPrefix prefix prefixedCommands (GroupParser knownCommands nextCommand) =
-    GroupParser (Dict.set prefix Nothing knownCommands) <| \appName name args flags ->
-        if name /= prefix then
-            nextCommand appName name args flags
+withPrefix prefix prefixedCommands (GroupParser { knownCommands, parseFn = nextCommand }) =
+    GroupParser
+        { knownCommands =
+            Dict.set prefix Nothing knownCommands
+        , parseFn = \appName name args flags ->
+            if name /= prefix then
+                nextCommand appName name args flags
 
-        else
-            runPrefix appName prefix args flags prefixedCommands
+            else
+                runPrefix appName prefix args flags prefixedCommands
+        }
 
 
 {-| Takes input from the user in the form of an `Array` of `String`, and parses it according
@@ -141,18 +153,18 @@ to the given `App` definition.
 run : Array String -> App result -> CommandParseResult result
 run tokens appDef =
     let
-        (GroupParser _ parse) =
+        (GroupParser { parseFn = parse }) =
             appDef.commands
         
         { trues = flags, falses = arguments } =
             Array.partition (\word -> String.startsWith "--" word) tokens
     in
-    case flags of
+    when flags is
         [ "--version" ] ->
             HelpText <| PP.text appDef.version
         
         _ ->
-            case Array.popFirst arguments of
+            when Array.popFirst arguments is
                 Just { first = command, rest = args } ->
                     parse appDef.name command args (buildFlagDict flags)
 
@@ -163,12 +175,12 @@ run tokens appDef =
 appHelpText : App result -> PP.Document
 appHelpText appDef =
     let
-        (GroupParser knownCommands _) =
+        (GroupParser { knownCommands }) =
             appDef.commands
         
         commonCommands =
             knownCommands
-                |> Dict.filterMap (\_name commonDescription -> commonDescription)
+                |> Dict.mapAndKeepJust (\_name commonDescription -> commonDescription)
 
         knownCommandsDocument =
             PP.verticalBlock
@@ -229,8 +241,8 @@ appHelpText appDef =
 
 
 runPrefix : String -> String -> Array String -> Dict String String -> GroupParser result -> CommandParseResult result
-runPrefix appName prefixName arguments flags ((GroupParser _ parse) as groupParser) =
-    case Array.popFirst arguments of
+runPrefix appName prefixName arguments flags ((GroupParser { parseFn = parse }) as groupParser) =
+    when Array.popFirst arguments is
         Just { first = command, rest = args } ->
             parse appName command args flags
 
@@ -239,7 +251,7 @@ runPrefix appName prefixName arguments flags ((GroupParser _ parse) as groupPars
 
 
 prefixHelpText : String -> String -> GroupParser result -> PP.Document
-prefixHelpText appName prefixName (GroupParser knownCommands _) =
+prefixHelpText appName prefixName (GroupParser { knownCommands }) =
     let
         knownCommandsDocument =
             PP.verticalBlock
@@ -271,11 +283,11 @@ buildFlagDict flags =
             let
                 flagParts =
                     rawFlag
-                        |> String.dropLeft 2 -- the --prefix            
+                        |> String.dropFirst 2 -- the --prefix            
                         |> String.split "="
                         |> Array.takeFirst 2
             in
-            case flagParts of
+            when flagParts is
                 [ key ] ->
                     Dict.set key "" dict
 
@@ -318,22 +330,22 @@ type CommandParseResult a
 runCommand : String -> Array String -> Dict String String -> Command args flags result -> CommandParseResult result
 runCommand appName args flags spec =
     let
-        (ArgumentParser _ parseArgs) =
+        (ArgumentParser { parseFn = parseArgs }) =
             spec.arguments
     
-        (FlagParser knownFlags parseFlags) =
+        (FlagParser { knownFlags, parseFn = parseFlags }) =
             spec.flags
     in
-    case Dict.get "help" flags of
+    when Dict.get "help" flags is
         Just "" ->
             HelpText <| commandHelpText appName spec
 
         _ ->
-            case
+            when
                 { argResult = parseArgs args
                 , flagResult = parseFlags knownFlags flags
                 }
-            of
+            is
                 { argResult = Ok argValue, flagResult = Ok flagValues } ->
                     Success <| spec.builder argValue flagValues
     
@@ -347,10 +359,10 @@ runCommand appName args flags spec =
 commandHelpText : String -> Command args flags result -> PP.Document
 commandHelpText appName spec =
     let
-        (ArgumentParser argumentType _) =
+        (ArgumentParser { description = argumentType }) =
             spec.arguments
         
-        (FlagParser knownFlags _) =
+        (FlagParser { knownFlags }) =
             spec.flags
 
         flagDocument =
@@ -399,7 +411,10 @@ commandHelpText appName spec =
 is a way of converting an arbitrary number of `String` inputs into Gren values.
 -}
 type ArgumentParser val
-    = ArgumentParser String (Array String -> Result ArgumentParserError val)
+    = ArgumentParser
+        { description : String
+        , parseFn : Array String -> Result ArgumentParserError val
+        }
 
 
 {-| Defines an argument value. The `fn` property is the function that parses
@@ -425,7 +440,7 @@ type ArgumentParserError
 -}
 argumentErrorPrettified : ArgumentParserError -> PP.Document
 argumentErrorPrettified err =
-    case err of
+    when err is
         ArgumentParserWrongArity info ->
             PP.verticalBlock
                 [ PP.words <| 
@@ -466,132 +481,150 @@ arguments were provided.
 -}
 noArgs : ArgumentParser {}
 noArgs =
-    ArgumentParser "" <| \args ->
-        if Array.length args /= 0 then
-            Err <| ArgumentParserWrongArity { expected = 0, actual = (Array.length args) }
+    ArgumentParser 
+        { description = ""
+        , parseFn = \args ->
+            if Array.length args /= 0 then
+                Err <| ArgumentParserWrongArity { expected = 0, actual = (Array.length args) }
 
-        else
-            Ok {}
+            else
+                Ok {}
+        }
 
 
 {-| Parses exactly one argument.
 -}
 oneArg : ValueParser val -> ArgumentParser val
 oneArg parseFn =
-    ArgumentParser ("<" ++ parseFn.singular ++ ">") <| \args ->
-        case args of
-            [ arg ] ->
-                parseFn.fn arg
-                    |> Maybe.map Ok
-                    |> Maybe.withDefault 
-                        (Err <| 
-                            ArgumentParserInvalidArgument
-                                { argument = arg
-                                , title = parseFn.singular
-                                , examples = parseFn.examples
-                                }
-                        )
+    ArgumentParser
+        { description = "<" ++ parseFn.singular ++ ">"
+        , parseFn = \args ->
+            when args is
+                [ arg ] ->
+                    parseFn.fn arg
+                        |> Maybe.map Ok
+                        |> Maybe.withDefault 
+                            (Err <| 
+                                ArgumentParserInvalidArgument
+                                    { argument = arg
+                                    , title = parseFn.singular
+                                    , examples = parseFn.examples
+                                    }
+                            )
 
-            _ ->
-                Err <| ArgumentParserWrongArity { expected = 1, actual = Array.length args }
+                _ ->
+                    Err <| ArgumentParserWrongArity { expected = 1, actual = Array.length args }
+        }
 
 
 {-| Parses exactly two arguments.
 -}
 twoArgs : (a -> b -> c) -> ValueParser a -> ValueParser b -> ArgumentParser c
 twoArgs combine firstValue secondValue =
-    ArgumentParser ("<" ++ firstValue.singular ++ "> <" ++ secondValue.singular ++ ">") <| \args ->
-        case args of
-            [ first, second ] ->
-                case { first = firstValue.fn first, second = secondValue.fn second } of
-                    { first = Just firstOk, second = Just secondOk } ->
-                        Ok <| combine firstOk secondOk
+    ArgumentParser 
+        { description = "<" ++ firstValue.singular ++ "> <" ++ secondValue.singular ++ ">"
+        , parseFn = \args ->
+            when args is
+                [ first, second ] ->
+                    when { first = firstValue.fn first, second = secondValue.fn second } is
+                        { first = Just firstOk, second = Just secondOk } ->
+                            Ok <| combine firstOk secondOk
 
-                    { first = Nothing } ->
-                        Err <| ArgumentParserInvalidArgument
-                            { argument = first
-                            , title = firstValue.singular
-                            , examples = firstValue.examples
-                            }
+                        { first = Nothing } ->
+                            Err <| ArgumentParserInvalidArgument
+                                { argument = first
+                                , title = firstValue.singular
+                                , examples = firstValue.examples
+                                }
                     
-                    { second = Nothing } ->
-                        Err <| ArgumentParserInvalidArgument
-                            { argument = second
-                            , title = secondValue.singular
-                            , examples = secondValue.examples
-                            }
+                        { second = Nothing } ->
+                            Err <| ArgumentParserInvalidArgument
+                                { argument = second
+                                , title = secondValue.singular
+                                , examples = secondValue.examples
+                                }
 
-            _ ->
-                Err <| ArgumentParserWrongArity { expected = 2, actual = Array.length args }
+                _ ->
+                    Err <| ArgumentParserWrongArity { expected = 2, actual = Array.length args }
+        }
 
 
 {-| Parses exactly three arguments.
 -}
 threeArgs : (a -> b -> c -> d) -> ValueParser a -> ValueParser b -> ValueParser c -> ArgumentParser d
 threeArgs combine firstValue secondValue thirdValue =
-    ArgumentParser ("<" ++ String.join "> <" [firstValue.singular, secondValue.singular, thirdValue.singular] ++ ">") <| \args ->
-        case args of
-            [ first, second, third ] ->
-                case { first = firstValue.fn first, second = secondValue.fn second, third = thirdValue.fn third } of
-                    { first = Just firstOk, second = Just secondOk, third = Just thirdOk } ->
-                        Ok <| combine firstOk secondOk thirdOk
+    ArgumentParser
+        { description = "<" ++ String.join "> <" [firstValue.singular, secondValue.singular, thirdValue.singular] ++ ">"
+        , parseFn = \args ->
+            when args is
+                [ first, second, third ] ->
+                    when { first = firstValue.fn first, second = secondValue.fn second, third = thirdValue.fn third } is
+                        { first = Just firstOk, second = Just secondOk, third = Just thirdOk } ->
+                            Ok <| combine firstOk secondOk thirdOk
 
-                    { first = Nothing } ->
-                        Err <| ArgumentParserInvalidArgument
-                            { argument = first
-                            , title = firstValue.singular
-                            , examples = firstValue.examples
-                            }
+                        { first = Nothing } ->
+                            Err <| ArgumentParserInvalidArgument
+                                { argument = first
+                                , title = firstValue.singular
+                                , examples = firstValue.examples
+                                }
                     
-                    { second = Nothing } ->
-                        Err <| ArgumentParserInvalidArgument
-                            { argument = second
-                            , title = secondValue.singular
-                            , examples = secondValue.examples
-                            }
+                        { second = Nothing } ->
+                            Err <| ArgumentParserInvalidArgument
+                                { argument = second
+                                , title = secondValue.singular
+                                , examples = secondValue.examples
+                                }
 
-                    { third = Nothing } ->
-                        Err <| ArgumentParserInvalidArgument
-                            { argument = third
-                            , title = thirdValue.singular
-                            , examples = thirdValue.examples
-                            }
+                        { third = Nothing } ->
+                            Err <| ArgumentParserInvalidArgument
+                                { argument = third
+                                , title = thirdValue.singular
+                                , examples = thirdValue.examples
+                                }
 
-            _ ->
-                Err <| ArgumentParserWrongArity { expected = 3, actual = Array.length args }
+                _ ->
+                    Err <| ArgumentParserWrongArity { expected = 3, actual = Array.length args }
+        }
 
 
 {-| Parses zero or more arguments of a single type.
 -}
 zeroOrMoreArgs : ValueParser val -> ArgumentParser (Array val)
 zeroOrMoreArgs parseFn =
-    ArgumentParser parseFn.plural <| \args ->
-        let
-            parsedArgs =
-                Array.filterMap parseFn.fn args
-        in
-        if Array.length args /= Array.length parsedArgs then
-            Err <| ArgumentParserInvalidArgument
-                { argument = String.join " " args
-                , title = parseFn.plural
-                , examples = parseFn.examples
-                }
+    ArgumentParser 
+        { description = parseFn.plural 
+        , parseFn = \args ->
+            let
+                parsedArgs =
+                    Array.mapAndKeepJust parseFn.fn args
+            in
+            if Array.length args /= Array.length parsedArgs then
+                Err <| ArgumentParserInvalidArgument
+                    { argument = String.join " " args
+                    , title = parseFn.plural
+                    , examples = parseFn.examples
+                    }
 
-        else
-            Ok parsedArgs
+            else
+                Ok parsedArgs
+        }
 
 
 {-| Maps a successfully parsed set of arguments into something else.
 -}
 mapArgs : (a -> b) -> ArgumentParser a -> ArgumentParser b
-mapArgs mapper (ArgumentParser desc fn) =
-    ArgumentParser desc <| \args ->
-        case fn args of
-            Ok val ->
-                Ok (mapper val)
+mapArgs mapper (ArgumentParser { description = desc, parseFn = fn }) =
+    ArgumentParser 
+        { description = desc 
+        , parseFn = \args ->
+            when fn args is
+                Ok val ->
+                    Ok (mapper val)
 
-            Err err ->
-                Err err
+                Err err ->
+                    Err err
+        }
 
 
 {-| A list of parsers that will be tried one after another until one
@@ -599,24 +632,27 @@ succeeds.
 -}
 oneOfArgs : Array (ArgumentParser val) -> ArgumentParser val
 oneOfArgs argParsers =
-    ArgumentParser "<one-of>" <| \args ->
-        let
-            parseResults =
-                Array.map (\(ArgumentParser _ fn) -> fn args) argParsers
-        in
-        case Result.firstOk parseResults of
-            Just result ->
-                Ok result
+    ArgumentParser 
+        { description = "<one-of>" 
+        , parseFn = \args ->
+            let
+                parseResults =
+                    Array.map (\(ArgumentParser { parseFn = fn }) -> fn args) argParsers
+            in
+            when Result.firstOk parseResults is
+                Just result ->
+                    Ok result
 
-            Nothing ->
-                Array.first parseResults
-                    |> Maybe.withDefault 
-                        (Err <| ArgumentParserInvalidArgument
-                            { argument = String.join " " args
-                            , title = "<one-of>" 
-                            , examples = []
-                            }
-                        )
+                Nothing ->
+                    Array.first parseResults
+                        |> Maybe.withDefault 
+                            (Err <| ArgumentParserInvalidArgument
+                                { argument = String.join " " args
+                                , title = "<one-of>" 
+                                , examples = []
+                                }
+                            )
+        }
 
 
 -- FLAGS
@@ -625,7 +661,10 @@ oneOfArgs argParsers =
 {-| Flags are prefixed with `--` and are meant to customize a command.
 -}
 type FlagParser val
-    = FlagParser KnownFlags (KnownFlags -> Dict String String -> Result FlagParserError val)
+    = FlagParser 
+        { knownFlags : KnownFlags
+        , parseFn : KnownFlags -> Dict String String -> Result FlagParserError val
+        }
 
 
 type alias KnownFlags =
@@ -649,18 +688,18 @@ type alias FlagParserDescription =
 * The flag might be unknown.
 -}
 type FlagParserError
-    = FlagParserFoundValueOnToggle KnownFlags String
-    | FlagParserMissingValue KnownFlags String
-    | FlagParserInvalidValue KnownFlags String
-    | FlagParserUnknownFlag KnownFlags String
+    = FlagParserFoundValueOnToggle { knownFlags : KnownFlags, flagName : String }
+    | FlagParserMissingValue { knownFlags : KnownFlags, flagName : String }
+    | FlagParserInvalidValue { knownFlags : KnownFlags, flagName : String }
+    | FlagParserUnknownFlag { knownFlags : KnownFlags, flagName : String }
 
 
 {-| Returns a prettified error message for the given [FlagParserError](#FlagParserError).
 -}
 flagErrorPrettified : FlagParserError -> PP.Document
 flagErrorPrettified err =
-    case err of
-        FlagParserFoundValueOnToggle knownFlags flagName ->
+    when err is
+        FlagParserFoundValueOnToggle { knownFlags, flagName } ->
             PP.verticalBlock
                 [ PP.words "This flag doesn't take a value:"
                 , PP.empty
@@ -672,7 +711,7 @@ flagErrorPrettified err =
                 , PP.empty
                 ]
 
-        FlagParserMissingValue knownFlags flagName ->
+        FlagParserMissingValue { knownFlags, flagName } ->
             PP.verticalBlock
                 [ PP.words "This flag needs more information:"
                 , PP.empty
@@ -682,7 +721,7 @@ flagErrorPrettified err =
                 , describeFlagUse knownFlags flagName
                 ]
         
-        FlagParserInvalidValue knownFlags flagName ->
+        FlagParserInvalidValue { knownFlags, flagName } ->
             PP.verticalBlock
                 [ PP.words "This flag was passed an invalid value:"
                 , PP.empty
@@ -692,7 +731,7 @@ flagErrorPrettified err =
                 , describeFlagUse knownFlags flagName
                 ]
         
-        FlagParserUnknownFlag knownFlags flagName ->
+        FlagParserUnknownFlag { knownFlags, flagName } ->
             let
                 otherFlags =
                     Dict.foldl
@@ -735,7 +774,7 @@ flagErrorPrettified err =
 
 describeFlagUse : KnownFlags -> String -> PP.Document
 describeFlagUse knownFlags flagName =
-    case Dict.get flagName knownFlags of
+    when Dict.get flagName knownFlags is
         Just flagDescription ->
             let
                 examples =
@@ -773,20 +812,23 @@ noFlags =
 -}
 initFlags : a -> FlagParser a
 initFlags value =
-    FlagParser Dict.empty <| \knownFlags remainingFlags -> 
-        case Dict.first remainingFlags of
-            Just unparsedFlag ->
-                Err <| FlagParserUnknownFlag knownFlags unparsedFlag.key
+    FlagParser 
+        { knownFlags = Dict.empty
+        , parseFn = \knownFlags remainingFlags -> 
+            when Dict.first remainingFlags is
+                Just unparsedFlag ->
+                    Err <| FlagParserUnknownFlag { knownFlags = knownFlags, flagName = unparsedFlag.key }
 
-            Nothing ->
-                Ok value
+                Nothing ->
+                    Ok value
+        }
 
 
 {-| Defines a flag that doesn't require an associated value. We're simply checking
 if the flag is present or not.
 -}
 toggle : String -> String -> FlagParser (Bool -> b) -> FlagParser b
-toggle key desc (FlagParser knownFlags previousSteps) =
+toggle key desc (FlagParser { knownFlags, parseFn = previousSteps }) =
     let
         descriptor =
             { title = ""
@@ -794,27 +836,30 @@ toggle key desc (FlagParser knownFlags previousSteps) =
             , examples = []
             }
     in
-    FlagParser (Dict.set key descriptor knownFlags) <| \flagDescriptions opts ->
-        case previousSteps flagDescriptions (Dict.remove key opts) of
-            Ok next ->
-                case Dict.get key opts of
-                    Just "" ->
-                        Ok (next True)
+    FlagParser 
+        { knownFlags = Dict.set key descriptor knownFlags
+        , parseFn = \flagDescriptions opts ->
+            when previousSteps flagDescriptions (Dict.remove key opts) is
+                Ok next ->
+                    when Dict.get key opts is
+                        Just "" ->
+                            Ok (next True)
 
-                    Just _ ->
-                        Err <| FlagParserFoundValueOnToggle flagDescriptions key
+                        Just _ ->
+                            Err <| FlagParserFoundValueOnToggle { knownFlags = flagDescriptions, flagName = key }
 
-                    Nothing ->
-                        Ok (next False)
+                        Nothing ->
+                            Ok (next False)
 
-            Err err ->
-                Err err
+                Err err ->
+                    Err err
+        }
 
 
 {-| Defines a flag that requires an associated value.
 -}
 flag : String -> ValueParser a -> String -> FlagParser (Maybe a -> b) -> FlagParser b
-flag key valueParserFn desc (FlagParser knownFlags previousSteps) =
+flag key valueParserFn desc (FlagParser { knownFlags, parseFn = previousSteps }) =
     let
         descriptor =
             { title = valueParserFn.singular
@@ -822,26 +867,29 @@ flag key valueParserFn desc (FlagParser knownFlags previousSteps) =
             , examples = valueParserFn.examples
             }
     in
-    FlagParser (Dict.set key descriptor knownFlags) <| \flagDescriptions opts ->
-        case previousSteps flagDescriptions (Dict.remove key opts) of
-            Ok next ->
-                case Dict.get key opts of
-                    Just "" ->
-                        Err <| FlagParserMissingValue flagDescriptions key
+    FlagParser
+        { knownFlags = Dict.set key descriptor knownFlags
+        , parseFn = \flagDescriptions opts ->
+            when previousSteps flagDescriptions (Dict.remove key opts) is
+                Ok next ->
+                    when Dict.get key opts is
+                        Just "" ->
+                            Err <| FlagParserMissingValue { knownFlags = flagDescriptions, flagName = key }
                     
-                    Just value ->
-                        case valueParserFn.fn value of
-                            Just parsedValue ->
-                                Ok (next <| Just parsedValue)
+                        Just value ->
+                            when valueParserFn.fn value is
+                                Just parsedValue ->
+                                    Ok (next <| Just parsedValue)
 
-                            Nothing ->
-                                Err <| FlagParserInvalidValue flagDescriptions key
+                                Nothing ->
+                                    Err <| FlagParserInvalidValue { knownFlags = flagDescriptions, flagName = key }
 
-                    Nothing ->
-                        Ok (next Nothing)
+                        Nothing ->
+                            Ok (next Nothing)
 
-            Err err ->
-                Err err
+                Err err ->
+                    Err err
+        }
 
 
 -- PARSERS

@@ -41,10 +41,10 @@ fromString str =
         parts =
             str
             |> String.split "."
-            |> Array.filterMap String.toInt
-            |> Array.filter (\num -> num >= 0)
+            |> Array.mapAndKeepJust String.toInt
+            |> Array.keepIf (\num -> num >= 0)
     in
-    case parts of
+    when parts is
         [ major, minor, patch ] ->
             Just
                 { major = major

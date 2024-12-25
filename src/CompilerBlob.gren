@@ -42,6 +42,7 @@ import Dict exposing (Dict)
 import Task exposing (Task)
 import Bytes exposing (Bytes)
 import HttpClient
+import Process
 
 
 {-| Version of the compiler blob. This might not match the version of the Gren compiler as a whole,
@@ -69,7 +70,7 @@ downloadUrl : Node.Platform -> Node.CpuArchitecture -> Result UnsupportedPlatfor
 downloadUrl platform cpuArch =
     let
         maybeFilename =
-            case { platform = platform, cpuArch = cpuArch } of
+            when { platform = platform, cpuArch = cpuArch } is
                 { platform = Node.Win32, cpuArch = Node.X64 } ->
                     Just "gren.exe"
                 
@@ -85,7 +86,7 @@ downloadUrl platform cpuArch =
                 _ ->
                     Nothing
     in
-    case maybeFilename of
+    when maybeFilename is
         Just filename ->
             Ok <|
                 String.join "/"
@@ -114,7 +115,7 @@ cachePath : Node.Platform -> Dict String String -> Path -> Path
 cachePath platform envVars homeDir =
     let
         startPath =
-            case platform of
+            when platform is
                 Node.Win32 ->
                     envVars
                         |> Dict.get "LOCALAPPDATA"
@@ -137,7 +138,7 @@ cachePath platform envVars homeDir =
                         |> Maybe.withDefault (Path.append (Path.fromPosixString ".cache") homeDir)
 
         filename =
-            case platform of
+            when platform is
                 Node.Win32 ->
                     "gren.exe"
 
@@ -185,7 +186,7 @@ isCached permission platform envVars homeDir =
 type Command
     = Init InitFlags
     | Repl ReplFlags
-    | Make MakeFlags (Array Path)
+    | Make { flags : MakeFlags, paths : (Array Path) }
     | Docs DocsFlags
     | PackageInstall (Maybe Package)
     | PackageUninstall Package
@@ -251,8 +252,8 @@ type DocsOutput
 type DiffArgs
     = DiffLatest
     | DiffVersion SemanticVersion
-    | DiffRange SemanticVersion SemanticVersion
-    | DiffGlobal Package SemanticVersion SemanticVersion
+    | DiffRange { lower : SemanticVersion, upper : SemanticVersion }
+    | DiffGlobal { package : Package, lower : SemanticVersion, upper : SemanticVersion }
 
 
 {-|-}
@@ -262,6 +263,7 @@ type alias RunOptions msg =
     , useColor : Bool
     , compilerPath : Path
     , pathToString : (Path -> String)
+    , onInit : { processId : Process.Id, streams : Maybe ChildProcess.StreamIO } -> msg
     , onComplete : (Int -> msg)
     }
 
@@ -286,8 +288,11 @@ run permission options =
             else
                 Dict.singleton "NO_COLOR" "1"
     in
-    ChildProcess.spawnAndNotifyOnExit permission options.onComplete (options.pathToString options.compilerPath) [ escapedCommand ] <|
-        { ChildProcess.defaultSpawnOptions
+    ChildProcess.spawn 
+        permission
+        (options.pathToString options.compilerPath) 
+        [ escapedCommand ]
+        { ( ChildProcess.defaultSpawnOptions options.onInit options.onComplete )
             | environmentVariables = 
                 ChildProcess.MergeWithEnvironmentVariables colorEnvVar
         }
@@ -296,7 +301,7 @@ run permission options =
 
 commandEncoder : Bool -> (Path -> String) -> Command -> Json.Value
 commandEncoder interactive pathToString command =
-    case command of
+    when command is
         Init flags ->
             Json.object
                 [ { key = "command", value = Json.string "init" }
@@ -311,7 +316,7 @@ commandEncoder interactive pathToString command =
                 , { key = "intepreter" , value = maybeEncoder Json.string flags.interpreter }
                 ]
         
-        Make flags paths ->
+        Make { flags, paths } ->
             Json.object
                 [ { key = "command", value = Json.string "make" }
                 , { key = "optimize", value = Json.bool flags.optimize }
@@ -359,7 +364,7 @@ commandEncoder interactive pathToString command =
                 ]
         
         PackageDiff args ->
-            case args of
+            when args is
                 DiffLatest ->
                     Json.object
                         [ { key = "command", value = Json.string "packageDiffLatest" }
@@ -371,14 +376,14 @@ commandEncoder interactive pathToString command =
                         , { key = "version", value = SemanticVersion.toJson ver }
                         ]
                 
-                DiffRange ver1 ver2 ->
+                DiffRange { lower = ver1, upper = ver2 } ->
                     Json.object
                         [ { key = "command", value = Json.string "packageDiffRange" }
                         , { key = "from", value = SemanticVersion.toJson ver1 }
                         , { key = "to", value = SemanticVersion.toJson ver2 }
                         ]
                 
-                DiffGlobal package ver1 ver2 ->
+                DiffGlobal { package, lower = ver1, upper = ver2 } ->
                     Json.object
                         [ { key = "command", value = Json.string "packageDiffGlobal" }
                         , { key = "package", value = Package.toJson package }
@@ -389,7 +394,7 @@ commandEncoder interactive pathToString command =
 
 maybeEncoder : (a -> Json.Value) -> Maybe a -> Json.Value
 maybeEncoder enc maybeVal =
-    case maybeVal of
+    when maybeVal is
         Just val ->
             enc val
 
@@ -399,7 +404,7 @@ maybeEncoder enc maybeVal =
 
 maybeToBool : Maybe a -> Json.Value
 maybeToBool maybeVal =
-    case maybeVal of
+    when maybeVal is
         Just val ->
             Json.bool True
 
@@ -409,7 +414,7 @@ maybeToBool maybeVal =
 
 platformEncoder : Platform -> Json.Value
 platformEncoder platform =
-    case platform of
+    when platform is
         Common -> Json.string "common"
         Browser -> Json.string "browser"
         Node -> Json.string "node"
@@ -417,7 +422,7 @@ platformEncoder platform =
 
 makeOutputEncoder : MakeOutput -> Json.Value
 makeOutputEncoder output =
-    case output of
+    when output is
         StdOut -> 
             Json.object
                 [ { key = "type", value = Json.string "stdout" }
@@ -449,7 +454,7 @@ makeOutputEncoder output =
 
 docsOutputEncoder : DocsOutput -> Json.Value
 docsOutputEncoder output =
-    case output of
+    when output is
         DocsStdOut -> 
             Json.object
                 [ { key = "type", value = Json.string "stdout" }

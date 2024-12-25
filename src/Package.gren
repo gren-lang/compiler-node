@@ -57,7 +57,7 @@ name (Package fields) =
 -}
 fromString : String -> Maybe Package
 fromString str =
-    case String.split "/" str of
+    when String.split "/" str is
         [ authorStr, nameStr ] ->
             let
                 validAuthor =
@@ -75,7 +75,7 @@ fromString str =
                         && String.all (\c -> Char.isDigit c || Char.isLower c || c == '-') nameStr
             in
             if validAuthor && validName then
-                case String.uncons nameStr of
+                when String.popFirst nameStr is
                     Just { first = firstChar } ->
                         if Char.isAlpha firstChar then
                             Just <|

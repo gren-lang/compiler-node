@@ -140,7 +140,7 @@ intenseColor clr doc =
 -}
 stripColor : Document -> Document
 stripColor doc =
-    case doc of
+    when doc is
         Empty ->
             doc
             
@@ -167,7 +167,7 @@ ansiColorCode : Color -> Bool -> String
 ansiColorCode clr intense =
     let
         baseValue =
-            case clr of
+            when clr is
                 Black -> 30
                 Red -> 31
                 Green -> 32
@@ -240,7 +240,7 @@ toStringWithOptions { maxColumns, indentationSize, newlineSeparator } doc =
 
 toStringHelper : String -> (String -> String) -> Int -> String -> Document -> String
 toStringHelper indentPrefix nextIndent maxColumns newlineSeparator doc =
-    case doc of
+    when doc is
         Empty ->
             ""
             
@@ -249,7 +249,7 @@ toStringHelper indentPrefix nextIndent maxColumns newlineSeparator doc =
                 indentedText =
                     indentPrefix ++ str
             in
-            if String.length indentedText > maxColumns then
+            if String.count indentedText > maxColumns then
                 indentedText
                     |> splitByLength maxColumns
                     |> String.join newlineSeparator
@@ -260,7 +260,7 @@ toStringHelper indentPrefix nextIndent maxColumns newlineSeparator doc =
         Words parts ->
             let
                 maxColumnsAfterIndent = 
-                    maxColumns - String.length indentPrefix
+                    maxColumns - String.count indentPrefix
                 
                 wordSplitter =
                     Array.foldl (addToWordSplitter maxColumnsAfterIndent) emptyWordSplitter parts
@@ -280,7 +280,7 @@ toStringHelper indentPrefix nextIndent maxColumns newlineSeparator doc =
             toStringHelper (nextIndent indentPrefix) nextIndent maxColumns newlineSeparator document
         
         Block docs ->
-            case Array.popFirst docs of
+            when Array.popFirst docs is
                 Nothing ->
                     ""
 
@@ -308,8 +308,8 @@ splitByLengthHelper size str acc =
 
     else
         let
-            first = String.left size str
-            rest = String.dropLeft size str
+            first = String.takeFirst size str
+            rest = String.dropFirst size str
         in
         splitByLengthHelper size rest (Array.pushLast first acc)
 
@@ -337,9 +337,9 @@ addToWordSplitter maxWidth str { currentLine, lines } =
         let
             currentWidth =
                 String.join " " currentLine
-                    |> String.length
+                    |> String.count
         in
-        if String.length str + currentWidth > maxWidth then
+        if String.count str + currentWidth > maxWidth then
             addToWordSplitter maxWidth str
                 { currentLine = []
                 , lines = Array.pushLast currentLine lines
