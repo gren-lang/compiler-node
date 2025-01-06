@@ -1,0 +1,58 @@
+module Main exposing (main)
+
+import Node
+import Init
+import Task
+import FileSystem
+import FileSystem.Path as Path
+import Compiler.Paths as Paths
+import Stream
+
+
+type alias Model =
+    { }
+
+
+type Msg 
+    = NoOp
+
+
+main : Node.Program Model Msg
+main =
+    Node.defineProgram
+        { init = init
+        , update = update
+        , subscriptions = \_ -> Sub.none
+        }
+
+
+init : Node.Environment -> Init.Task { model : Model, command : Cmd Msg }
+init env =
+    Init.await FileSystem.initialize <| \fsPerm ->
+        Node.startProgram
+            { model = {}
+            , command =
+                when Array.get 2 env.args is
+                    Just "gren.json" ->
+                        Paths.projectMetadata fsPerm
+                            |> Task.map Path.toPosixString
+                            |> Task.onError (\fsErr -> Task.succeed (FileSystem.errorCode fsErr))
+                            |> Task.andThen (\output -> 
+                                Stream.writeLineAsBytes output env.stdout
+                            )
+                            |> Task.onError (\_ -> Task.succeed env.stdout)
+                            |> Task.execute
+
+
+                    _ ->
+                        Stream.writeLineAsBytes "Invalid start argument" env.stdout
+                            |> Task.onError (\_ -> Task.succeed env.stdout)
+                            |> Task.execute
+            }
+
+
+update : Msg -> Model -> { model : Model, command : Cmd Msg }
+update msg model =
+    { model = model
+    , command = Cmd.none
+    }
