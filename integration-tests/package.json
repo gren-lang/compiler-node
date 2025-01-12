@@ -1,10 +1,12 @@
 {
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "format": "prettier -w test/"
   },
   "dependencies": {
     "clet": "^1.0.1",
     "gren-lang": "^0.5.2",
-    "mocha": "^10.2.0"
+    "mocha": "^10.2.0",
+    "prettier": "^3.4.2"
   }
 }

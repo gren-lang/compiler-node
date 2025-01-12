@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import Bytes
 import Node
 import Init
 import Task
@@ -33,7 +34,7 @@ init env =
             { model = {}
             , command =
                 when Array.get 2 env.args is
-                    Just "gren.json" ->
+                    Just "find gren.json" ->
                         Paths.projectMetadata fsPerm
                             |> Task.map Path.toPosixString
                             |> Task.onError (\fsErr -> Task.succeed (FileSystem.errorCode fsErr))
@@ -43,6 +44,18 @@ init env =
                             |> Task.onError (\_ -> Task.succeed env.stdout)
                             |> Task.execute
 
+                    Just "parse gren.json" ->
+                        Paths.projectMetadata fsPerm
+                            |> Task.andThen (\grenJsonPath ->
+                                FileSystem.readFile fsPerm grenJsonPath
+                                    |> Task.map (Maybe.withDefault "" << Bytes.toString)
+                            )
+                            |> Task.onError (\fsErr -> Task.succeed (FileSystem.errorCode fsErr))
+                            |> Task.andThen (\output -> 
+                                Stream.writeLineAsBytes output env.stdout
+                            )
+                            |> Task.onError (\_ -> Task.succeed env.stdout)
+                            |> Task.execute
 
                     _ ->
                         Stream.writeLineAsBytes "Invalid start argument" env.stdout
