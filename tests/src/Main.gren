@@ -5,7 +5,7 @@ import Test.Runner.Node as TestRunner
 import Test.CLI.Parser as CLIParser
 import Test.CLI.PrettyPrinter as PrettyPrinter
 import Test.SemanticVersion as SemanticVersion
-import Test.Package as Package
+import Test.Compiler.PackageName as PackageName
 import Node exposing (Program)
 
 
@@ -16,5 +16,5 @@ main =
             [ CLIParser.tests
             , PrettyPrinter.tests
             , SemanticVersion.tests
-            , Package.tests
+            , PackageName.tests
             ]

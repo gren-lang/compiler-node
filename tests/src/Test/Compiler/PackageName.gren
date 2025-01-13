@@ -1,14 +1,14 @@
-module Test.Package exposing (tests)
+module Test.Compiler.PackageName exposing (tests)
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
 import Fuzz exposing (Fuzzer)
-import Package as Pkg
+import Compiler.PackageName as Pkg
 
 
 tests : Test
 tests =
-    describe "Package"
+    describe "PackageName"
         [ describe "fromString"
             [ test "valid name" <| \{} ->
                 let
@@ -44,7 +44,7 @@ tests =
                 expectFailure "gren-lang/"
             , describe "Author name"
                 [ test "can contain upper case and digits" <| \{} ->
-                    case Pkg.fromString "grENLang3/core2" of
+                    when Pkg.fromString "grENLang3/core2" is
                         Just pkg ->
                             Pkg.author pkg
                                 |> Expect.equal "grENLang3"
@@ -65,7 +65,7 @@ tests =
                 ]
             , describe "Project name"
                 [ test "can only contain lower-case ascii and digits" <| \{} ->
-                    case Pkg.fromString "gren-lang/core-2" of
+                    when Pkg.fromString "gren-lang/core-2" is
                         Just pkg ->
                             Pkg.name pkg
                                 |> Expect.equal "core-2"
@@ -93,7 +93,7 @@ tests =
 
 expectFailure : String -> Expectation
 expectFailure str =
-    case Pkg.fromString str of
+    when Pkg.fromString str is
         Just pkg ->
             Expect.fail "Expected to fail parsing"
 

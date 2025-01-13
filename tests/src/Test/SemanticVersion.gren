@@ -22,7 +22,7 @@ tests =
                             |> Array.map String.fromInt 
                             |> String.join "."
                 in
-                case SV.fromString constructedVersion of
+                when SV.fromString constructedVersion is
                     Just version ->
                         Expect.equal
                             { major = num1
@@ -34,28 +34,28 @@ tests =
                     Nothing ->
                         Expect.fail "Expected fromString to pass"
             , test "inverse of toString" <| \{} ->
-                case SV.fromString "1.5.3" of
+                when SV.fromString "1.5.3" is
                     Just version ->
                         Expect.equal "1.5.3" (SV.toString version)
 
                     Nothing ->
                         Expect.fail "Expected fromString to succeed"
             , test "too many parts" <| \{} -> 
-                case SV.fromString "1.2.3.4" of
+                when SV.fromString "1.2.3.4" is
                     Just version ->
                         Expect.fail "This should have failed"
 
                     Nothing ->
                         Expect.pass
             , test "too few parts" <| \{} -> 
-                case SV.fromString "1.2" of
+                when SV.fromString "1.2" is
                     Just version ->
                         Expect.fail "This should have failed"
 
                     Nothing ->
                         Expect.pass
             , test "numbers must be positive" <| \{} -> 
-                case SV.fromString "1.-2.0" of
+                when SV.fromString "1.-2.0" is
                     Just version ->
                         Expect.fail "This should have failed"
 

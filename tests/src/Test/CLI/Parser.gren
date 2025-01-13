@@ -25,7 +25,7 @@ tests =
                 result =
                     runCommand testCmd ["--help"]
             in
-            case result of
+            when result is
                 Parser.HelpText prettyText ->
                     let
                         plainText =
@@ -45,7 +45,7 @@ tests =
                 result =
                     runCommand testCmd ["make", "--help"]
             in
-            case result of
+            when result is
                 Parser.HelpText prettyText ->
                     let
                         plainText =
@@ -332,36 +332,36 @@ tests =
                 expectParseSuccess testCmd [ "make" ] <| \cmd ->
                     Expect.equal Nothing cmd.flags.output
             , test "Leaving out a toggle flag means it's false" <| \{} -> 
-                expectParseSuccess testCmd (Array.filter (\f -> f /= "--debug") testArgs) <| \cmd ->
+                expectParseSuccess testCmd (Array.keepIf (\f -> f /= "--debug") testArgs) <| \cmd ->
                     Expect.equal False cmd.flags.debug
             , test "Passing a toggle flag that is defined as value flag fails" <| \{} ->
                 runCommand testCmd [ "make", "--output" ]
-                    |> expectBadFlag (Parser.FlagParserMissingValue Dict.empty "output")
+                    |> expectBadFlag (Parser.FlagParserMissingValue { knownFlags = Dict.empty, flagName = "output" })
             , test "Passing a value flag without a set value fails" <| \{} ->
                 runCommand testCmd [ "make", "--output=" ]
-                    |> expectBadFlag (Parser.FlagParserMissingValue Dict.empty "output")
+                    |> expectBadFlag (Parser.FlagParserMissingValue { knownFlags = Dict.empty, flagName = "output" })
             , test "Passing a value flag where a toggle was expected fails" <| \{} ->
                 runCommand testCmd [ "make", "--debug=true" ]
-                    |> expectBadFlag (Parser.FlagParserFoundValueOnToggle Dict.empty "debug")
+                    |> expectBadFlag (Parser.FlagParserFoundValueOnToggle { knownFlags = Dict.empty, flagName = "debug" })
             , test "Passing a flag that isn't recognized will return the appropriate error" <| \{} ->
                 runCommand testCmd [ "make", "--hiya" ]
-                    |> expectBadFlag (Parser.FlagParserUnknownFlag Dict.empty "hiya")
+                    |> expectBadFlag (Parser.FlagParserUnknownFlag { knownFlags = Dict.empty, flagName = "hiya" })
             , test "Passing --help will always output help text" <| \{} ->
-                case runCommand testCmd [ "make", "--help" ] of
+                when runCommand testCmd [ "make", "--help" ] is
                     Parser.HelpText _ ->
                         Expect.pass
 
                     _ ->
                         Expect.fail "Expected help text"
             , test "Passing --help will output help text, even in the presence of other flags" <| \{} ->
-                case runCommand testCmd [ "make", "--debug", "--help" ] of
+                when runCommand testCmd [ "make", "--debug", "--help" ] is
                     Parser.HelpText _ ->
                         Expect.pass
 
                     _ ->
                         Expect.fail "Expected help text"
             , test "Passing --help will output help text even when command takes no flags and requires args" <| \{} ->
-                case runCommand (cmdBuilder (Parser.oneArg Parser.pathParser) Parser.noFlags) [ "make", "--help" ] of
+                when runCommand (cmdBuilder (Parser.oneArg Parser.pathParser) Parser.noFlags) [ "make", "--help" ] is
                     Parser.HelpText _ ->
                         Expect.pass
 
@@ -404,7 +404,7 @@ runCommand cmd args =
 
 expectParseSuccess : Parser.Command args flags result -> Array String -> (result -> Expectation) -> Expectation
 expectParseSuccess cmd args next =
-    case runCommand cmd args of
+    when runCommand cmd args is
         Parser.Success result ->
             next result
         
@@ -414,7 +414,7 @@ expectParseSuccess cmd args next =
 
 expectBadFlag : Parser.FlagParserError -> Parser.CommandParseResult a-> Expectation
 expectBadFlag expected actualError =
-    case actualError of
+    when actualError is
         Parser.BadFlags err ->
             err
                 |> stripFlagDescriptions
@@ -426,18 +426,18 @@ expectBadFlag expected actualError =
 
 stripFlagDescriptions : Parser.FlagParserError -> Parser.FlagParserError
 stripFlagDescriptions error =
-    case error of
-        Parser.FlagParserFoundValueOnToggle _ key ->
-            Parser.FlagParserFoundValueOnToggle Dict.empty key
+    when error is
+        Parser.FlagParserFoundValueOnToggle { flagName } ->
+            Parser.FlagParserFoundValueOnToggle { knownFlags = Dict.empty, flagName = flagName }
         
-        Parser.FlagParserMissingValue _ key ->
-            Parser.FlagParserMissingValue Dict.empty key
+        Parser.FlagParserMissingValue { flagName } ->
+            Parser.FlagParserMissingValue { knownFlags = Dict.empty, flagName = flagName }
         
-        Parser.FlagParserInvalidValue _ key ->
-            Parser.FlagParserInvalidValue Dict.empty key
+        Parser.FlagParserInvalidValue { flagName } ->
+            Parser.FlagParserInvalidValue { knownFlags = Dict.empty, flagName = flagName }
         
-        Parser.FlagParserUnknownFlag _ key ->
-            Parser.FlagParserUnknownFlag Dict.empty key
+        Parser.FlagParserUnknownFlag { flagName } ->
+            Parser.FlagParserUnknownFlag { knownFlags = Dict.empty, flagName = flagName }
 
 
 testArgs : Array String
