@@ -1,0 +1,35 @@
+module Compiler.Platform exposing
+    ( Platform
+    , toJson
+    , fromJson
+    )
+
+
+import Json.Encode as Encode
+import Json.Decode as Decode exposing (Decoder)
+
+
+type Platform
+    = Node
+    | Browser
+    | Common
+
+
+toJson : Platform -> Encode.Value
+toJson platform =
+    when platform is
+        Common -> Encode.string "common"
+        Browser -> Encode.string "browser"
+        Node -> Encode.string "node"
+
+
+fromJson : Decoder Platform
+fromJson =
+    Decode.string
+        |> Decode.andThen (\value ->
+            when String.toLower value is
+                "common" -> Decode.succeed Common
+                "browser" -> Decode.succeed Browser
+                "node" -> Decode.succeed Node
+                _ -> Decode.fail (value ++ " is not a valid platform value")
+        )

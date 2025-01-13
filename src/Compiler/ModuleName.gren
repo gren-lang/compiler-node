@@ -1,0 +1,13 @@
+module Compiler.ModuleName exposing
+    ( ModuleName
+    , toString
+    )
+
+
+type ModuleName
+    = ModuleName String
+
+
+toString : ModuleName -> String
+toString (ModuleName name) =
+    name

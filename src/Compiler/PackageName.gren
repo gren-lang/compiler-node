@@ -1,5 +1,5 @@
-module Package exposing
-    ( Package
+module Compiler.PackageName exposing
+    ( PackageName
     --
     , author
     , name
@@ -32,8 +32,8 @@ Where `author` represents the person, or organization, that built the package, a
 Both `author` and `name` can contain alphanumeric characters and a single dash as a seperator,
 but no other characters.
 -}
-type Package
-    = Package 
+type PackageName
+    = PackageName 
         { author : String
         , name : String
         }
@@ -41,21 +41,21 @@ type Package
 
 {-| Retrieve the package author.
 -}
-author : Package -> String
-author (Package fields) =
+author : PackageName -> String
+author (PackageName fields) =
     fields.author
 
 
 {-| Retrieve the package name.
 -}
-name : Package -> String
-name (Package fields) =
+name : PackageName -> String
+name (PackageName fields) =
     fields.name
 
 
-{-| Attempt to convert a `String` into [Package](#Package).
+{-| Attempt to convert a `String` into [PackageName](#PackageName).
 -}
-fromString : String -> Maybe Package
+fromString : String -> Maybe PackageName
 fromString str =
     when String.split "/" str is
         [ authorStr, nameStr ] ->
@@ -79,7 +79,7 @@ fromString str =
                     Just { first = firstChar } ->
                         if Char.isAlpha firstChar then
                             Just <|
-                                Package
+                                PackageName
                                     { author = authorStr
                                     , name = nameStr
                                     }
@@ -99,7 +99,7 @@ fromString str =
 
 {-| A parser for use with [CLI.Parser](#CLI.Parser).
 -}
-cliParser : CLI.Parser.ValueParser Package
+cliParser : CLI.Parser.ValueParser PackageName
 cliParser =
     { singular = "package"
     , plural = "packages"
@@ -111,16 +111,16 @@ cliParser =
     }
 
 
-{-| Turn [Package](#Package) into a `String`.
+{-| Turn [PackageName](#PackageName) into a `String`.
 -}
-toString : Package -> String
+toString : PackageName -> String
 toString package =
     author package ++ "/" ++ name package
 
 
-{-| Turn [Package](#Package) into `Json`.
+{-| Turn [PackageName](#PackageName) into `Json`.
 -}
-toJson: Package -> Json.Value
+toJson: PackageName -> Json.Value
 toJson package =
     Json.string <| toString package
 

@@ -8,10 +8,14 @@
     "exposed-modules": [
         "CLI.Parser",
         "CLI.PrettyPrinter",
+        "Compiler.Backend",
+        "Compiler.ModuleName",
+        "Compiler.Outline",
+        "Compiler.PackageName",
         "Compiler.Paths",
-        "CompilerBlob",
+        "Compiler.License",
         "SemanticVersion",
-        "Package"
+        "SemanticVersionRange"
     ],
     "gren-version": "0.5.0 <= v < 0.6.0",
     "dependencies": {

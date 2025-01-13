@@ -1,0 +1,124 @@
+module Compiler.License exposing
+    ( License
+    , toString
+    )
+
+
+import Dict exposing (Dict)
+
+
+type License
+    = License String
+
+
+toString : License -> String
+toString (License value) =
+    value
+
+
+{-|
+-- OSI approved licenses in SPDX format.
+-- <https://spdx.org/licenses/>
+-}
+osiApprovedSpdxLicenses : Dict String String
+osiApprovedSpdxLicenses =
+  Dict.empty
+    |> Dict.set "0BSD" "BSD Zero Clause License"
+    |> Dict.set  "AAL" "Attribution Assurance License"
+    |> Dict.set  "AFL-1.1" "Academic Free License v1.1"
+    |> Dict.set  "AFL-1.2" "Academic Free License v1.2"
+    |> Dict.set  "AFL-2.0" "Academic Free License v2.0"
+    |> Dict.set  "AFL-2.1" "Academic Free License v2.1"
+    |> Dict.set  "AFL-3.0" "Academic Free License v3.0"
+    |> Dict.set  "AGPL-3.0" "GNU Affero General Public License v3.0"
+    |> Dict.set  "Apache-1.1" "Apache License 1.1"
+    |> Dict.set  "Apache-2.0" "Apache License 2.0"
+    |> Dict.set  "APL-1.0" "Adaptive Public License 1.0"
+    |> Dict.set  "APSL-1.0" "Apple Public Source License 1.0"
+    |> Dict.set  "APSL-1.1" "Apple Public Source License 1.1"
+    |> Dict.set  "APSL-1.2" "Apple Public Source License 1.2"
+    |> Dict.set  "APSL-2.0" "Apple Public Source License 2.0"
+    |> Dict.set  "Artistic-1.0" "Artistic License 1.0"
+    |> Dict.set  "Artistic-1.0-cl8" "Artistic License 1.0 w/clause 8"
+    |> Dict.set  "Artistic-1.0-Perl" "Artistic License 1.0 (Perl)"
+    |> Dict.set  "Artistic-2.0" "Artistic License 2.0"
+    |> Dict.set  "BSD-2-Clause" "BSD 2-clause \"Simplified\" License"
+    |> Dict.set  "BSD-3-Clause" "BSD 3-clause \"New\" or \"Revised\" License"
+    |> Dict.set  "BSL-1.0" "Boost Software License 1.0"
+    |> Dict.set  "CATOSL-1.1" "Computer Associates Trusted Open Source License 1.1"
+    |> Dict.set  "CDDL-1.0" "Common Development and Distribution License 1.0"
+    |> Dict.set  "CECILL-2.1" "CeCILL Free Software License Agreement v2.1"
+    |> Dict.set  "CNRI-Python" "CNRI Python License"
+    |> Dict.set  "CPAL-1.0" "Common Public Attribution License 1.0"
+    |> Dict.set  "CPL-1.0" "Common Public License 1.0"
+    |> Dict.set  "CUA-OPL-1.0" "CUA Office Public License v1.0"
+    |> Dict.set  "ECL-1.0" "Educational Community License v1.0"
+    |> Dict.set  "ECL-2.0" "Educational Community License v2.0"
+    |> Dict.set  "EFL-1.0" "Eiffel Forum License v1.0"
+    |> Dict.set  "EFL-2.0" "Eiffel Forum License v2.0"
+    |> Dict.set  "Entessa" "Entessa Public License v1.0"
+    |> Dict.set  "EPL-1.0" "Eclipse Public License 1.0"
+    |> Dict.set  "EUDatagrid" "EU DataGrid Software License"
+    |> Dict.set  "EUPL-1.1" "European Union Public License 1.1"
+    |> Dict.set  "Fair" "Fair License"
+    |> Dict.set  "Frameworx-1.0" "Frameworx Open License 1.0"
+    |> Dict.set  "GPL-2.0" "GNU General Public License v2.0 only"
+    |> Dict.set  "GPL-3.0" "GNU General Public License v3.0 only"
+    |> Dict.set  "HPND" "Historic Permission Notice and Disclaimer"
+    |> Dict.set  "Intel" "Intel Open Source License"
+    |> Dict.set  "IPA" "IPA Font License"
+    |> Dict.set  "IPL-1.0" "IBM Public License v1.0"
+    |> Dict.set  "ISC" "ISC License"
+    |> Dict.set  "LGPL-2.0" "GNU Library General Public License v2 only"
+    |> Dict.set  "LGPL-2.1" "GNU Lesser General Public License v2.1 only"
+    |> Dict.set  "LGPL-3.0" "GNU Lesser General Public License v3.0 only"
+    |> Dict.set  "LiLiQ-P-1.1" "Licence Libre du Québec – Permissive version 1.1"
+    |> Dict.set  "LiLiQ-R-1.1" "Licence Libre du Québec – Réciprocité version 1.1"
+    |> Dict.set  "LiLiQ-Rplus-1.1" "Licence Libre du Québec – Réciprocité forte version 1.1"
+    |> Dict.set  "LPL-1.0" "Lucent Public License Version 1.0"
+    |> Dict.set  "LPL-1.02" "Lucent Public License v1.02"
+    |> Dict.set  "LPPL-1.3c" "LaTeX Project Public License v1.3c"
+    |> Dict.set  "MirOS" "MirOS Licence"
+    |> Dict.set  "MIT" "MIT License"
+    |> Dict.set  "Motosoto" "Motosoto License"
+    |> Dict.set  "MPL-1.0" "Mozilla Public License 1.0"
+    |> Dict.set  "MPL-1.1" "Mozilla Public License 1.1"
+    |> Dict.set  "MPL-2.0" "Mozilla Public License 2.0"
+    |> Dict.set  "MPL-2.0-no-copyleft-exception" "Mozilla Public License 2.0 (no copyleft exception)"
+    |> Dict.set  "MS-PL" "Microsoft Public License"
+    |> Dict.set  "MS-RL" "Microsoft Reciprocal License"
+    |> Dict.set  "Multics" "Multics License"
+    |> Dict.set  "NASA-1.3" "NASA Open Source Agreement 1.3"
+    |> Dict.set  "Naumen" "Naumen Public License"
+    |> Dict.set  "NCSA" "University of Illinois/NCSA Open Source License"
+    |> Dict.set  "NGPL" "Nethack General Public License"
+    |> Dict.set  "Nokia" "Nokia Open Source License"
+    |> Dict.set  "NPOSL-3.0" "Non-Profit Open Software License 3.0"
+    |> Dict.set  "NTP" "NTP License"
+    |> Dict.set  "OCLC-2.0" "OCLC Research Public License 2.0"
+    |> Dict.set  "OFL-1.1" "SIL Open Font License 1.1"
+    |> Dict.set  "OGTSL" "Open Group Test Suite License"
+    |> Dict.set  "OSET-PL-2.1" "OSET Public License version 2.1"
+    |> Dict.set  "OSL-1.0" "Open Software License 1.0"
+    |> Dict.set  "OSL-2.0" "Open Software License 2.0"
+    |> Dict.set  "OSL-2.1" "Open Software License 2.1"
+    |> Dict.set  "OSL-3.0" "Open Software License 3.0"
+    |> Dict.set  "PHP-3.0" "PHP License v3.0"
+    |> Dict.set  "PostgreSQL" "PostgreSQL License"
+    |> Dict.set  "Python-2.0" "Python License 2.0"
+    |> Dict.set  "QPL-1.0" "Q Public License 1.0"
+    |> Dict.set  "RPL-1.1" "Reciprocal Public License 1.1"
+    |> Dict.set  "RPL-1.5" "Reciprocal Public License 1.5"
+    |> Dict.set  "RPSL-1.0" "RealNetworks Public Source License v1.0"
+    |> Dict.set  "RSCPL" "Ricoh Source Code Public License"
+    |> Dict.set  "SimPL-2.0" "Simple Public License 2.0"
+    |> Dict.set  "SISSL" "Sun Industry Standards Source License v1.1"
+    |> Dict.set  "Sleepycat" "Sleepycat License"
+    |> Dict.set  "SPL-1.0" "Sun Public License v1.0"
+    |> Dict.set  "UPL-1.0" "Universal Permissive License v1.0"
+    |> Dict.set  "VSL-1.0" "Vovida Software License v1.0"
+    |> Dict.set  "W3C" "W3C Software Notice and License (2002-12-31)"
+    |> Dict.set  "Watcom-1.0" "Sybase Open Watcom Public License 1.0"
+    |> Dict.set  "Xnet" "X.Net License"
+    |> Dict.set  "Zlib" "zlib License"
+    |> Dict.set  "ZPL-2.0" "Zope Public License 2.0"

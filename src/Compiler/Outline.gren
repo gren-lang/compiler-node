@@ -1,0 +1,55 @@
+module Compiler.Outline exposing
+    ( Outline
+    , AppOutline
+    , PkgOutline
+    , VersionConstraint
+    )
+
+
+import SemanticVersion exposing (SemanticVersion)
+import SemanticVersionRange exposing (SemanticVersionRange)
+import FileSystem.Path as Path exposing (Path)
+import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
+import Compiler.License as License exposing (License)
+import Compiler.Platform as Platform exposing (Platform)
+import Dict exposing (Dict)
+
+
+type Outline
+    = App AppOutline
+    | Pkg PkgOutline
+
+
+type alias AppOutline =
+    { platform : Platform
+    , sourceDirectories : Array Path
+    , grenVersion : SemanticVersion
+    , dependencies :
+        { direct : Dict String (VersionConstraint SemanticVersion)
+        , indirect : Dict String (VersionConstraint SemanticVersion)
+        }
+    }
+
+
+type alias PkgOutline =
+    { platform : Platform
+    , name : PackageName
+    , summary : String
+    , license : License
+    , version : SemanticVersion
+    , exposedModules : Exposed
+    , grenVersion : SemanticVersionRange
+    , dependencies : Dict String (VersionConstraint SemanticVersionRange)
+    }
+
+
+type Exposed
+    = ExposedList (Array ModuleName)
+    | ExposedDict (Dict String (Array ModuleName))
+
+type VersionConstraint a
+    = Version a
+    | LocalPath Path

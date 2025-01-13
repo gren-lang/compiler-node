@@ -1,0 +1,10 @@
+module SemanticVersionRange exposing
+    ( SemanticVersionRange
+    )
+
+
+import SemanticVersion exposing (SemanticVersion)
+
+
+type SemanticVersionRange
+    = SemanticVersionRange { lower : SemanticVersion, upper : SemanticVersion }
