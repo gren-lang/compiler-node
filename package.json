@@ -1,8 +1,0 @@
-{
-  "scripts": {
-    "build": "gren make"
-  },
-  "dependencies": {
-    "gren-lang": "^0.5.2"
-  }
-}
