@@ -15,7 +15,8 @@
         "Compiler.Paths",
         "Compiler.License",
         "SemanticVersion",
-        "SemanticVersionRange"
+        "SemanticVersionRange",
+        "String.EditDistance"
     ],
     "gren-version": "0.5.0 <= v < 0.6.0",
     "dependencies": {

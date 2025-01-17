@@ -1,0 +1,31 @@
+module String.EditDistance exposing
+    ( calculate
+    )
+
+{- Based on code from wikipedia article on [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance)
+-}
+
+calculate : String -> String -> Int
+calculate left right =
+    when String.popFirst left is
+        Nothing ->
+            String.count right
+
+        Just { first = firstLeft, rest = restLeft } ->
+            when String.popFirst right is
+                Nothing ->
+                    String.count left
+
+                Just { first = firstRight, rest = restRight } ->
+                    if firstLeft == firstRight then
+                        calculate restLeft restRight
+
+                    else
+                        1 +
+                            ([ calculate left restRight -- character inserted
+                            , calculate restLeft right -- character deleted
+                            , calculate restLeft restRight -- character replaced
+                            ]
+                                |> Array.minimum
+                                |> Maybe.withDefault 0
+                            )
