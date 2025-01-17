@@ -33,4 +33,20 @@ tests =
                 EditDistance.calculate "sitting" "kitten" 
                     |> Expect.equal 3
             ]
+        , describe "findSimilar"
+            [ test "Simple example" <| \{} ->
+                EditDistance.findMostSimilar
+                    { maxAmount = 3
+                    , maxDistance = 3
+                    , from =
+                        [ "one"
+                        , "two"
+                        , "three"
+                        , "four"
+                        , "five"
+                        ]
+                    }
+                    "thre"
+                        |> Expect.equal [ "three" ]
+            ]
         ]

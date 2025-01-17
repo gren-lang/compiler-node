@@ -1,5 +1,6 @@
 module String.EditDistance exposing
     ( calculate
+    , findMostSimilar
     )
 
 {- Based on code from wikipedia article on [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance)
@@ -29,3 +30,23 @@ calculate left right =
                                 |> Array.minimum
                                 |> Maybe.withDefault 0
                             )
+
+
+findMostSimilar : { maxAmount : Int, maxDistance : Int, from : Array String } -> String -> Array String
+findMostSimilar { maxAmount, maxDistance, from } str =
+    let
+        byDistance =
+            from
+                |> Array.map (\sample -> { distance = calculate sample str, sample = sample })
+                |> Array.keepIf (\{ distance } -> distance <= maxDistance)
+
+        minDistance =
+            byDistance
+                |> Array.map .distance
+                |> Array.minimum
+                |> Maybe.withDefault 0
+    in
+    byDistance
+        |> Array.keepIf (\{ distance } -> distance == minDistance)
+        |> Array.takeFirst maxAmount
+        |> Array.map .sample
