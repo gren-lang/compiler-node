@@ -33,11 +33,11 @@ tests =
                 EditDistance.calculate "sitting" "kitten" 
                     |> Expect.equal 3
             ]
-        , describe "findSimilar"
-            [ test "Simple example" <| \{} ->
-                EditDistance.findMostSimilar
+        , describe "findMostSimilar" <|
+            let
+                opts =
                     { maxAmount = 3
-                    , maxDistance = 3
+                    , maxDistance = 30
                     , from =
                         [ "one"
                         , "two"
@@ -46,7 +46,29 @@ tests =
                         , "five"
                         ]
                     }
-                    "thre"
+            in
+            [ test "Finds samples with lowest distance" <| \{} ->
+                EditDistance.findMostSimilar
+                    opts
+                    "tre"
+                        -- In all cases, you need to make two modifications to arrive at "tre"
+                        -- Even though maxDistance is set really high, it only finds those
+                        -- that tie for the lowest distance
+                        |> Expect.equal [ "one", "two", "three" ]
+            , test "Low maxDistance might return nothing" <| \{} ->
+                EditDistance.findMostSimilar
+                    { opts | maxDistance = 1 }
+                    "tre"
+                        |> Expect.equal []
+            , test "Exact match is always returned" <| \{} ->
+                EditDistance.findMostSimilar
+                    {opts | maxDistance = 0 }
+                    "three"
                         |> Expect.equal [ "three" ]
+            , test "Low maxAmount limits size of response" <| \{} ->
+                EditDistance.findMostSimilar
+                    { opts | maxAmount = 2 }
+                    "tre"
+                        |> Expect.equal [ "one", "two" ]
             ]
         ]

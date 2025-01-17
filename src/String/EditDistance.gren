@@ -4,6 +4,10 @@ module String.EditDistance exposing
     )
 
 {- Based on code from wikipedia article on [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance)
+
+TODO: deletion/insertion should only add a distance of 0.5
+TODO: add support for transposition
+TODO: performance?
 -}
 
 calculate : String -> String -> Int
