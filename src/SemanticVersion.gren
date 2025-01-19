@@ -2,6 +2,7 @@ module SemanticVersion exposing
     ( SemanticVersion
     , fromString
     , cliParser
+    , jsonDecoder
     , toString
     , toJson
     )
@@ -11,12 +12,13 @@ module SemanticVersion exposing
 meaning. This module makes no attempt to enforce the semantic versioning
 rules.
 
-@docs SemanticVersion, fromString, cliParser, toString, toJson
+@docs SemanticVersion, fromString, cliParser, jsonDecoder, toString, toJson
 -}
 
 
 import CLI.Parser
 import Json.Encode as Json
+import Json.Decode as Decode exposing (Decoder)
 
 
 {-| A semantic version has three numbers, separated by a period.
@@ -69,6 +71,22 @@ cliParser =
         , "5.1.0"
         ]
     }
+
+
+{-| Decode [SemanticVersion](#SemanticVersion) from JSON.
+-}
+jsonDecoder : Decoder SemanticVersion
+jsonDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\strValue ->
+                when fromString strValue is
+                    Just semVer ->
+                        Decode.succeed semVer
+
+                    Nothing ->
+                        Decode.fail ("This is not a valid semver formatted version: " ++ strValue)
+            )
 
 
 {-| Turn a [SemanticVersion](#SemanticVersion) into a `String`.

@@ -1,0 +1,42 @@
+module Test.Compiler.ModuleName exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import Compiler.ModuleName as ModuleName
+
+
+tests : Test
+tests =
+    describe "ModuleName"
+        [ describe "fromString"
+            [ test "valid name" <| \{} ->
+                ModuleName.fromString "MyModule"
+                    |> Maybe.map ModuleName.toString
+                    |> Maybe.withDefault ""
+                    |> Expect.equal "MyModule"
+            , test "valid nested name" <| \{} ->
+                ModuleName.fromString "My.Nested.Module"
+                    |> Maybe.map ModuleName.toString
+                    |> Maybe.withDefault ""
+                    |> Expect.equal "My.Nested.Module"
+            , test "name must be capitalized" <| \{} ->
+                ModuleName.fromString "myModule"
+                    |> Expect.equal Nothing
+            , test "name cannot contain whitespace" <| \{} ->
+                ModuleName.fromString "My Module"
+                    |> Expect.equal Nothing
+            , test "name cannot start with digit" <| \{} ->
+                ModuleName.fromString "9Modules"
+                    |> Expect.equal Nothing
+            , test "nested name must be capitalized" <| \{} ->
+                ModuleName.fromString "My.module"
+                    |> Expect.equal Nothing
+            , test "nested name cannot contain whitespace" <| \{} ->
+                ModuleName.fromString "My. Module"
+                    |> Expect.equal Nothing
+            , test "nested name cannot start with digit" <| \{} ->
+                ModuleName.fromString "My.9odule"
+                    |> Expect.equal Nothing
+            ]
+        ]

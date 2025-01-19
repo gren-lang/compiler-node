@@ -1,0 +1,44 @@
+module Test.SemanticVersionRange exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import SemanticVersion as SV
+import SemanticVersionRange as Range
+
+
+tests : Test
+tests =
+    describe "SemanticVersionRange"
+        [ describe "fromString"
+            [ test "Simple example" <| \{} ->
+                when Range.fromString "1.2.0 <= v < 2.0.0" is
+                    Just range ->
+                        Expect.all
+                            [ Range.lowerBound >> SV.toString >> Expect.equal "1.2.0"
+                            , Range.upperBound >> SV.toString >> Expect.equal "2.0.0"
+                            ]
+                            range
+
+                    Nothing ->
+                        Expect.fail "Expected fromString to succeed"
+            , test "Simple example, but with wierd whitespace" <| \{} ->
+                when Range.fromString "1.2.0  <= v< 2.0.0" is
+                    Just range ->
+                        Expect.all
+                            [ Range.lowerBound >> SV.toString >> Expect.equal "1.2.0"
+                            , Range.upperBound >> SV.toString >> Expect.equal "2.0.0"
+                            ]
+                            range
+
+                    Nothing ->
+                        Expect.fail "Expected fromString to succeed"
+            , test "<= v < is required" <| \{} ->
+                when Range.fromString "1.2.0 2.0.0" is
+                    Just range ->
+                        Expect.fail "Expected fromString to fail"
+
+                    Nothing ->
+                        Expect.pass
+            ]
+        ]

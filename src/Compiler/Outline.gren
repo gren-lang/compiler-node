@@ -1,8 +1,10 @@
 module Compiler.Outline exposing
-    ( Outline
+    ( Outline(..)
     , AppOutline
     , PkgOutline
     , VersionConstraint
+    , jsonDecoder
+    , toJson
     )
 
 
@@ -47,9 +49,191 @@ type alias PkgOutline =
 
 
 type Exposed
-    = ExposedList (Array ModuleName)
+    = ExposedArray (Array ModuleName)
     | ExposedDict (Dict String (Array ModuleName))
+
 
 type VersionConstraint a
     = Version a
     | LocalPath Path
+
+
+jsonDecoder : Decoder Outline
+jsonDecoder =
+    Decode.field "type" Decode.string    
+        |> Decode.andThen
+            (\type_ ->
+                when type_ is
+                    "application" -> Decode.map App appDecoder
+                    "package" -> Decode.map Pkg pkgDecoder
+                    _ ->
+                        Decode.fail ("Unknown gren.json type: " ++ type_)
+            )
+
+
+appDecoder : Decoder AppOutline
+appDecoder =
+    Decode.map4
+        (\platform srcDirs grenVersion deps ->
+            { platform = platform
+            , sourceDirectories = srcDirs
+            , grenVersion = grenVersion
+            , dependencies = deps
+            }
+        )
+        (Decode.field "platform" Platform.jsonDecoder)
+        (Decode.field "source-directories" (Decode.array srcDirDecoder))
+        (Decode.field "gren-version" SemanticVersion.jsonDecoder)
+        (Decode.field "dependencies" appDependenciesDecoder)
+
+
+srcDirDecoder : Decoder Path
+srcDirDecoder =
+    Decode.string
+        |> Decode.map Path.fromPosixString
+        |> Decode.andThen
+            (\path ->
+                if path.root == "" then
+                    Decode.succeed path
+
+                else
+                    Decode.fail ("Path needs to be relative, not absolute: " ++ Path.toPosixString path)
+            )
+
+
+appDependenciesDecoder : Decoder { direct : Dict String (VersionConstraint SemanticVersion), indirect : Dict String (VersionConstraint SemanticVersion) }
+appDependenciesDecoder =
+    Decode.map2
+        (\direct indirect ->
+            { direct = direct
+            , indirect = indirect
+            }
+        )
+        (Decode.field "direct" (Decode.dict (constraintDecoder SemanticVersion.jsonDecoder)))
+        (Decode.field "indirect" (Decode.dict (constraintDecoder SemanticVersion.jsonDecoder)))
+
+
+appDependenciesEncoder : Dict String (VersionConstraint SemanticVersion) -> Encode.Value
+appDependenciesEncoder deps =
+    Encode.dict identity (constraintEncoder SemanticVersion.toJson) deps
+
+
+constraintDecoder : Decoder a -> Decoder (VersionConstraint a)
+constraintDecoder versionDecoder =
+    Decode.oneOf
+        [ Decode.map Version versionDecoder
+        , Decode.string
+            |> Decode.andThen
+                (\strValue ->
+                    if String.startsWith "local:" strValue then
+                        strValue
+                            |> String.dropFirst localPrefixLength
+                            |> Path.fromPosixString
+                            |> LocalPath
+                            |> Decode.succeed
+
+                    else
+                        Decode.fail ("Not valid dependency constraint: " ++ strValue)
+                )
+        ]
+
+
+localPrefixLength : Int
+localPrefixLength =
+    String.count "local:"
+
+
+constraintEncoder : (a -> Encode.Value) -> VersionConstraint a -> Encode.Value
+constraintEncoder versionEncoder constraint =
+    when constraint is
+        Version vsn ->
+            versionEncoder vsn
+
+        LocalPath path ->
+            Encode.string ("local:" ++ Path.toPosixString path)
+
+
+pkgDecoder : Decoder PkgOutline
+pkgDecoder =
+    Decode.map8
+        (\platform name summary license version exposedModules grenVersion dependencies ->
+            { platform = platform
+            , name = name
+            , summary = summary
+            , license = license
+            , version = version
+            , exposedModules = exposedModules
+            , grenVersion = grenVersion
+            , dependencies = dependencies
+            }
+        )
+        (Decode.field "platform" Platform.jsonDecoder)
+        (Decode.field "name" PackageName.jsonDecoder)
+        (Decode.field "summary" Decode.string)
+        (Decode.field "license" License.jsonDecoder)
+        (Decode.field "version" SemanticVersion.jsonDecoder)
+        (Decode.field "exposed-modules" exposedModulesDecoder)
+        (Decode.field "gren-version" SemanticVersionRange.jsonDecoder)
+        (Decode.field "dependencies" pkgDependenciesDecoder)
+
+
+exposedModulesDecoder : Decoder Exposed
+exposedModulesDecoder =
+    Decode.oneOf
+        [ Decode.array ModuleName.jsonDecoder
+            |> Decode.map ExposedArray
+        , Decode.dict (Decode.array ModuleName.jsonDecoder)
+            |> Decode.map ExposedDict
+        ]
+
+
+exposedModulesEncoder : Exposed -> Encode.Value
+exposedModulesEncoder exposed =
+    when exposed is
+        ExposedArray names ->
+            Encode.array ModuleName.toJson names
+
+        ExposedDict dictOfNames ->
+            Encode.dict identity (Encode.array ModuleName.toJson) dictOfNames
+
+
+pkgDependenciesDecoder : Decoder (Dict String (VersionConstraint SemanticVersionRange))
+pkgDependenciesDecoder =
+    Decode.dict (constraintDecoder SemanticVersionRange.jsonDecoder)
+
+
+pkgDependenciesEncoder : Dict String (VersionConstraint SemanticVersionRange) -> Encode.Value
+pkgDependenciesEncoder deps =
+    Encode.dict identity (constraintEncoder SemanticVersionRange.toJson) deps
+
+
+toJson : Outline -> Encode.Value
+toJson outline =
+    when outline is
+        App app ->
+            Encode.object
+                [ { key = "type", value = Encode.string "application" }
+                , { key = "platform", value = Platform.toJson app.platform }
+                , { key = "source-directories", value = Encode.array (Encode.string << Path.toPosixString) app.sourceDirectories }
+                , { key = "gren-version", value = SemanticVersion.toJson app.grenVersion }
+                , { key = "dependencies"
+                  , value =
+                    Encode.object
+                        [ { key = "direct", value = appDependenciesEncoder app.dependencies.direct }
+                        , { key = "indirect", value = appDependenciesEncoder app.dependencies.indirect }
+                        ]
+                  }
+                ]
+
+        Pkg pkg ->
+            Encode.object
+                [ { key = "type", value = Encode.string "package" }
+                , { key = "platform", value = Platform.toJson pkg.platform }
+                , { key = "name", value = PackageName.toJson pkg.name }
+                , { key = "summary", value = Encode.string pkg.summary }
+                , { key = "license", value = License.toJson pkg.license }
+                , { key = "version", value = SemanticVersion.toJson pkg.version }
+                , { key = "exposed-modules", value = exposedModulesEncoder pkg.exposedModules }
+                , { key = "gren-version", value = SemanticVersionRange.toJson pkg.grenVersion }
+                , { key = "dependencies", value = pkgDependenciesEncoder pkg.dependencies }
+                ]

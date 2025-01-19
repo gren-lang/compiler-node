@@ -1,10 +1,71 @@
 module SemanticVersionRange exposing
     ( SemanticVersionRange
+    , lowerBound
+    , upperBound
+    , fromString
+    , jsonDecoder
+    , toString
+    , toJson
     )
 
 
 import SemanticVersion exposing (SemanticVersion)
+import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 
 
 type SemanticVersionRange
     = SemanticVersionRange { lower : SemanticVersion, upper : SemanticVersion }
+
+
+lowerBound : SemanticVersionRange -> SemanticVersion
+lowerBound (SemanticVersionRange { lower }) =
+    lower
+
+
+upperBound : SemanticVersionRange -> SemanticVersion
+upperBound (SemanticVersionRange { upper }) =
+    upper
+
+
+fromString : String -> Maybe SemanticVersionRange
+fromString str =
+    when str |> String.keepIf (\char -> char /= ' ') |> String.split "<=v<" is
+        [ lowerStr, upperStr ] ->
+            when
+                { maybeLower = SemanticVersion.fromString lowerStr
+                , maybeUpper = SemanticVersion.fromString upperStr
+                }
+            is
+            { maybeLower = Just lower, maybeUpper = Just upper } ->
+                Just (SemanticVersionRange { lower = lower, upper = upper })
+
+            _ ->
+                Nothing
+
+        _ ->
+            Nothing
+
+
+jsonDecoder : Decoder SemanticVersionRange
+jsonDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\strValue ->
+                when fromString strValue is
+                    Just range ->
+                        Decode.succeed range
+
+                    Nothing ->
+                        Decode.fail ("Not a valid range: " ++ strValue)
+            )    
+
+
+toString : SemanticVersionRange -> String
+toString (SemanticVersionRange { lower, upper }) =
+    SemanticVersion.toString lower ++ " <= v < " ++ SemanticVersion.toString upper
+
+
+toJson : SemanticVersionRange -> Encode.Value
+toJson range =
+    Encode.string (toString range)

@@ -6,6 +6,7 @@ module Compiler.PackageName exposing
     --
     , fromString
     , cliParser
+    , jsonDecoder
     --
     , toString
     , toJson
@@ -14,12 +15,13 @@ module Compiler.PackageName exposing
 
 {-| Functions for working with package identifiers.
 
-@docs Package, author, name, fromString, cliParser, toString, toJson
+@docs Package, author, name, fromString, cliParser, jsonDecoder, toString, toJson
 -}
 
 
 import CLI.Parser
 import Json.Encode as Json
+import Json.Decode as Decode exposing (Decoder)
 
 
 {-| A package is identified by a string in the following format:
@@ -109,6 +111,20 @@ cliParser =
         , "robheghan/string-diff"
         ]
     }
+
+
+jsonDecoder : Decoder PackageName
+jsonDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\strValue ->
+                when fromString strValue is
+                    Just packageName ->
+                        Decode.succeed packageName
+
+                    Nothing ->
+                        Decode.fail ("Not a valid package name: " ++ strValue)
+            )
 
 
 {-| Turn [PackageName](#PackageName) into a `String`.

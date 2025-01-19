@@ -1,19 +1,61 @@
 module Compiler.License exposing
     ( License
+    , bsd3
     , toString
+    , toJson
+    , jsonDecoder
+    , findMostSimilar
     )
 
 
 import Dict exposing (Dict)
+import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
+import String.EditDistance as EditDistance
 
 
 type License
     = License String
 
 
+bsd3 : License
+bsd3 =
+    License "BSD-3-Clause"
+
+
 toString : License -> String
 toString (License value) =
     value
+
+
+toJson : License -> Encode.Value
+toJson license =
+    Encode.string (toString license)
+
+
+jsonDecoder : Decoder License
+jsonDecoder =
+    Decode.string
+        |> Decode.andThen decodeHelper
+
+
+decodeHelper : String -> Decoder License
+decodeHelper givenCode =
+    if Dict.member givenCode osiApprovedSpdxLicenses then
+        Decode.succeed (License givenCode)
+
+    else
+        Decode.fail ("Invalid license name: " ++ givenCode)
+
+
+findMostSimilar : String -> Array String
+findMostSimilar givenCode =
+    EditDistance.findMostSimilar
+        { maxDistance = 3
+        , maxAmount = 3
+        , from = Dict.keys osiApprovedSpdxLicenses
+        }
+        givenCode
 
 
 {-|

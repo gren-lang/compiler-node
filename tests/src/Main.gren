@@ -5,7 +5,9 @@ import Test.Runner.Node as TestRunner
 import Test.CLI.Parser as CLIParser
 import Test.CLI.PrettyPrinter as PrettyPrinter
 import Test.SemanticVersion as SemanticVersion
+import Test.SemanticVersionRange as SemanticVersionRange
 import Test.Compiler.PackageName as PackageName
+import Test.Compiler.ModuleName as ModuleName
 import Test.String.EditDistance as EditDistance
 import Node exposing (Program)
 
@@ -17,6 +19,8 @@ main =
             [ CLIParser.tests
             , PrettyPrinter.tests
             , SemanticVersion.tests
+            , SemanticVersionRange.tests
             , PackageName.tests
+            , ModuleName.tests
             , EditDistance.tests
             ]

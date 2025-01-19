@@ -1,7 +1,7 @@
 module Compiler.Platform exposing
     ( Platform
     , toJson
-    , fromJson
+    , jsonDecoder
     )
 
 
@@ -23,8 +23,8 @@ toJson platform =
         Node -> Encode.string "node"
 
 
-fromJson : Decoder Platform
-fromJson =
+jsonDecoder : Decoder Platform
+jsonDecoder =
     Decode.string
         |> Decode.andThen (\value ->
             when String.toLower value is

@@ -1,13 +1,60 @@
 module Compiler.ModuleName exposing
     ( ModuleName
+    , fromString
+    , jsonDecoder
     , toString
+    , toJson
     )
+
+
+import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 
 
 type ModuleName
     = ModuleName String
 
 
+fromString : String -> Maybe ModuleName
+fromString str =
+    let
+        sections =
+            String.split "." str
+
+        sectionTest section =
+            when String.popFirst section is
+                Just { first, rest } ->
+                    Char.isUpper first && String.all Char.isAlphaNum rest
+
+                Nothing ->
+                    False
+    in
+    if Array.all sectionTest sections then
+        Just <| ModuleName str
+
+    else
+        Nothing
+
+
+jsonDecoder : Decoder ModuleName
+jsonDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\str ->
+                when fromString str is
+                    Just moduleName ->
+                        Decode.succeed moduleName
+
+                    Nothing ->
+                        Decode.fail ("Not a valid module name: " ++ str)
+            )
+
+
 toString : ModuleName -> String
 toString (ModuleName name) =
     name
+
+
+toJson : ModuleName -> Encode.Value
+toJson moduleName =
+    Encode.string (toString moduleName)
