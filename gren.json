@@ -14,6 +14,7 @@
         "Compiler.PackageName",
         "Compiler.Paths",
         "Compiler.License",
+        "FileSystem.Lock",
         "SemanticVersion",
         "SemanticVersionRange",
         "String.EditDistance"

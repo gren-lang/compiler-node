@@ -1,0 +1,157 @@
+module FileSystem.Lock exposing
+    ( Model
+    , Msg
+    , UpdateResult
+    , init
+    , update
+    , getLocks
+    )
+
+
+{-| Based on [proper-lockfile](https://www.npmjs.com/package/proper-lockfile)
+-}
+
+
+import Dict exposing (Dict)
+import FileSystem
+import FileSystem.Path as Path exposing (Path)
+import Task
+import Process
+import Time
+
+
+type alias Model =
+    Dict String {}
+
+
+type Msg
+    = Lock Path
+    | LockAttempt { path : Path, result : Result FileSystem.Error Path }
+    | LockMetaCheck { path : Path, result : Result FileSystem.Error { time : Time.Posix, meta : FileSystem.Metadata } }
+    | Touch Path
+    | TouchAttempt { path : Path, result : Result FileSystem.Error Path }
+    | Unlock Path
+
+
+type UpdateResult
+    = Working (Cmd Msg)
+    | UnexpectedError { path : Path, error : FileSystem.Error }
+    | LockAquired { path : Path, model : Model, command : Cmd Msg }
+    | LockReleased { path : Path, model : Model, command : Cmd Msg }
+    | AlreadyLocked Path
+
+
+init : Model
+init =
+    Dict.empty
+
+
+getLocks : Model -> Array Path
+getLocks model =
+    model
+        |> Dict.keys
+        |> Array.map Path.fromPosixString
+        |> Array.map (\path -> Path.parentPath path |> Maybe.withDefault path)
+
+
+update : FileSystem.Permission -> Msg -> Model -> UpdateResult
+update fsPerm msg model =
+    when msg is
+        Lock path ->
+            let
+                lockPath =
+                    toLockPath path
+            in
+            FileSystem.makeDirectory fsPerm { recursive = False } lockPath
+                |> Task.attempt (\result -> LockAttempt { path = lockPath, result = result })
+                |> Working
+
+        LockAttempt { path, result = (Err fsErr) } ->
+            if FileSystem.errorIsFileExists fsErr then
+                -- Lock already exists. Need to retrieve modification time
+                -- to figure out how long we should wait, or if it is stale
+                FileSystem.metadata fsPerm { resolveLink = False } path
+                    |> Task.andThen (\meta -> Time.now |> Task.map (\time -> { time = time, meta = meta }))
+                    |> Task.attempt (\result -> LockMetaCheck { path = path, result = result })
+                    |> Working
+
+            else
+                UnexpectedError { path = fromLockPath path, error = fsErr }
+
+        LockAttempt { path, result = Ok _ } ->
+            LockAquired
+                { path = Path.parentPath path |> Maybe.withDefault path
+                , model = Dict.set (Path.toPosixString path) {} model
+                , command =
+                    Process.sleep 1000
+                        |> Task.perform (\_ -> Touch path)
+                }
+            
+        Touch path ->
+            Time.now
+                |> Task.andThen
+                    (\time ->
+                        FileSystem.changeTimes
+                            fsPerm
+                            { lastAccessed = time
+                            , lastModified = time
+                            , resolveLink = False
+                            }
+                            path
+                    )
+                |> Task.attempt (\result -> TouchAttempt { path = path, result = result })
+                |> Working
+
+        TouchAttempt { path, result = Err fsErr } ->
+            UnexpectedError { path = fromLockPath path, error = fsErr }
+
+        TouchAttempt { path, result = Ok _ } ->
+            Process.sleep 1000
+                |> Task.perform (\_ -> Touch path)
+                |> Working
+
+        Unlock path ->
+            let
+                lockPath =
+                    toLockPath path
+            in
+            LockReleased
+                { path = path
+                , model = Dict.remove (Path.toPosixString lockPath) model
+                , command =
+                    FileSystem.remove fsPerm { recursive = False, ignoreErrors = False } lockPath
+                        |> Task.onError (\_ -> Task.succeed lockPath)
+                        |> Task.execute
+                }
+
+        LockMetaCheck { path, result = Err fsErr } ->
+            if FileSystem.errorIsFileExists fsErr then
+                -- Lock might have been removed while we asked for metadata
+                update fsPerm (Lock (fromLockPath path)) model
+
+            else
+                UnexpectedError { path = fromLockPath path, error = fsErr }
+
+        LockMetaCheck { path, result = Ok { time, meta } } ->
+            if Time.posixToMillis time - Time.posixToMillis meta.lastAccessed > 5000 then
+                -- Lock is stale, let's try again
+                FileSystem.remove fsPerm { recursive = False, ignoreErrors = False } path
+                    |> Task.onError (\_ -> Task.succeed path)
+                    |> Task.perform (\_ -> Lock (fromLockPath path))
+                    |> Working
+
+            else
+                -- TODO: Implement retries
+                AlreadyLocked path
+
+
+toLockPath : Path -> Path
+toLockPath path =
+    Path.fromPosixString ".lock"
+        |> Path.prepend path
+
+
+fromLockPath : Path -> Path
+fromLockPath lockPath =
+    Path.parentPath lockPath
+        |> Maybe.withDefault lockPath
