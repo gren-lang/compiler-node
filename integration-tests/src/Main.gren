@@ -32,11 +32,11 @@ type alias Model =
     }
 
 
-initModel : FileSystem.Permission -> Stream.Writable Bytes -> Model
-initModel fsPerm stdout =
+initModel : FileSystem.Permission -> Maybe Int -> Stream.Writable Bytes -> Model
+initModel fsPerm retryWait stdout =
     { fsPerm = fsPerm
     , stdout = stdout
-    , locks = Lock.init
+    , locks = Lock.init (Maybe.map (\wait -> { attempts = 3, millisecondsBetween = wait }) retryWait)
     , lockTime = 0
     }
 
@@ -52,7 +52,7 @@ init env =
         Node.startProgram <|
             when Array.get 2 env.args is
                 Just "find gren.json" ->
-                    { model = initModel fsPerm env.stdout
+                    { model = initModel fsPerm Nothing env.stdout
                     , command =
                         Paths.projectMetadata fsPerm
                             |> Task.map Path.toPosixString
@@ -65,7 +65,7 @@ init env =
                     }
 
                 Just "parse gren.json" ->
-                    { model = initModel fsPerm env.stdout
+                    { model = initModel fsPerm Nothing env.stdout
                     , command =
                         Paths.projectMetadata fsPerm
                             |> Task.andThen (\grenJsonPath ->
@@ -93,15 +93,19 @@ init env =
                             Array.get 3 env.args
                                 |> Maybe.andThen String.toInt
                                 |> Maybe.withDefault 0
+
+                        maybeRetryWait =
+                            Array.get 4 env.args
+                                |> Maybe.andThen String.toInt
                     in
-                    { model = { (initModel fsPerm env.stdout) | lockTime = lockTime }
+                    { model = { (initModel fsPerm maybeRetryWait env.stdout) | lockTime = lockTime }
                     , command =
                         Lock.aquire (Path.empty)
                             |> Cmd.map LockMsg
                     }
 
                 _ ->
-                    { model = initModel fsPerm env.stdout
+                    { model = initModel fsPerm Nothing env.stdout
                     , command =
                         log "Invalid start argument" env.stdout
                     }

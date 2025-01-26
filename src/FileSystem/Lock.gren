@@ -14,7 +14,7 @@ module FileSystem.Lock exposing
 -}
 
 
-import Dict exposing (Dict)
+import Set exposing (Set)
 import FileSystem
 import FileSystem.Path as Path exposing (Path)
 import Task
@@ -23,13 +23,21 @@ import Time
 
 
 type alias Model =
-    Dict String {}
+    { locks : Set String
+    , retryOptions : Maybe RetryOptions
+    }
+
+
+type alias RetryOptions =
+    { attempts : Int
+    , millisecondsBetween : Int
+    }
 
 
 type Msg
-    = Lock Path
-    | LockAttempt { path : Path, result : Result FileSystem.Error Path }
-    | LockMetaCheck { path : Path, result : Result FileSystem.Error { time : Time.Posix, meta : FileSystem.Metadata } }
+    = Lock { path : Path, attempt : Int }
+    | LockAttempt { path : Path, attempt : Int, result : Result FileSystem.Error Path }
+    | LockMetaCheck { path : Path, attempt : Int, result : Result FileSystem.Error { time : Time.Posix, meta : FileSystem.Metadata } }
     | Touch Path
     | TouchAttempt { path : Path, result : Result FileSystem.Error Path }
     | Unlock Path
@@ -43,14 +51,16 @@ type UpdateResult
     | AlreadyLocked Path
 
 
-init : Model
-init =
-    Dict.empty
+init : Maybe RetryOptions -> Model
+init maybeRetryOptions =
+    { locks = Set.empty
+    , retryOptions = maybeRetryOptions
+    }
 
 
 aquire : Path -> Cmd Msg
 aquire path =
-    Task.succeed (Lock path)
+    Task.succeed (Lock { path = path, attempt = 0 })
         |> Task.perform identity
 
 
@@ -62,8 +72,8 @@ release path =
 
 getLocks : Model -> Array Path
 getLocks model =
-    model
-        |> Dict.keys
+    model.locks
+        |> Set.toArray
         |> Array.map Path.fromPosixString
         |> Array.map (\path -> Path.parentPath path |> Maybe.withDefault path)
 
@@ -71,22 +81,22 @@ getLocks model =
 update : FileSystem.Permission -> Msg -> Model -> UpdateResult
 update fsPerm msg model =
     when msg is
-        Lock path ->
+        Lock { path, attempt } ->
             let
                 lockPath =
                     toLockPath path
             in
             FileSystem.makeDirectory fsPerm { recursive = False } lockPath
-                |> Task.attempt (\result -> LockAttempt { path = lockPath, result = result })
+                |> Task.attempt (\result -> LockAttempt { path = lockPath, attempt = attempt, result = result })
                 |> Working
 
-        LockAttempt { path, result = (Err fsErr) } ->
+        LockAttempt { path, attempt, result = (Err fsErr) } ->
             if FileSystem.errorIsFileExists fsErr then
                 -- Lock already exists. Need to retrieve modification time
                 -- to figure out how long we should wait, or if it is stale
                 FileSystem.metadata fsPerm { resolveLink = False } path
                     |> Task.andThen (\meta -> Time.now |> Task.map (\time -> { time = time, meta = meta }))
-                    |> Task.attempt (\result -> LockMetaCheck { path = path, result = result })
+                    |> Task.attempt (\result -> LockMetaCheck { path = path, attempt = attempt, result = result })
                     |> Working
 
             else
@@ -95,7 +105,7 @@ update fsPerm msg model =
         LockAttempt { path, result = Ok _ } ->
             LockAquired
                 { path = Path.parentPath path |> Maybe.withDefault path
-                , model = Dict.set (Path.toPosixString path) {} model
+                , model = { model | locks = Set.set (Path.toPosixString path) model.locks }
                 , command =
                     Process.sleep 1000
                         |> Task.perform (\_ -> Touch path)
@@ -129,34 +139,48 @@ update fsPerm msg model =
                 lockPath =
                     toLockPath path
             in
-            LockReleased
-                { path = path
-                , model = Dict.remove (Path.toPosixString lockPath) model
-                , command =
-                    FileSystem.remove fsPerm { recursive = True, ignoreErrors = False } lockPath
-                        |> Task.onError (\err -> Task.succeed lockPath)
-                        |> Task.execute
-                }
+            if Set.member (Path.toPosixString lockPath) model.locks then
+                LockReleased
+                    { path = path
+                    , model = { model | locks = Set.remove (Path.toPosixString lockPath) model.locks }
+                    , command =
+                        FileSystem.remove fsPerm { recursive = True, ignoreErrors = False } lockPath
+                            |> Task.onError (\err -> Task.succeed lockPath)
+                            |> Task.execute
+                    }
 
-        LockMetaCheck { path, result = Err fsErr } ->
+            else
+                Working Cmd.none
+
+        LockMetaCheck { path, attempt, result = Err fsErr } ->
             if FileSystem.errorIsFileExists fsErr then
                 -- Lock might have been removed while we asked for metadata
-                update fsPerm (Lock (fromLockPath path)) model
+                update fsPerm (Lock { path = fromLockPath path, attempt = attempt + 1 }) model
 
             else
                 UnexpectedError { path = fromLockPath path, error = fsErr }
 
-        LockMetaCheck { path, result = Ok { time, meta } } ->
+        LockMetaCheck { path, attempt, result = Ok { time, meta } } ->
             if Time.posixToMillis time - Time.posixToMillis meta.lastAccessed > 5000 then
                 -- Lock is stale, let's try again
                 FileSystem.remove fsPerm { recursive = True, ignoreErrors = False } path
                     |> Task.onError (\_ -> Task.succeed path)
-                    |> Task.perform (\_ -> Lock (fromLockPath path))
+                    |> Task.perform (\_ -> Lock { path = fromLockPath path, attempt = attempt + 1 })
                     |> Working
 
             else
-                -- TODO: Implement retries
-                AlreadyLocked path
+                when model.retryOptions is
+                    Just opts ->
+                        if opts.attempts > attempt then
+                            Process.sleep (toFloat opts.millisecondsBetween)
+                                |> Task.perform (\_ -> Lock { path = fromLockPath path, attempt = attempt + 1 })
+                                |> Working
+                        
+                        else
+                            AlreadyLocked path
+
+                    Nothing ->
+                        AlreadyLocked path
 
 
 toLockPath : Path -> Path
