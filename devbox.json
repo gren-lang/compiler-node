@@ -5,16 +5,21 @@
     "github:gren-lang/nix/0.5.2"
   ],
   "shell": {
-    "init_hook": [
-      "echo 'Welcome to devbox!' > /dev/null"
-    ],
     "scripts": {
       "build": [
         "gren make"
       ],
       "test": [
+        "devbox run test:unit",
+        "devbox run test:integration"
+      ],
+      "test:unit": [
         "cd tests/",
         "./run-tests.sh"
+      ],
+      "test:integration": [
+        "cd integration-tests/",
+        "make test"
       ]
     }
   }
