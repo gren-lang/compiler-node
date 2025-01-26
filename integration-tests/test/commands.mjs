@@ -60,4 +60,14 @@ describe("compiler-node", () => {
         });
     });
   });
+
+  describe("file lock", () => {
+    it("Aquires and releases lock", () => {
+      return runner()
+        .cwd(rootDir)
+        .fork("bin/app", ["lock", "10"], {})
+        .stdout("Lock Aquired")
+        .stdout("Lock Released");
+    });
+  });
 });

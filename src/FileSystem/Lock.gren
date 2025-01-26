@@ -1,9 +1,11 @@
 module FileSystem.Lock exposing
     ( Model
     , Msg
-    , UpdateResult
+    , UpdateResult(..)
     , init
     , update
+    , aquire
+    , release
     , getLocks
     )
 
@@ -44,6 +46,18 @@ type UpdateResult
 init : Model
 init =
     Dict.empty
+
+
+aquire : Path -> Cmd Msg
+aquire path =
+    Task.succeed (Lock path)
+        |> Task.perform identity
+
+
+release : Path -> Cmd Msg
+release path =
+    Task.succeed (Unlock path)
+        |> Task.perform identity
 
 
 getLocks : Model -> Array Path
