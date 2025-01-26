@@ -67,7 +67,10 @@ describe("compiler-node", () => {
         .cwd(rootDir)
         .fork("bin/app", ["lock", "10"], {})
         .stdout("Lock Aquired")
-        .stdout("Lock Released");
+        .stdout("Lock Released")
+        .expect(({ assert }) => {
+          assert.equal(false, fs.existsSync(".lock"))
+        });
     });
   });
 });

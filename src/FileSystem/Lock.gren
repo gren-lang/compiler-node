@@ -133,8 +133,8 @@ update fsPerm msg model =
                 { path = path
                 , model = Dict.remove (Path.toPosixString lockPath) model
                 , command =
-                    FileSystem.remove fsPerm { recursive = False, ignoreErrors = False } lockPath
-                        |> Task.onError (\_ -> Task.succeed lockPath)
+                    FileSystem.remove fsPerm { recursive = True, ignoreErrors = False } lockPath
+                        |> Task.onError (\err -> Task.succeed lockPath)
                         |> Task.execute
                 }
 
@@ -149,7 +149,7 @@ update fsPerm msg model =
         LockMetaCheck { path, result = Ok { time, meta } } ->
             if Time.posixToMillis time - Time.posixToMillis meta.lastAccessed > 5000 then
                 -- Lock is stale, let's try again
-                FileSystem.remove fsPerm { recursive = False, ignoreErrors = False } path
+                FileSystem.remove fsPerm { recursive = True, ignoreErrors = False } path
                     |> Task.onError (\_ -> Task.succeed path)
                     |> Task.perform (\_ -> Lock (fromLockPath path))
                     |> Working

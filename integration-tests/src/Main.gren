@@ -137,7 +137,10 @@ update msg model =
                 Lock.LockReleased { path, model = lockModel, command } ->
                     { model = { model | locks = lockModel }
                     , command =
-                        log "Lock Released" model.stdout
+                        Cmd.batch
+                            [ log "Lock Released" model.stdout
+                            , Cmd.map LockMsg command
+                            ]
                     }
 
                 Lock.AlreadyLocked path ->
