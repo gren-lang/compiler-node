@@ -71,14 +71,16 @@ describe("compiler-node", () => {
         .stdout("Lock Aquired")
         .stdout("Lock Released")
         .expect(({ assert }) => {
-          assert.equal(false, fs.existsSync(".lock"))
+          assert.equal(false, fs.existsSync(".lock"));
         });
     });
 
     it("Blocks others from aquiring lock", async () => {
-      const proc = childProc.spawn("bin/app", ["lock", "1000"], { cwd: rootDir });
+      const proc = childProc.spawn("bin/app", ["lock", "1000"], {
+        cwd: rootDir,
+      });
 
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 50));
 
       return runner()
         .cwd(rootDir)
@@ -87,7 +89,7 @@ describe("compiler-node", () => {
         .expect(async () => {
           proc.kill();
           fsProm.rm(".lock", { recursive: true });
-        })
+        });
     });
 
     it("Ignores stale locks", async () => {
@@ -103,9 +105,11 @@ describe("compiler-node", () => {
     });
 
     it("Can be set to perform 3 retries", async () => {
-      const proc = childProc.spawn("bin/app", ["lock", "1000"], { cwd: rootDir });
+      const proc = childProc.spawn("bin/app", ["lock", "1000"], {
+        cwd: rootDir,
+      });
 
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 50));
 
       return runner()
         .cwd(rootDir)
@@ -115,7 +119,7 @@ describe("compiler-node", () => {
         .expect(async () => {
           proc.kill();
           fsProm.rm(".lock", { recursive: true });
-        })
+        });
     });
   });
 });

@@ -2,12 +2,19 @@
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.7/.schema/devbox.schema.json",
   "packages": [
     "nodejs@20",
-    "github:gren-lang/nix/0.5.2"
+    "github:gren-lang/nix/0.5.2",
+    "nodePackages.prettier@latest"
   ],
   "shell": {
     "scripts": {
       "build": [
         "gren make"
+      ],
+      "format": [
+        "prettier . --write"
+      ],
+      "format:check": [
+        "prettier . --check"
       ],
       "test": [
         "devbox run test:unit",

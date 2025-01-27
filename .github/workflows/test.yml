@@ -9,8 +9,8 @@ on:
 jobs:
   run-tests:
     strategy:
-        matrix:
-            os: [ ubuntu-latest, macos-latest ]
+      matrix:
+        os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -21,6 +21,15 @@ jobs:
         uses: jetify-com/devbox-install-action@v0.11.0
         with:
           enable-cache: true
+
+      - name: Cache npm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.home }}/.cache
+          key: ${{ runner.os }}-npm
+
+      - name: Verify formatting
+        run: devbox run format:check
 
       - name: Run tests
         run: devbox run test
