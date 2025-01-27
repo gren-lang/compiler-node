@@ -76,15 +76,19 @@ describe("compiler-node", () => {
     });
 
     it("Blocks others from aquiring lock", async () => {
-      const proc = childProc.spawn("bin/app", ["lock", "1000"], {
-        cwd: rootDir,
-      });
+      const proc = childProc.spawn(
+        path.join(rootDir, "bin/app"),
+        ["lock", "1000"],
+        {
+          cwd: rootDir,
+        },
+      );
 
       await new Promise((r) => setTimeout(r, 50));
 
       return runner()
         .cwd(rootDir)
-        .spawn("bin/app", ["lock", "50"], {})
+        .fork("bin/app", ["lock", "50"], {})
         .stdout("Already Locked")
         .expect(async () => {
           proc.kill();
@@ -93,27 +97,31 @@ describe("compiler-node", () => {
     });
 
     it("Ignores stale locks", async () => {
-      await fsProm.mkdir(".lock");
-
-      await fsProm.utimes(".lock", 0, 0);
+      const lockPath = path.join(rootDir, ".lock");
+      await fsProm.mkdir(lockPath);
+      await fsProm.utimes(lockPath, 0, 0);
 
       return runner()
         .cwd(rootDir)
-        .spawn("bin/app", ["lock", "50"], {})
+        .fork("bin/app", ["lock", "50"], {})
         .stdout("Lock Aquired")
         .stdout("Lock Released");
     });
 
     it("Can be set to perform 3 retries", async () => {
-      const proc = childProc.spawn("bin/app", ["lock", "1000"], {
-        cwd: rootDir,
-      });
+      const proc = childProc.spawn(
+        path.join(rootDir, "bin/app"),
+        ["lock", "1000"],
+        {
+          cwd: rootDir,
+        },
+      );
 
       await new Promise((r) => setTimeout(r, 50));
 
       return runner()
         .cwd(rootDir)
-        .spawn("bin/app", ["lock", "50", "500"], {})
+        .fork("bin/app", ["lock", "50", "500"], {})
         .stdout("Lock Aquired")
         .stdout("Lock Released")
         .expect(async () => {
