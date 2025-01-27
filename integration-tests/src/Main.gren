@@ -1,24 +1,18 @@
 module Main exposing (main)
 
-import Bytes
+import Bytes exposing (Bytes)
 import Node
 import Init
 import Task
 import FileSystem
 import FileSystem.Path as Path
+import FileSystem.Lock as Lock
 import Compiler.Paths as Paths
 import Compiler.Outline as Outline
 import Stream
 import Json.Decode as Decode
 import Json.Encode as Encode
-
-
-type alias Model =
-    { }
-
-
-type Msg 
-    = NoOp
+import Process
 
 
 main : Node.Program Model Msg
@@ -30,14 +24,36 @@ main =
         }
 
 
+type alias Model =
+    { fsPerm : FileSystem.Permission
+    , stdout : Stream.Writable Bytes
+    , locks : Lock.Model
+    , lockTime : Int
+    }
+
+
+initModel : FileSystem.Permission -> Maybe Int -> Stream.Writable Bytes -> Model
+initModel fsPerm retryWait stdout =
+    { fsPerm = fsPerm
+    , stdout = stdout
+    , locks = Lock.init (Maybe.map (\wait -> { attempts = 3, millisecondsBetween = wait }) retryWait)
+    , lockTime = 0
+    }
+
+
+type Msg 
+    = LockMsg Lock.Msg
+    | ReleaseLock
+
+
 init : Node.Environment -> Init.Task { model : Model, command : Cmd Msg }
 init env =
     Init.await FileSystem.initialize <| \fsPerm ->
-        Node.startProgram
-            { model = {}
-            , command =
-                when Array.get 2 env.args is
-                    Just "find gren.json" ->
+        Node.startProgram <|
+            when Array.get 2 env.args is
+                Just "find gren.json" ->
+                    { model = initModel fsPerm Nothing env.stdout
+                    , command =
                         Paths.projectMetadata fsPerm
                             |> Task.map Path.toPosixString
                             |> Task.onError (\fsErr -> Task.succeed (FileSystem.errorCode fsErr))
@@ -46,8 +62,11 @@ init env =
                             )
                             |> Task.onError (\_ -> Task.succeed env.stdout)
                             |> Task.execute
+                    }
 
-                    Just "parse gren.json" ->
+                Just "parse gren.json" ->
+                    { model = initModel fsPerm Nothing env.stdout
+                    , command =
                         Paths.projectMetadata fsPerm
                             |> Task.andThen (\grenJsonPath ->
                                 FileSystem.readFile fsPerm grenJsonPath
@@ -66,16 +85,84 @@ init env =
                             )
                             |> Task.onError (\_ -> Task.succeed env.stdout)
                             |> Task.execute
+                    }
 
-                    _ ->
-                        Stream.writeLineAsBytes "Invalid start argument" env.stdout
-                            |> Task.onError (\_ -> Task.succeed env.stdout)
-                            |> Task.execute
-            }
+                Just "lock" ->
+                    let
+                        lockTime =
+                            Array.get 3 env.args
+                                |> Maybe.andThen String.toInt
+                                |> Maybe.withDefault 0
+
+                        maybeRetryWait =
+                            Array.get 4 env.args
+                                |> Maybe.andThen String.toInt
+                    in
+                    { model = { (initModel fsPerm maybeRetryWait env.stdout) | lockTime = lockTime }
+                    , command =
+                        Lock.aquire (Path.empty)
+                            |> Cmd.map LockMsg
+                    }
+
+                _ ->
+                    { model = initModel fsPerm Nothing env.stdout
+                    , command =
+                        log "Invalid start argument" env.stdout
+                    }
 
 
 update : Msg -> Model -> { model : Model, command : Cmd Msg }
 update msg model =
-    { model = model
-    , command = Cmd.none
-    }
+    when msg is
+        LockMsg lockMsg ->
+            when Lock.update model.fsPerm lockMsg model.locks is
+                Lock.Working cmd ->
+                    { model = model
+                    , command =
+                        Cmd.map LockMsg cmd
+                    }
+
+                Lock.UnexpectedError { path, error } ->
+                    { model = model
+                    , command =
+                        log "Error" model.stdout
+                    }
+
+                Lock.LockAquired { path, model = lockModel, command } ->
+                    { model = { model | locks = lockModel }
+                    , command =
+                        Cmd.batch
+                            [ log "Lock Aquired" model.stdout
+                            , Process.sleep (toFloat model.lockTime)
+                                |> Task.perform (\_ -> ReleaseLock)
+                            ]
+                    }
+
+                Lock.LockReleased { path, model = lockModel, command } ->
+                    { model = { model | locks = lockModel }
+                    , command =
+                        Cmd.batch
+                            [ log "Lock Released" model.stdout
+                            , Cmd.map LockMsg command
+                            ]
+                    }
+
+                Lock.AlreadyLocked path ->
+                    { model = model
+                    , command =
+                        log "Already Locked" model.stdout
+                    }
+
+        ReleaseLock ->
+            { model = model
+            , command =
+                Lock.release Path.empty
+                    |> Cmd.map LockMsg
+            }
+
+
+log : String -> Stream.Writable Bytes -> Cmd msg
+log msg stdout =
+    Stream.writeLineAsBytes msg stdout
+        |> Task.onError (\_ -> Task.succeed stdout)
+        |> Task.execute

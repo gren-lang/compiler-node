@@ -1,6 +1,8 @@
 import * as path from "node:path";
 import * as os from "node:os";
 import * as fs from "node:fs";
+import * as fsProm from "node:fs/promises";
+import * as childProc from "node:child_process";
 import { runner, KEYS } from "clet";
 
 const rootDir = path.resolve();
@@ -57,6 +59,74 @@ describe("compiler-node", () => {
         .expect(({ assert, result }) => {
           const parsed = JSON.parse(result.stdout);
           assert.deepStrictEqual(packageGrenJson, parsed);
+        });
+    });
+  });
+
+  describe("file lock", () => {
+    it("Aquires and releases lock", () => {
+      return runner()
+        .cwd(rootDir)
+        .fork("bin/app", ["lock", "50"], {})
+        .stdout("Lock Aquired")
+        .stdout("Lock Released")
+        .expect(({ assert }) => {
+          assert.equal(false, fs.existsSync(".lock"));
+        });
+    });
+
+    it("Blocks others from aquiring lock", async () => {
+      const proc = childProc.spawn(
+        path.join(rootDir, "bin/app"),
+        ["lock", "1000"],
+        {
+          cwd: rootDir,
+        },
+      );
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      return runner()
+        .cwd(rootDir)
+        .fork("bin/app", ["lock", "50"], {})
+        .stdout("Already Locked")
+        .expect(async () => {
+          proc.kill();
+          fsProm.rm(".lock", { recursive: true });
+        });
+    });
+
+    it("Ignores stale locks", async () => {
+      const lockPath = path.join(rootDir, ".lock");
+      await fsProm.mkdir(lockPath);
+      await fsProm.utimes(lockPath, 0, 0);
+
+      return runner()
+        .cwd(rootDir)
+        .fork("bin/app", ["lock", "50"], {})
+        .stdout("Lock Aquired")
+        .stdout("Lock Released");
+    });
+
+    it("Can be set to perform 3 retries", async () => {
+      const proc = childProc.spawn(
+        path.join(rootDir, "bin/app"),
+        ["lock", "1000"],
+        {
+          cwd: rootDir,
+        },
+      );
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      return runner()
+        .cwd(rootDir)
+        .fork("bin/app", ["lock", "50", "500"], {})
+        .stdout("Lock Aquired")
+        .stdout("Lock Released")
+        .expect(async () => {
+          proc.kill();
+          fsProm.rm(".lock", { recursive: true });
         });
     });
   });

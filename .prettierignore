@@ -1,0 +1,3 @@
+*.json
+integration-tests/bin/app
+tests/app
