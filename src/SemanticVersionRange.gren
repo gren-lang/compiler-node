@@ -4,6 +4,7 @@ module SemanticVersionRange exposing
     , example
     , lowerBound
     , upperBound
+    , intersect
     , fromString
     , jsonDecoder
     , toString
@@ -22,8 +23,11 @@ type SemanticVersionRange
 
 of : SemanticVersion -> SemanticVersion -> Maybe SemanticVersionRange
 of lower upper =
-    -- TODO: tests
-    Just (SemanticVersionRange { lower = lower, upper = upper })
+    if SemanticVersion.compare lower upper /= GT then
+        Just (SemanticVersionRange { lower = lower, upper = upper })
+
+    else
+        Nothing
 
 
 example : SemanticVersionRange
@@ -42,6 +46,61 @@ lowerBound (SemanticVersionRange { lower }) =
 upperBound : SemanticVersionRange -> SemanticVersion
 upperBound (SemanticVersionRange { upper }) =
     upper
+
+
+intersect : SemanticVersionRange -> SemanticVersionRange -> Maybe SemanticVersionRange
+intersect left right =
+    let
+        (SemanticVersionRange { lower = lowerLeft, upper = upperLeft }) =
+            left
+
+        (SemanticVersionRange { lower = lowerRight, upper = upperRight }) =
+            right
+    in
+    -- TODO: make sure distance between majors are acceptable
+    when SemanticVersion.compare upperLeft upperRight is
+        LT ->
+            if SemanticVersion.compare upperLeft lowerRight /= GT then
+                Nothing
+
+            else
+                Just <|
+                    when SemanticVersion.compare lowerLeft lowerRight is
+                        LT ->
+                            SemanticVersionRange { lower = lowerRight, upper = upperLeft }
+
+                        EQ ->
+                            SemanticVersionRange { lower = lowerLeft, upper = upperLeft }
+
+                        GT ->
+                            SemanticVersionRange { lower = lowerLeft, upper = upperLeft }
+
+        EQ ->
+            Just <|
+                when SemanticVersion.compare lowerLeft lowerRight is
+                    LT ->
+                        SemanticVersionRange { lower = lowerRight, upper = upperLeft }
+
+                    EQ ->
+                        SemanticVersionRange { lower = lowerLeft, upper = upperLeft }
+
+                    GT ->
+                        SemanticVersionRange { lower = lowerLeft, upper = upperLeft }
+
+        GT ->
+            if SemanticVersion.compare upperRight lowerLeft /= GT then
+                Nothing
+            else
+                Just <|
+                    when SemanticVersion.compare lowerLeft lowerRight is
+                        LT ->
+                            SemanticVersionRange { lower = lowerLeft, upper = upperRight }
+
+                        EQ ->
+                            SemanticVersionRange { lower = lowerLeft, upper = upperRight }
+
+                        GT ->
+                            SemanticVersionRange { lower = lowerRight, upper = upperRight }
 
 
 fromString : String -> Maybe SemanticVersionRange

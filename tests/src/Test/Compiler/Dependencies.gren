@@ -4,7 +4,7 @@ import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
 import Compiler.Dependencies as Deps
 import Compiler.PackageName as PackageName exposing (PackageName)
-import Dict
+import Dict exposing (Dict)
 import SemanticVersion exposing (SemanticVersion)
 import SemanticVersionRange exposing (SemanticVersionRange)
 
@@ -12,27 +12,80 @@ import SemanticVersionRange exposing (SemanticVersionRange)
 tests : Test
 tests =
     describe "Compiler.Dependencies"
-        [ describe "findMissing"
+        [ describe "solve"
             [ test "returns empty array for a project without dependencies" <| \{} ->
-                Deps.findMissing Dict.empty Dict.empty
-                    |> Expect.equal Nothing
+                Deps.solve [] Dict.empty
+                    |> Expect.equal Deps.Complete
             , test "If root defines a dependency that isn't provided with an outline, that package is returned" <| \{} ->
                 let
                     rootDeps =
-                        Dict.empty
-                            |> Dict.set "my/package" (rangeStartingAt 1 1 0)
+                        [ { name = packageName "my/first", version = versionRange 1 1 0 }
+                        ]
                 in
-                Deps.findMissing rootDeps Dict.empty
-                    |> Expect.equal (Just <| result "my/package" 1 1 0)
+                Deps.solve rootDeps Dict.empty
+                    |> Expect.equal (missing "my/first" 1 1 0)
+            , test "Finds missing package" <| \{} ->
+                let
+                    rootDeps =
+                        [ { name = packageName "my/first", version = versionRange 1 1 0 }
+                        , { name = packageName "my/second", version = versionRange 2 0 0 }
+                        , { name = packageName "your/first", version = versionRange 1 0 0 }
+                        ]
+
+                    loaded =
+                        Dict.empty
+                            |> insertDep "my/first" 1 1 0 []
+                            |> insertDep "your/first" 1 0 0 []
+                in
+                Deps.solve rootDeps loaded
+                    |> Expect.equal (missing "my/second" 2 0 0)
+            , test "Finds missing transitive package" <| \{} ->
+                let
+                    rootDeps =
+                        [ { name = packageName "my/first", version = versionRange 1 1 0 }
+                        ]
+
+                    loaded =
+                        Dict.empty
+                            |> insertDep "my/first" 1 1 0
+                                [ { name = packageName "your/first", version = versionRange 1 5 0 }]
+                in
+                Deps.solve rootDeps loaded
+                    |> Expect.equal (missing "your/first" 1 5 0)
+            , test "Reports unsolvable conflicts" <| \{} ->
+                let
+                    rootDeps =
+                        [ { name = packageName "my/first", version = versionRange 1 1 0 }
+                        , { name = packageName "your/first", version = versionRange 2 0 0 }
+                        ]
+
+                    loaded =
+                        Dict.empty
+                            |> insertDep "my/first" 1 1 0
+                                [ { name = packageName "your/first", version = versionRange 1 5 0 }]
+                            |> insertDep "your/first" 2 0 0 []
+                in
+                Deps.solve rootDeps loaded
+                    |> Expect.equal (conflict "your/first" (versionRange 2 0 0) (versionRange 1 5 0))
             ]
         ]
 
 
-result : String -> Int -> Int -> Int -> { name : PackageName, version : SemanticVersion }
-result name major minor patch =
-    { name = packageName name
-    , version = { major = major, minor = minor, patch = patch }
-    }
+missing : String -> Int -> Int -> Int -> Deps.Solution
+missing name major minor patch =
+    Deps.Missing
+        { name = packageName name
+        , version = { major = major, minor = minor, patch = patch }
+        }
+
+
+conflict : String -> SemanticVersionRange -> SemanticVersionRange -> Deps.Solution
+conflict name versionOne versionTwo =
+    Deps.Conflict
+        { name = packageName name
+        , version1 = versionOne
+        , version2 = versionTwo
+        }
 
 
 packageName : String -> PackageName
@@ -41,8 +94,8 @@ packageName str =
         |> Maybe.withDefault PackageName.example
 
 
-rangeStartingAt : Int -> Int -> Int -> SemanticVersionRange
-rangeStartingAt major minor patch =
+versionRange : Int -> Int -> Int -> SemanticVersionRange
+versionRange major minor patch =
     let
         upperBound =
             { major = major + 1
@@ -52,3 +105,25 @@ rangeStartingAt major minor patch =
     in
     SemanticVersionRange.of { major = major, minor = minor, patch = patch } upperBound
         |> Maybe.withDefault SemanticVersionRange.example
+
+
+insertDep
+    : String
+    -> Int
+    -> Int
+    -> Int
+    -> Array { name : PackageName, version : SemanticVersionRange }
+    -> Dict String Deps.SimplifiedOutline
+    -> Dict String Deps.SimplifiedOutline
+insertDep name major minor patch deps dict =
+    Dict.set
+        name
+        { name = packageName name
+        , version = versionRange major minor patch
+        , dependencies =
+            Array.foldl
+                (\dep -> Dict.set (PackageName.toString dep.name) dep.version)
+                Dict.empty
+                deps
+        }
+        dict
