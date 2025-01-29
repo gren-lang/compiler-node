@@ -1,0 +1,18 @@
+module Test.Compiler.Dependencies exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Compiler.Dependencies as Deps
+import Dict
+import SemanticVersion
+
+
+tests : Test
+tests =
+    describe "Compiler.Dependencies"
+        [ describe "findMissingOutlines"
+            [ test "returns empty array for a project without dependencies" <| \{} ->
+                Deps.findMissing Dict.empty Dict.empty
+                    |> Expect.equal Nothing
+            ]
+        ]

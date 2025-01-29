@@ -1,0 +1,22 @@
+module Compiler.Dependencies exposing
+    ( findMissing
+    )
+
+
+import Compiler.Outline as Outline exposing (Outline)
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Dict exposing (Dict)
+import SemanticVersion exposing (SemanticVersion)
+import SemanticVersionRange exposing (SemanticVersionRange)
+
+
+type alias SimplifiedOutline =
+    { name : PackageName
+    , version : SemanticVersion
+    , dependencies : Dict String SemanticVersionRange
+    }
+
+
+findMissing : Dict String SemanticVersionRange -> Dict String SimplifiedOutline -> Maybe { name : PackageName, version : SemanticVersion }
+findMissing rootRequirements loadedOutlines =
+    Nothing
