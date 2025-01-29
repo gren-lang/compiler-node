@@ -1,5 +1,7 @@
 module SemanticVersionRange exposing
     ( SemanticVersionRange
+    , of
+    , example
     , lowerBound
     , upperBound
     , fromString
@@ -16,6 +18,20 @@ import Json.Encode as Encode
 
 type SemanticVersionRange
     = SemanticVersionRange { lower : SemanticVersion, upper : SemanticVersion }
+
+
+of : SemanticVersion -> SemanticVersion -> Maybe SemanticVersionRange
+of lower upper =
+    -- TODO: tests
+    Just (SemanticVersionRange { lower = lower, upper = upper })
+
+
+example : SemanticVersionRange
+example =
+    SemanticVersionRange
+        { lower = { major = 1, minor = 0, patch = 0 }
+        , upper = { major = 2, minor = 0, patch = 0 }
+        }
 
 
 lowerBound : SemanticVersionRange -> SemanticVersion

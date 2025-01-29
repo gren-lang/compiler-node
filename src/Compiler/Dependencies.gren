@@ -19,4 +19,47 @@ type alias SimplifiedOutline =
 
 findMissing : Dict String SemanticVersionRange -> Dict String SimplifiedOutline -> Maybe { name : PackageName, version : SemanticVersion }
 findMissing rootRequirements loadedOutlines =
-    Nothing
+    findMissingHelp rootRequirements Dict.empty loadedOutlines
+
+
+findMissingHelp
+    : Dict String SemanticVersionRange
+    -> Dict String SimplifiedOutline
+    -> Dict String SimplifiedOutline
+    -> Maybe { name : PackageName, version : SemanticVersion }
+findMissingHelp pending solved loaded =
+    when Dict.first pending is
+        Nothing ->
+            -- No missing dependencies
+            Nothing
+
+        Just { key = packageNameStr, value = packageVersion } ->
+            if isSolved packageNameStr packageVersion solved then
+                findMissingHelp (Dict.remove packageNameStr pending) solved loaded
+
+            else
+                when Dict.get packageNameStr loaded is
+                    Nothing ->
+                        -- Missing package
+                        Just
+                            { name = Maybe.withDefault PackageName.example (PackageName.fromString packageNameStr)
+                            , version = SemanticVersionRange.lowerBound packageVersion
+                            }
+
+                    Just outline ->
+                        let
+                            newPending =
+                                Dict.foldl Dict.set (Dict.remove packageNameStr pending) outline.dependencies
+                        in
+                        findMissingHelp newPending solved loaded
+
+
+isSolved : String -> SemanticVersionRange -> Dict String SimplifiedOutline -> Bool
+isSolved packageNameStr packageVersion solved =
+    when Dict.get packageNameStr solved is
+        Nothing ->
+            False
+
+        Just outline ->
+            -- TODO: Check version
+            True

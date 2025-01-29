@@ -3,16 +3,52 @@ module Test.Compiler.Dependencies exposing (tests)
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
 import Compiler.Dependencies as Deps
+import Compiler.PackageName as PackageName exposing (PackageName)
 import Dict
-import SemanticVersion
+import SemanticVersion exposing (SemanticVersion)
+import SemanticVersionRange exposing (SemanticVersionRange)
 
 
 tests : Test
 tests =
     describe "Compiler.Dependencies"
-        [ describe "findMissingOutlines"
+        [ describe "findMissing"
             [ test "returns empty array for a project without dependencies" <| \{} ->
                 Deps.findMissing Dict.empty Dict.empty
                     |> Expect.equal Nothing
+            , test "If root defines a dependency that isn't provided with an outline, that package is returned" <| \{} ->
+                let
+                    rootDeps =
+                        Dict.empty
+                            |> Dict.set "my/package" (rangeStartingAt 1 1 0)
+                in
+                Deps.findMissing rootDeps Dict.empty
+                    |> Expect.equal (Just <| result "my/package" 1 1 0)
             ]
         ]
+
+
+result : String -> Int -> Int -> Int -> { name : PackageName, version : SemanticVersion }
+result name major minor patch =
+    { name = packageName name
+    , version = { major = major, minor = minor, patch = patch }
+    }
+
+
+packageName : String -> PackageName
+packageName str =
+    PackageName.fromString str
+        |> Maybe.withDefault PackageName.example
+
+
+rangeStartingAt : Int -> Int -> Int -> SemanticVersionRange
+rangeStartingAt major minor patch =
+    let
+        upperBound =
+            { major = major + 1
+            , minor = 0
+            , patch = 0
+            }
+    in
+    SemanticVersionRange.of { major = major, minor = minor, patch = patch } upperBound
+        |> Maybe.withDefault SemanticVersionRange.example
