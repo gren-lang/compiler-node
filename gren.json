@@ -9,6 +9,7 @@
         "CLI.Parser",
         "CLI.PrettyPrinter",
         "Compiler.Backend",
+        "Compiler.Dependencies",
         "Compiler.ModuleName",
         "Compiler.Outline",
         "Compiler.PackageName",

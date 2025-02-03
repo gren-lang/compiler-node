@@ -1,5 +1,6 @@
 module SemanticVersion exposing 
     ( SemanticVersion
+    , compare
     , fromString
     , cliParser
     , jsonDecoder
@@ -33,6 +34,21 @@ type alias SemanticVersion =
     , minor : Int
     , patch : Int
     }
+
+
+compare : SemanticVersion -> SemanticVersion -> Order
+compare left right =
+    when Basics.compare left.major right.major is
+        EQ ->
+            when Basics.compare left.minor right.minor is
+                EQ ->
+                    Basics.compare left.patch right.patch
+
+                otherMinor ->
+                    otherMinor
+
+        otherMajor ->
+            otherMajor
 
 
 {-| Convert a `String` into a [SemanticVersion](#SemanticVersion).

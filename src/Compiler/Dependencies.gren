@@ -1,0 +1,86 @@
+module Compiler.Dependencies exposing
+    ( SimplifiedOutline
+    , Solution(..)
+    , solve
+    )
+
+
+import Compiler.Outline as Outline exposing (Outline)
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Dict exposing (Dict)
+import SemanticVersion exposing (SemanticVersion)
+import SemanticVersionRange exposing (SemanticVersionRange)
+
+
+type alias SimplifiedOutline =
+    { name : PackageName
+    , version : SemanticVersionRange
+    , dependencies : Dict String SemanticVersionRange
+    }
+
+
+type Solution
+    = Complete
+    | Missing { name : PackageName, version : SemanticVersion }
+    | Conflict { name : PackageName, version1 : SemanticVersionRange, version2 : SemanticVersionRange }
+
+
+solve : Array { name : PackageName, version : SemanticVersionRange } -> Dict String SimplifiedOutline -> Solution
+solve rootRequirements loadedOutlines =
+    solveHelp rootRequirements Dict.empty loadedOutlines
+
+
+solveHelp
+    : Array { name : PackageName, version : SemanticVersionRange }
+    -> Dict String SimplifiedOutline
+    -> Dict String SimplifiedOutline
+    -> Solution
+solveHelp pending solved loaded =
+    when Array.popFirst pending is
+        Nothing ->
+            Complete
+
+        Just { first = { name = packageName, version = packageVersion }, rest } ->
+            let
+                packageNameStr =
+                    PackageName.toString packageName
+            in
+            when Dict.get packageNameStr solved is
+                Just outline ->
+                    when SemanticVersionRange.intersect outline.version packageVersion is
+                        Nothing ->
+                            Conflict
+                                { name = outline.name
+                                , version1 = outline.version
+                                , version2 = packageVersion
+                                }
+
+                        Just intersectedVersion ->
+                            solveHelp
+                                rest
+                                (Dict.set packageNameStr { outline | version = intersectedVersion } solved)
+                                loaded
+
+                Nothing ->
+                    when Dict.get packageNameStr loaded is
+                        Nothing ->
+                            Missing
+                                { name = packageName
+                                , version = SemanticVersionRange.lowerBound packageVersion
+                                }
+
+                        Just outline ->
+                            let
+                                newPending =
+                                    outline.dependencies
+                                        |> Dict.foldl
+                                            (\name version acc ->
+                                                Array.pushLast
+                                                    { name = PackageName.fromString name |> Maybe.withDefault PackageName.example
+                                                    , version = version
+                                                    }
+                                                    acc
+                                            )
+                                            rest
+                            in
+                            solveHelp newPending (Dict.set packageNameStr outline solved) loaded

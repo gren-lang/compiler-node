@@ -1,5 +1,6 @@
 module Compiler.PackageName exposing
     ( PackageName
+    , example
     --
     , author
     , name
@@ -22,6 +23,13 @@ module Compiler.PackageName exposing
 import CLI.Parser
 import Json.Encode as Json
 import Json.Decode as Decode exposing (Decoder)
+
+
+{-| An example package name. Useful for tests.
+-}
+example : PackageName
+example =
+    PackageName { author = "example", name = "package" }
 
 
 {-| A package is identified by a string in the following format:

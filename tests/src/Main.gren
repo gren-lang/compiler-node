@@ -6,6 +6,7 @@ import Test.CLI.Parser as CLIParser
 import Test.CLI.PrettyPrinter as PrettyPrinter
 import Test.SemanticVersion as SemanticVersion
 import Test.SemanticVersionRange as SemanticVersionRange
+import Test.Compiler.Dependencies as Dependencies
 import Test.Compiler.PackageName as PackageName
 import Test.Compiler.ModuleName as ModuleName
 import Test.String.EditDistance as EditDistance
@@ -17,6 +18,7 @@ main =
     TestRunner.run <|
         Test.describe "Gren Compiler Node tests"
             [ CLIParser.tests
+            , Dependencies.tests
             , PrettyPrinter.tests
             , SemanticVersion.tests
             , SemanticVersionRange.tests
