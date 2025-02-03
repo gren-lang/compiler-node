@@ -57,7 +57,6 @@ intersect left right =
         (SemanticVersionRange { lower = lowerRight, upper = upperRight }) =
             right
     in
-    -- TODO: make sure distance between majors are acceptable
     when SemanticVersion.compare upperLeft upperRight is
         LT ->
             if SemanticVersion.compare upperLeft lowerRight /= GT then
