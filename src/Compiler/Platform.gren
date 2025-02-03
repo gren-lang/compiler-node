@@ -1,5 +1,5 @@
 module Compiler.Platform exposing
-    ( Platform
+    ( Platform(..)
     , toJson
     , jsonDecoder
     )

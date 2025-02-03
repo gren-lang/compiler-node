@@ -13,6 +13,7 @@
         "Compiler.ModuleName",
         "Compiler.Outline",
         "Compiler.PackageName",
+        "Compiler.Platform",
         "Compiler.Paths",
         "Compiler.License",
         "FileSystem.Lock",
