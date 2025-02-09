@@ -5,6 +5,7 @@ module SemanticVersionRange exposing
     , lowerBound
     , upperBound
     , intersect
+    , fromExact
     , fromString
     , jsonDecoder
     , toString
@@ -100,6 +101,14 @@ intersect left right =
 
                         GT ->
                             SemanticVersionRange { lower = lowerRight, upper = upperRight }
+
+
+fromExact : SemanticVersion -> SemanticVersionRange
+fromExact ({ major, minor, patch } as lower) =
+    SemanticVersionRange
+        { lower = lower
+        , upper = { major = major, minor = minor, patch = patch + 1 }
+        }
 
 
 fromString : String -> Maybe SemanticVersionRange
