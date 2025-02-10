@@ -21,7 +21,7 @@ type alias SimplifiedOutline =
 
 type Solution
     = Complete
-    | Missing { name : PackageName, version : SemanticVersion }
+    | Missing { name : PackageName, version : SemanticVersionRange }
     | Conflict { name : PackageName, version1 : SemanticVersionRange, version2 : SemanticVersionRange }
 
 
@@ -66,7 +66,7 @@ solveHelp pending solved loaded =
                         Nothing ->
                             Missing
                                 { name = packageName
-                                , version = SemanticVersionRange.lowerBound packageVersion
+                                , version = packageVersion
                                 }
 
                         Just outline ->

@@ -75,7 +75,7 @@ missing : String -> Int -> Int -> Int -> Deps.Solution
 missing name major minor patch =
     Deps.Missing
         { name = packageName name
-        , version = { major = major, minor = minor, patch = patch }
+        , version = versionRange major minor patch
         }
 
 
