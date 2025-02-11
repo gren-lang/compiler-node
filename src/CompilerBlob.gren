@@ -36,7 +36,7 @@ import FileSystem
 import FileSystem.Path as Path exposing (Path)
 import Package exposing (Package)
 import SemanticVersion exposing (SemanticVersion)
-import ChildProcess
+import ChildProcess exposing (Shell(..))
 import Json.Encode as Json
 import Dict exposing (Dict)
 import Task exposing (Task)
@@ -277,18 +277,16 @@ run permission options =
                 |> commandEncoder options.interactiveSession options.pathToString
                 |> Json.encode 0
 
-        escapedCommand =
-            "'" ++ commandAsJson ++ "'"
-       
         colorEnvVar =
             if options.useColor then
                 Dict.singleton "FORCE_COLOR" "1"
             else
                 Dict.singleton "NO_COLOR" "1"
     in
-    ChildProcess.spawnAndNotifyOnExit permission options.onComplete (options.pathToString options.compilerPath) [ escapedCommand ] <|
+    ChildProcess.spawnAndNotifyOnExit permission options.onComplete (options.pathToString options.compilerPath) [ commandAsJson ] <|
         { ChildProcess.defaultSpawnOptions
-            | environmentVariables = 
+            | shell = NoShell
+            , environmentVariables = 
                 ChildProcess.MergeWithEnvironmentVariables colorEnvVar
         }
 
