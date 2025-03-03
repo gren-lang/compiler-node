@@ -35,6 +35,7 @@ import FileSystem
 import FileSystem.Path as Path exposing (Path)
 import Compiler.PackageName as PackageName exposing (PackageName)
 import Compiler.Platform as Platform exposing (Platform)
+import Compiler.Outline as Outline exposing (Outline)
 import SemanticVersion exposing (SemanticVersion)
 import ChildProcess exposing (Shell(..))
 import Json.Encode as Json
@@ -186,7 +187,7 @@ isCached permission platform envVars homeDir =
 type Command
     = Init InitFlags
     | Repl ReplFlags
-    | Make { flags : MakeFlags, paths : (Array Path) }
+    | Make MakeFlags
     | Docs DocsFlags
     | PackageInstall (Maybe PackageName)
     | PackageUninstall PackageName
@@ -215,6 +216,11 @@ type alias MakeFlags =
     , sourcemaps : Bool
     , output : Maybe MakeOutput
     , report : Maybe {}
+    , projectPath : Path
+    , entryPoints : Array Path
+    , outline : Outline
+    , rootSources : Dict String String
+    , dependencies : Dict String { outline : Outline, sources : Dict String String }
     }
 
 
@@ -307,14 +313,26 @@ commandEncoder interactive pathToString command =
                 , { key = "intepreter" , value = maybeEncoder Json.string flags.interpreter }
                 ]
         
-        Make { flags, paths } ->
+        Make flags ->
+            let
+                depsToJson : { outline : Outline, sources : Dict String String } -> Json.Value
+                depsToJson dep =
+                    Json.object
+                        [ { key = "outline", value = Outline.toJson dep.outline }
+                        , { key = "sources", value = Json.dict identity Json.string dep.sources }
+                        ]
+            in
             Json.object
                 [ { key = "command", value = Json.string "make" }
                 , { key = "optimize", value = Json.bool flags.optimize }
                 , { key = "sourcemaps", value = Json.bool flags.sourcemaps }
                 , { key = "output", value = maybeEncoder makeOutputEncoder flags.output }
                 , { key = "report-json", value = maybeToBool flags.report }
-                , { key = "paths", value = Json.array (pathToString >> Json.string) paths }
+                , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
+                , { key = "entry-points", value = Json.array (Json.string << pathToString) flags.entryPoints }
+                , { key = "project-outline", value = Outline.toJson flags.outline }
+                , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
+                , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
                 ]
         
         Docs flags ->
