@@ -2,14 +2,14 @@
   "lockfile_version": "1",
   "packages": {
     "github:NixOS/nixpkgs/nixpkgs-unstable": {
-      "resolved": "github:NixOS/nixpkgs/b58e19b11fe72175fd7a9e014a4786a91e99da5f?lastModified=1740916017&narHash=sha256-Ze%2F3XCElkVljFCnBKezLldOz2ZaGp7eozxRqFzACnMI%3D"
+      "resolved": "github:NixOS/nixpkgs/573c650e8a14b2faa0041645ab18aed7e60f0c9a?lastModified=1741865919&narHash=sha256-4thdbnP6dlbdq%2BqZWTsm4ffAwoS8Tiq1YResB%2BRP6WE%3D"
     },
     "github:gren-lang/nix/0.5.2": {
       "resolved": "github:gren-lang/nix/7998732cd4878c7b121b4ebb2d9929b0b635f9b9?lastModified=1736597972&narHash=sha256-s40gUeBIqhG1WdcXyNAZsebAVgEOivMhleofe4%2BmbvM%3D"
     },
     "nodePackages.prettier@latest": {
-      "last_modified": "2025-02-26T05:29:08Z",
-      "resolved": "github:NixOS/nixpkgs/3a05eebede89661660945da1f151959900903b6a#nodePackages.prettier",
+      "last_modified": "2025-03-11T17:52:14Z",
+      "resolved": "github:NixOS/nixpkgs/0d534853a55b5d02a4ababa1d71921ce8f0aee4c#nodePackages.prettier",
       "source": "devbox-search",
       "version": "3.5.2",
       "systems": {
@@ -17,21 +17,21 @@
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/lm9hk1n71vkiikm67nghrkbsipcvbkvl-prettier-3.5.2",
+              "path": "/nix/store/fchnppwy0d7hjjfjxr6gxscgh0vs9ffa-prettier-3.5.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/lm9hk1n71vkiikm67nghrkbsipcvbkvl-prettier-3.5.2"
+          "store_path": "/nix/store/fchnppwy0d7hjjfjxr6gxscgh0vs9ffa-prettier-3.5.2"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/hx8jyny7h8li13n78kyanyawj0whbcvb-prettier-3.5.2",
+              "path": "/nix/store/raz43q27gv3ra4l1ywfdaqzxal8p096n-prettier-3.5.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/hx8jyny7h8li13n78kyanyawj0whbcvb-prettier-3.5.2"
+          "store_path": "/nix/store/raz43q27gv3ra4l1ywfdaqzxal8p096n-prettier-3.5.2"
         },
         "x86_64-darwin": {
           "outputs": [
@@ -47,18 +47,18 @@
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/kgvkmqw96w38jqng7iy11wr9ir98893p-prettier-3.5.2",
+              "path": "/nix/store/qc57vgkvs7dl8zzzk8cibc2wjgl2v3w2-prettier-3.5.2",
               "default": true
             }
           ],
-          "store_path": "/nix/store/kgvkmqw96w38jqng7iy11wr9ir98893p-prettier-3.5.2"
+          "store_path": "/nix/store/qc57vgkvs7dl8zzzk8cibc2wjgl2v3w2-prettier-3.5.2"
         }
       }
     },
     "nodejs@20": {
-      "last_modified": "2025-02-12T00:10:52Z",
+      "last_modified": "2025-03-11T17:52:14Z",
       "plugin_version": "0.0.2",
-      "resolved": "github:NixOS/nixpkgs/83a2581c81ff5b06f7c1a4e7cc736a455dfcf7b4#nodejs_20",
+      "resolved": "github:NixOS/nixpkgs/0d534853a55b5d02a4ababa1d71921ce8f0aee4c#nodejs_20",
       "source": "devbox-search",
       "version": "20.18.3",
       "systems": {
@@ -66,57 +66,57 @@
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/pba611q472k53hjk8kai3mqg5nqa0q4v-nodejs-20.18.3",
+              "path": "/nix/store/lwizv982l8v1xi0i9qg38cvqgmmq9l7w-nodejs-20.18.3",
               "default": true
             },
             {
               "name": "libv8",
-              "path": "/nix/store/giz92jzgk5j5x4rr87qfhh7h23vxw02s-nodejs-20.18.3-libv8"
+              "path": "/nix/store/6zb8ma14q3s0w7gq2bgz0sfyaa7lm323-nodejs-20.18.3-libv8"
             }
           ],
-          "store_path": "/nix/store/pba611q472k53hjk8kai3mqg5nqa0q4v-nodejs-20.18.3"
+          "store_path": "/nix/store/lwizv982l8v1xi0i9qg38cvqgmmq9l7w-nodejs-20.18.3"
         },
         "aarch64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/958yayymdnm342x6vldlfbjah51dy0d4-nodejs-20.18.3",
+              "path": "/nix/store/vxcnpdyx7lqf3ccfgmnnvw2887v5smzn-nodejs-20.18.3",
               "default": true
             },
             {
               "name": "libv8",
-              "path": "/nix/store/wxl92b7ld4dfhskvmgvf9r7q9h86q2s6-nodejs-20.18.3-libv8"
+              "path": "/nix/store/55ca4bz6hdns6dp42fsw0xdzy38717z1-nodejs-20.18.3-libv8"
             }
           ],
-          "store_path": "/nix/store/958yayymdnm342x6vldlfbjah51dy0d4-nodejs-20.18.3"
+          "store_path": "/nix/store/vxcnpdyx7lqf3ccfgmnnvw2887v5smzn-nodejs-20.18.3"
         },
         "x86_64-darwin": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/3wrrj4ddsc8mrim3xnqwws8w2b3an4jv-nodejs-20.18.3",
+              "path": "/nix/store/gq01xlgcqpnl61z2prx7ndh2qvcp628v-nodejs-20.18.3",
               "default": true
             },
             {
               "name": "libv8",
-              "path": "/nix/store/bw62bzsr6rgrygpk5g4vjpbbqwffn8sg-nodejs-20.18.3-libv8"
+              "path": "/nix/store/jn2z0dywrvp69dadfzbxakp41s3asq1w-nodejs-20.18.3-libv8"
             }
           ],
-          "store_path": "/nix/store/3wrrj4ddsc8mrim3xnqwws8w2b3an4jv-nodejs-20.18.3"
+          "store_path": "/nix/store/gq01xlgcqpnl61z2prx7ndh2qvcp628v-nodejs-20.18.3"
         },
         "x86_64-linux": {
           "outputs": [
             {
               "name": "out",
-              "path": "/nix/store/1bmfcixbhs5fxv2zzyc45grx3xgc90j9-nodejs-20.18.3",
+              "path": "/nix/store/sw8mgfgy28h0jrbf8icbvr6w8wfr77np-nodejs-20.18.3",
               "default": true
             },
             {
               "name": "libv8",
-              "path": "/nix/store/03gwhdryzihhv729133pfmri9qjhnbr5-nodejs-20.18.3-libv8"
+              "path": "/nix/store/8kx6sh17pk01hklv5k44lgp21r2zwk04-nodejs-20.18.3-libv8"
             }
           ],
-          "store_path": "/nix/store/1bmfcixbhs5fxv2zzyc45grx3xgc90j9-nodejs-20.18.3"
+          "store_path": "/nix/store/sw8mgfgy28h0jrbf8icbvr6w8wfr77np-nodejs-20.18.3"
         }
       }
     }
