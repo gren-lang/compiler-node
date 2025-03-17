@@ -9,6 +9,7 @@ module Compiler.Backend exposing
     , DocsFlags
     , DocsOutput(..)
     , DiffArgs(..)
+    , encodeCommand
     , run
     --
     , UnsupportedPlatform(..)
@@ -25,7 +26,7 @@ module Compiler.Backend exposing
 
 @docs UnsupportedPlatform, downloadUrl, download, cachePath, isCached
 
-@docs Command, InitFlags, ReplFlags, MakeFlags, MakeOutput, DocsFlags, DocsOutput, DiffArgs, Platform, run
+@docs Command, InitFlags, ReplFlags, MakeFlags, MakeOutput, DocsFlags, DocsOutput, DiffArgs, Platform, encodeCommand, run
 
 -}
 
@@ -257,9 +258,7 @@ type DiffArgs
 
 {-|-}
 type alias RunOptions msg =
-    { command : Command
-    , interactiveSession : Bool
-    , useColor : Bool
+    { useColor : Bool
     , compilerPath : Path
     , pathToString : (Path -> String)
     , onInit : { processId : Process.Id, streams : Maybe ChildProcess.StreamIO } -> msg
@@ -269,35 +268,36 @@ type alias RunOptions msg =
 
 {-| Execute the compiler backend. The backend will write to stdout and stderr. There's currently no way
 to redirect what is written to these streams.
-
-The `encodedCommand` should be fed to the backend's stdin stream on initialization.
 -}
-run : ChildProcess.Permission -> RunOptions msg -> { encodedCommand : String, command : Cmd msg }
+run : ChildProcess.Permission -> RunOptions msg -> Cmd msg
 run permission options =
     let
-        commandAsJson =
-            options.command
-                |> commandEncoder options.interactiveSession options.pathToString
-                |> Json.encode 0
-
         colorEnvVar =
             if options.useColor then
                 Dict.singleton "FORCE_COLOR" "1"
             else
                 Dict.singleton "NO_COLOR" "1"
     in
-    { encodedCommand = commandAsJson
-    , command =
-        ChildProcess.spawn 
-            permission
-            (options.pathToString options.compilerPath) 
-            []
-            { ( ChildProcess.defaultSpawnOptions options.onInit options.onComplete )
-                | shell = NoShell
-                , environmentVariables = 
-                    ChildProcess.MergeWithEnvironmentVariables colorEnvVar
-            }
-    }
+    ChildProcess.spawn 
+        permission
+        (options.pathToString options.compilerPath) 
+        []
+        { ( ChildProcess.defaultSpawnOptions options.onInit options.onComplete )
+            | shell = NoShell
+            , environmentVariables = 
+                ChildProcess.MergeWithEnvironmentVariables colorEnvVar
+        }
+
+
+{-| Encode a backend command to JSON. This should be fed to the compiler backend upon
+initialization.
+-}
+encodeCommand : { interactiveSession : Bool, pathToString : Path -> String } -> Command -> Bytes
+encodeCommand options command =
+    command
+        |> commandEncoder options.interactiveSession options.pathToString
+        |> Json.encode 0
+        |> Bytes.fromString
 
 
 commandEncoder : Bool -> (Path -> String) -> Command -> Json.Value
