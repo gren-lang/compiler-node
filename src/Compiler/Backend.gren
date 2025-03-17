@@ -267,10 +267,12 @@ type alias RunOptions msg =
     }
 
 
-{-| Execute the compiler blob. The blob will write to stdout and stderr. There's currently no way
+{-| Execute the compiler backend. The backend will write to stdout and stderr. There's currently no way
 to redirect what is written to these streams.
+
+The `encodedCommand` should be fed to the backend's stdin stream on initialization.
 -}
-run : ChildProcess.Permission -> RunOptions msg -> Cmd msg
+run : ChildProcess.Permission -> RunOptions msg -> { encodedCommand : String, command : Cmd msg }
 run permission options =
     let
         commandAsJson =
@@ -284,16 +286,18 @@ run permission options =
             else
                 Dict.singleton "NO_COLOR" "1"
     in
-    ChildProcess.spawn 
-        permission
-        (options.pathToString options.compilerPath) 
-        [ commandAsJson ]
-        { ( ChildProcess.defaultSpawnOptions options.onInit options.onComplete )
-            | shell = NoShell
-            , environmentVariables = 
-                ChildProcess.MergeWithEnvironmentVariables colorEnvVar
-        }
-
+    { encodedCommand = commandAsJson
+    , command =
+        ChildProcess.spawn 
+            permission
+            (options.pathToString options.compilerPath) 
+            []
+            { ( ChildProcess.defaultSpawnOptions options.onInit options.onComplete )
+                | shell = NoShell
+                , environmentVariables = 
+                    ChildProcess.MergeWithEnvironmentVariables colorEnvVar
+            }
+    }
 
 
 commandEncoder : Bool -> (Path -> String) -> Command -> Json.Value
