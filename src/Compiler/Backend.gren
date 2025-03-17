@@ -286,6 +286,7 @@ run permission options =
             | shell = NoShell
             , environmentVariables = 
                 ChildProcess.MergeWithEnvironmentVariables colorEnvVar
+            , connection = ChildProcess.External
         }
 
 
