@@ -221,7 +221,7 @@ type alias MakeFlags =
     , entryPoints : Array Path
     , outline : Outline
     , rootSources : Dict String String
-    , dependencies : Dict String { outline : Outline, sources : Dict String String }
+    , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
     }
 
 
@@ -320,10 +320,10 @@ commandEncoder interactive pathToString command =
         
         Make flags ->
             let
-                depsToJson : { outline : Outline, sources : Dict String String } -> Json.Value
+                depsToJson : { outline : Outline.PkgOutline, sources : Dict String String } -> Json.Value
                 depsToJson dep =
                     Json.object
-                        [ { key = "outline", value = Outline.toJson dep.outline }
+                        [ { key = "outline", value = Outline.toJson (Outline.Pkg dep.outline) }
                         , { key = "sources", value = Json.dict identity Json.string dep.sources }
                         ]
             in

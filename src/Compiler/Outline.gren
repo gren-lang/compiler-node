@@ -7,6 +7,7 @@ module Compiler.Outline exposing
     , findSourceFiles
     --
     , jsonDecoder
+    , pkgJsonDecoder
     , toJson
     )
 
@@ -137,6 +138,20 @@ jsonDecoder =
                     "package" -> Decode.map Pkg pkgDecoder
                     _ ->
                         Decode.fail ("Unknown gren.json type: " ++ type_)
+            )
+
+
+pkgJsonDecoder : Decoder PkgOutline
+pkgJsonDecoder =
+    jsonDecoder
+        |> Decode.andThen
+            (\outline ->
+                when outline is
+                    Pkg pkgOutline ->
+                        Decode.succeed pkgOutline
+
+                    App _ ->
+                        Decode.fail "Expected package outline, but decoded an application outline."
             )
 
 
