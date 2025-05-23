@@ -11,12 +11,21 @@ module Compiler.PackageName exposing
     --
     , toString
     , toJson
+    --
+    , core
+    , browser
+    , node
     )
 
 
 {-| Functions for working with package identifiers.
 
-@docs Package, author, name, fromString, cliParser, jsonDecoder, toString, toJson
+@docs Package, example, author, name, fromString, cliParser, jsonDecoder, toString, toJson
+
+## Common package names
+
+@docs core, browser, node
+
 -}
 
 
@@ -149,3 +158,19 @@ toJson package =
     Json.string <| toString package
 
 
+{-| -}
+core : PackageName
+core =
+    PackageName { author = "gren-lang", name = "core" }
+
+
+{-| -}
+browser : PackageName
+browser =
+    PackageName { author = "gren-lang", name = "browser" }
+
+
+{-| -}
+node : PackageName
+node =
+    PackageName { author = "gren-lang", name = "node" }
