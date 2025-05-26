@@ -67,6 +67,11 @@ tests =
                     ]
                     (rangeFrom 1 5 0)
             ]
+        , describe "compatibleWith"
+            [ test "1.2.4" <| \{} ->
+                Range.compatibleWith { major = 1, minor = 2, patch = 4 }
+                    |> Expect.equal (rangeFrom 1 2 0)
+            ]
         ]
 
 
