@@ -71,6 +71,14 @@ tests =
             [ test "1.2.4" <| \{} ->
                 Range.compatibleWith { major = 1, minor = 2, patch = 4 }
                     |> Expect.equal (rangeFrom 1 2 0)
+            , test "0.4.2" <| \{} ->
+                Range.compatibleWith { major = 0, minor = 4, patch = 2 }
+                    |> Expect.equal
+                        (Range.of
+                            { major = 0, minor = 4, patch = 0 }
+                            { major = 0, minor = 5, patch = 0 }
+                            |> Maybe.withDefault Range.example
+                        )
             ]
         ]
 

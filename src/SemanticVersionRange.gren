@@ -106,10 +106,17 @@ intersect left right =
 
 compatibleWith : SemanticVersion -> SemanticVersionRange
 compatibleWith ver =
-    SemanticVersionRange
-        { lower = { major = ver.major, minor = ver.minor, patch = 0 }
-        , upper = { major = ver.major + 1, minor = 0, patch = 0 }
-        }
+    if ver.major < 1 then
+        SemanticVersionRange
+            { lower = { major = ver.major, minor = ver.minor, patch = 0 }
+            , upper = { major = ver.major, minor = ver.minor + 1, patch = 0 }
+            }
+
+    else
+        SemanticVersionRange
+            { lower = { major = ver.major, minor = ver.minor, patch = 0 }
+            , upper = { major = ver.major + 1, minor = 0, patch = 0 }
+            }
 
 
 fromExact : SemanticVersion -> SemanticVersionRange
