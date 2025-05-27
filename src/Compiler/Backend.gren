@@ -184,14 +184,27 @@ type Command
     = Repl ReplFlags
     | Make MakeFlags
     | Docs DocsFlags
-    | PackageValidate
-    | PackageBump
+    | PackageValidate ProjectSources
+    | PackageBump ProjectSources
     | PackageDiff DiffArgs
+
+
+{-|-}
+type alias ProjectSources =
+    { projectPath : Path
+    , outline : Outline
+    , rootSources : Dict String String
+    , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+    }
 
 
 {-|-}
 type alias ReplFlags =
     { interpreter : Maybe String
+    , projectPath : Path
+    , outline : Outline
+    , rootSources : Dict String String
+    , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
     }
 
 
@@ -222,6 +235,10 @@ type MakeOutput
 type alias DocsFlags =
     { output : Maybe DocsOutput
     , report : Maybe {}
+    , projectPath : Path
+    , outline : Outline
+    , rootSources : Dict String String
+    , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
     }
 
 
@@ -292,17 +309,13 @@ commandEncoder interactive pathToString command =
             Json.object
                 [ { key = "command", value = Json.string "repl" }
                 , { key = "intepreter" , value = maybeEncoder Json.string flags.interpreter }
+                , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
+                , { key = "project-outline", value = Outline.toJson flags.outline }
+                , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
+                , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
                 ]
         
         Make flags ->
-            let
-                depsToJson : { outline : Outline.PkgOutline, sources : Dict String String } -> Json.Value
-                depsToJson dep =
-                    Json.object
-                        [ { key = "outline", value = Outline.toJson (Outline.Pkg dep.outline) }
-                        , { key = "sources", value = Json.dict identity Json.string dep.sources }
-                        ]
-            in
             Json.object
                 [ { key = "command", value = Json.string "make" }
                 , { key = "optimize", value = Json.bool flags.optimize }
@@ -321,17 +334,29 @@ commandEncoder interactive pathToString command =
                 [ { key = "command", value = Json.string "docs" }
                 , { key = "output", value = maybeEncoder docsOutputEncoder flags.output }
                 , { key = "report-json", value = maybeToBool flags.report }
+                , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
+                , { key = "project-outline", value = Outline.toJson flags.outline }
+                , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
+                , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
                 ]
         
-        PackageValidate ->
+        PackageValidate flags ->
             Json.object
                 [ { key = "command", value = Json.string "packageValidate" }
+                , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
+                , { key = "project-outline", value = Outline.toJson flags.outline }
+                , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
+                , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
                 ]
         
-        PackageBump ->
+        PackageBump flags ->
             Json.object
                 [ { key = "command", value = Json.string "packageBump" }
                 , { key = "interactive", value = Json.bool interactive }
+                , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
+                , { key = "project-outline", value = Outline.toJson flags.outline }
+                , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
+                , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
                 ]
         
         PackageDiff args ->
@@ -361,6 +386,14 @@ commandEncoder interactive pathToString command =
                         , { key = "from", value = SemanticVersion.toJson ver1 }
                         , { key = "to", value = SemanticVersion.toJson ver2 }
                         ]
+
+
+depsToJson : { outline : Outline.PkgOutline, sources : Dict String String } -> Json.Value
+depsToJson dep =
+    Json.object
+        [ { key = "outline", value = Outline.toJson (Outline.Pkg dep.outline) }
+        , { key = "sources", value = Json.dict identity Json.string dep.sources }
+        ]
 
 
 maybeEncoder : (a -> Json.Value) -> Maybe a -> Json.Value
