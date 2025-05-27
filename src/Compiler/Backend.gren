@@ -2,7 +2,6 @@ module Compiler.Backend exposing
     ( version
     --
     , Command(..)
-    , InitFlags
     , ReplFlags
     , MakeFlags
     , MakeOutput(..)
@@ -174,35 +173,20 @@ isCached permission platform envVars homeDir =
 
 {-| Commands supported by the compiler blob.
 
-* `Init`: generate a gren.json and src directory in the current directory.
 * `Repl`: run a REPL.
 * `Make`: compile a project
 * `Docs`: generate a docs.json file
-* `PackageInstall`: install dependencies
-* `PackageUninstall`: remove a dependency
-* `PackageOutdated`: get a list of outdated dependencies
 * `PackageValide`: check if this package is ready to be deployed
 * `PackageBump`: bump package version to next compatible semantic version
 * `PackageDiff`: calculate the API-difference between this package and another version.
 -}
 type Command
-    = Init InitFlags
-    | Repl ReplFlags
+    = Repl ReplFlags
     | Make MakeFlags
     | Docs DocsFlags
-    | PackageInstall (Maybe PackageName)
-    | PackageUninstall PackageName
-    | PackageOutdated
     | PackageValidate
     | PackageBump
     | PackageDiff DiffArgs
-
-
-{-|-}
-type alias InitFlags =
-    { package : Bool
-    , platform : Platform
-    }
 
 
 {-|-}
@@ -304,14 +288,6 @@ encodeCommand options command =
 commandEncoder : Bool -> (Path -> String) -> Command -> Json.Value
 commandEncoder interactive pathToString command =
     when command is
-        Init flags ->
-            Json.object
-                [ { key = "command", value = Json.string "init" }
-                , { key = "interactive", value = Json.bool interactive }
-                , { key = "package", value = Json.bool flags.package }
-                , { key = "platform", value = Platform.toJson flags.platform }
-                ]
-        
         Repl flags ->
             Json.object
                 [ { key = "command", value = Json.string "repl" }
@@ -345,25 +321,6 @@ commandEncoder interactive pathToString command =
                 [ { key = "command", value = Json.string "docs" }
                 , { key = "output", value = maybeEncoder docsOutputEncoder flags.output }
                 , { key = "report-json", value = maybeToBool flags.report }
-                ]
-        
-        PackageInstall maybePackage ->
-            Json.object
-                [ { key = "command", value = Json.string "packageInstall" }
-                , { key = "interactive", value = Json.bool interactive }
-                , { key = "package", value = maybeEncoder PackageName.toJson maybePackage }
-                ]
-        
-        PackageUninstall package ->
-            Json.object
-                [ { key = "command", value = Json.string "packageUninstall" }
-                , { key = "interactive", value = Json.bool interactive }
-                , { key = "package", value = PackageName.toJson package }
-                ]
-        
-        PackageOutdated ->
-            Json.object
-                [ { key = "command", value = Json.string "packageOutdated" }
                 ]
         
         PackageValidate ->
