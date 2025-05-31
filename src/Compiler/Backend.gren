@@ -36,6 +36,7 @@ import FileSystem.Path as Path exposing (Path)
 import Compiler.PackageName as PackageName exposing (PackageName)
 import Compiler.Platform as Platform exposing (Platform)
 import Compiler.Outline as Outline exposing (Outline)
+import Compiler.ModuleName as ModuleName exposing (ModuleName)
 import SemanticVersion exposing (SemanticVersion)
 import ChildProcess exposing (Shell(..))
 import Json.Encode as Json
@@ -215,7 +216,7 @@ type alias MakeFlags =
     , output : Maybe MakeOutput
     , report : Maybe {}
     , projectPath : Path
-    , entryPoints : Array Path
+    , entryPoints : Array ModuleName
     , outline : Outline
     , rootSources : Dict String String
     , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
@@ -323,7 +324,7 @@ commandEncoder interactive pathToString command =
                 , { key = "output", value = maybeEncoder makeOutputEncoder flags.output }
                 , { key = "report-json", value = maybeToBool flags.report }
                 , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
-                , { key = "entry-points", value = Json.array (Json.string << pathToString) flags.entryPoints }
+                , { key = "entry-points", value = Json.array ModuleName.toJson flags.entryPoints }
                 , { key = "project-outline", value = Outline.toJson flags.outline }
                 , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
                 , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
