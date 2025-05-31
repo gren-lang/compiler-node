@@ -185,14 +185,15 @@ type Command
     = Repl ReplFlags
     | Make MakeFlags
     | Docs DocsFlags
-    | PackageValidate ProjectSources
-    | PackageBump ProjectSources
+    | PackageValidate PackageValidateFlags
+    | PackageBump PackageValidateFlags
     | PackageDiff DiffArgs
 
 
 {-|-}
-type alias ProjectSources =
+type alias PackageValidateFlags =
     { projectPath : Path
+    , knownVersions : Array SemanticVersion
     , outline : Outline
     , rootSources : Dict String String
     , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
@@ -344,6 +345,8 @@ commandEncoder interactive pathToString command =
         PackageValidate flags ->
             Json.object
                 [ { key = "command", value = Json.string "packageValidate" }
+                , { key = "interactive", value = Json.bool interactive }
+                , { key = "known-versions", value = Json.array SemanticVersion.toJson flags.knownVersions }
                 , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
                 , { key = "project-outline", value = Outline.toJson flags.outline }
                 , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
@@ -354,6 +357,7 @@ commandEncoder interactive pathToString command =
             Json.object
                 [ { key = "command", value = Json.string "packageBump" }
                 , { key = "interactive", value = Json.bool interactive }
+                , { key = "known-versions", value = Json.array SemanticVersion.toJson flags.knownVersions }
                 , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
                 , { key = "project-outline", value = Outline.toJson flags.outline }
                 , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
