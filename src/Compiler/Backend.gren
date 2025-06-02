@@ -194,9 +194,16 @@ type Command
 type alias PackageValidateFlags =
     { projectPath : Path
     , knownVersions : Array SemanticVersion
-    , outline : Outline
-    , rootSources : Dict String String
-    , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+    , publishedVersion :
+        { outline : Outline
+        , rootSources : Dict String String
+        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+        }
+    , currentVersion :
+        { outline : Outline
+        , rootSources : Dict String String
+        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+        }
     }
 
 
@@ -344,13 +351,26 @@ commandEncoder interactive pathToString command =
         
         PackageValidate flags ->
             Json.object
-                [ { key = "command", value = Json.string "packageValidate" }
+                [ { key = "command", value = Json.string "packageBump" }
                 , { key = "interactive", value = Json.bool interactive }
                 , { key = "known-versions", value = Json.array SemanticVersion.toJson flags.knownVersions }
                 , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
-                , { key = "project-outline", value = Outline.toJson flags.outline }
-                , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
-                , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
+                , { key = "current-version"
+                  , value =
+                    Json.object
+                        [ { key = "project-outline", value = Outline.toJson flags.currentVersion.outline }
+                        , { key = "sources", value = Json.dict identity Json.string flags.currentVersion.rootSources }
+                        , { key = "dependencies", value = Json.dict identity depsToJson flags.currentVersion.dependencies }
+                        ]
+                  }
+                , { key = "published-version"
+                  , value =
+                    Json.object
+                        [ { key = "project-outline", value = Outline.toJson flags.publishedVersion.outline }
+                        , { key = "sources", value = Json.dict identity Json.string flags.publishedVersion.rootSources }
+                        , { key = "dependencies", value = Json.dict identity depsToJson flags.publishedVersion.dependencies }
+                        ]
+                  }
                 ]
         
         PackageBump flags ->
@@ -359,9 +379,22 @@ commandEncoder interactive pathToString command =
                 , { key = "interactive", value = Json.bool interactive }
                 , { key = "known-versions", value = Json.array SemanticVersion.toJson flags.knownVersions }
                 , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
-                , { key = "project-outline", value = Outline.toJson flags.outline }
-                , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
-                , { key = "dependencies", value = Json.dict identity depsToJson flags.dependencies }
+                , { key = "current-version"
+                  , value =
+                    Json.object
+                        [ { key = "project-outline", value = Outline.toJson flags.currentVersion.outline }
+                        , { key = "sources", value = Json.dict identity Json.string flags.currentVersion.rootSources }
+                        , { key = "dependencies", value = Json.dict identity depsToJson flags.currentVersion.dependencies }
+                        ]
+                  }
+                , { key = "published-version"
+                  , value =
+                    Json.object
+                        [ { key = "project-outline", value = Outline.toJson flags.publishedVersion.outline }
+                        , { key = "sources", value = Json.dict identity Json.string flags.publishedVersion.rootSources }
+                        , { key = "dependencies", value = Json.dict identity depsToJson flags.publishedVersion.dependencies }
+                        ]
+                  }
                 ]
         
         PackageDiff args ->
