@@ -7,7 +7,8 @@ module Compiler.Backend exposing
     , MakeOutput(..)
     , DocsFlags
     , DocsOutput(..)
-    , DiffArgs(..)
+    , PackageValidateFlags
+    , PackageDiffFlags
     , encodeCommand
     , run
     --
@@ -187,24 +188,7 @@ type Command
     | Docs DocsFlags
     | PackageValidate PackageValidateFlags
     | PackageBump PackageValidateFlags
-    | PackageDiff DiffArgs
-
-
-{-|-}
-type alias PackageValidateFlags =
-    { projectPath : Path
-    , knownVersions : Array SemanticVersion
-    , publishedVersion :
-        { outline : Outline
-        , rootSources : Dict String String
-        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
-        }
-    , currentVersion :
-        { outline : Outline
-        , rootSources : Dict String String
-        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
-        }
-    }
+    | PackageDiff PackageDiffFlags
 
 
 {-|-}
@@ -259,11 +243,36 @@ type DocsOutput
 
 
 {-|-}
-type DiffArgs
-    = DiffLatest
-    | DiffVersion SemanticVersion
-    | DiffRange { lower : SemanticVersion, upper : SemanticVersion }
-    | DiffGlobal { package : PackageName, lower : SemanticVersion, upper : SemanticVersion }
+type alias PackageValidateFlags =
+    { projectPath : Path
+    , knownVersions : Array SemanticVersion
+    , publishedVersion :
+        { outline : Outline
+        , rootSources : Dict String String
+        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+        }
+    , currentVersion :
+        { outline : Outline
+        , rootSources : Dict String String
+        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+        }
+    }
+
+
+{-|-}
+type alias PackageDiffFlags =
+    { projectPath : Path
+    , firstPackage :
+        { outline : Outline
+        , rootSources : Dict String String
+        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+        }
+    , secondPackage :
+        { outline : Outline
+        , rootSources : Dict String String
+        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+        }
+    }
 
 
 {-|-}
@@ -397,33 +406,28 @@ commandEncoder interactive pathToString command =
                   }
                 ]
         
-        PackageDiff args ->
-            when args is
-                DiffLatest ->
+        PackageDiff flags ->
+            Json.object
+                [ { key = "command", value = Json.string "packageDiff" }
+                , { key = "interactive", value = Json.bool interactive }
+                , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
+                , { key = "first-package"
+                  , value =
                     Json.object
-                        [ { key = "command", value = Json.string "packageDiffLatest" }
+                        [ { key = "project-outline", value = Outline.toJson flags.firstPackage.outline }
+                        , { key = "sources", value = Json.dict identity Json.string flags.firstPackage.rootSources }
+                        , { key = "dependencies", value = Json.dict identity depsToJson flags.firstPackage.dependencies }
                         ]
-                
-                DiffVersion ver ->
+                  }
+                , { key = "second-package"
+                  , value =
                     Json.object
-                        [ { key = "command", value = Json.string "packageDiffVersion" }
-                        , { key = "version", value = SemanticVersion.toJson ver }
+                        [ { key = "project-outline", value = Outline.toJson flags.secondPackage.outline }
+                        , { key = "sources", value = Json.dict identity Json.string flags.secondPackage.rootSources }
+                        , { key = "dependencies", value = Json.dict identity depsToJson flags.secondPackage.dependencies }
                         ]
-                
-                DiffRange { lower = ver1, upper = ver2 } ->
-                    Json.object
-                        [ { key = "command", value = Json.string "packageDiffRange" }
-                        , { key = "from", value = SemanticVersion.toJson ver1 }
-                        , { key = "to", value = SemanticVersion.toJson ver2 }
-                        ]
-                
-                DiffGlobal { package, lower = ver1, upper = ver2 } ->
-                    Json.object
-                        [ { key = "command", value = Json.string "packageDiffGlobal" }
-                        , { key = "package", value = PackageName.toJson package }
-                        , { key = "from", value = SemanticVersion.toJson ver1 }
-                        , { key = "to", value = SemanticVersion.toJson ver2 }
-                        ]
+                  }
+                ]
 
 
 depsToJson : { outline : Outline.PkgOutline, sources : Dict String String } -> Json.Value
