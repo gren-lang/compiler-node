@@ -104,7 +104,7 @@ downloadUrl platform cpuArch =
 
 {-| Downlod the compiler blob.
 -}
-download : HttpClient.Permission -> String -> Task (HttpClient.Error Bytes) (HttpClient.Response Bytes)
+download : HttpClient.Permission -> String -> Task HttpClient.Error (HttpClient.Response Bytes)
 download permission url =
     HttpClient.get url
         |> HttpClient.expectBytes
@@ -280,7 +280,7 @@ type alias RunOptions msg =
     { useColor : Bool
     , compilerPath : Path
     , pathToString : (Path -> String)
-    , onInit : { processId : Process.Id, streams : Maybe ChildProcess.StreamIO } -> msg
+    , connection : ChildProcess.Connection msg
     , onComplete : (Int -> msg)
     }
 
@@ -301,11 +301,10 @@ run permission options =
         permission
         (options.pathToString options.compilerPath) 
         []
-        { ( ChildProcess.defaultSpawnOptions options.onInit options.onComplete )
+        { ( ChildProcess.defaultSpawnOptions options.connection options.onComplete )
             | shell = NoShell
             , environmentVariables = 
                 ChildProcess.MergeWithEnvironmentVariables colorEnvVar
-            , connection = ChildProcess.External
         }
 
 
