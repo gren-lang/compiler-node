@@ -316,6 +316,7 @@ encodeCommand options command =
     command
         |> commandEncoder options.interactiveSession options.pathToString
         |> Json.encode 0
+        |> (\jsonStr -> jsonStr ++ "\n")
         |> Bytes.fromString
 
 
@@ -325,7 +326,7 @@ commandEncoder interactive pathToString command =
         Repl flags ->
             Json.object
                 [ { key = "command", value = Json.string "repl" }
-                , { key = "intepreter" , value = maybeEncoder Json.string flags.interpreter }
+                , { key = "interpreter" , value = maybeEncoder Json.string flags.interpreter }
                 , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
                 , { key = "project-outline", value = Outline.toJson flags.outline }
                 , { key = "sources", value = Json.dict identity Json.string flags.rootSources }
