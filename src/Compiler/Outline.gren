@@ -5,6 +5,7 @@ module Compiler.Outline exposing
     , VersionConstraint(..)
     , Exposed (..)
     --
+    , defaultSummary
     , findSourceFiles
     --
     , jsonDecoder
@@ -64,6 +65,11 @@ type Exposed
 type VersionConstraint a
     = Version a
     | LocalPath Path
+
+
+defaultSummary : String
+defaultSummary =
+    "helpful summary of your project, less than 80 characters"
 
 
 -- TODO: Ignore hidden directories
