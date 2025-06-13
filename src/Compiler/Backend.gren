@@ -187,7 +187,7 @@ type Command
     | Make MakeFlags
     | Docs DocsFlags
     | PackageValidate PackageValidateFlags
-    | PackageBump PackageValidateFlags
+    | PackageBump PackageBumpFlags
     | PackageDiff PackageDiffFlags
 
 
@@ -244,6 +244,24 @@ type DocsOutput
 
 {-|-}
 type alias PackageValidateFlags =
+    { projectPath : Path
+    , knownVersions : Array SemanticVersion
+    , previousVersion :
+        Maybe
+            { outline : Outline
+            , rootSources : Dict String String
+            , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+            }
+    , currentVersion :
+        { outline : Outline
+        , rootSources : Dict String String
+        , dependencies : Dict String { outline : Outline.PkgOutline, sources : Dict String String }
+        }
+    }
+
+
+{-|-}
+type alias PackageBumpFlags =
     { projectPath : Path
     , knownVersions : Array SemanticVersion
     , publishedVersion :
@@ -372,13 +390,17 @@ commandEncoder interactive pathToString command =
                         , { key = "dependencies", value = Json.dict identity depsToJson flags.currentVersion.dependencies }
                         ]
                   }
-                , { key = "published-version"
+                , { key = "previous-version"
                   , value =
-                    Json.object
-                        [ { key = "project-outline", value = Outline.toJson flags.publishedVersion.outline }
-                        , { key = "sources", value = Json.dict identity Json.string flags.publishedVersion.rootSources }
-                        , { key = "dependencies", value = Json.dict identity depsToJson flags.publishedVersion.dependencies }
-                        ]
+                    maybeEncoder
+                        (\package ->
+                            Json.object
+                                [ { key = "project-outline", value = Outline.toJson package.outline }
+                                , { key = "sources", value = Json.dict identity Json.string package.rootSources }
+                                , { key = "dependencies", value = Json.dict identity depsToJson package.dependencies }
+                                ]
+                        )
+                        flags.previousVersion
                   }
                 ]
         
