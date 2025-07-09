@@ -74,7 +74,7 @@ defaultSummary =
 
 -- TODO: Ignore hidden directories
 -- More info: https://github.com/gren-lang/compiler/pull/287
-findSourceFiles : FileSystem.Permission -> Outline -> Path -> Task FileSystem.Error (Array { moduleName : String, source : String })
+findSourceFiles : FileSystem.Permission -> Outline -> Path -> Task FileSystem.Error (Array { path : Path, moduleName : String, source : String })
 findSourceFiles fsPerm outline outlinePath =
     let
         sourceDirs =
@@ -120,12 +120,13 @@ findSourceFilesHelp fsPerm local root =
             )
 
 
-readSourceFile : FileSystem.Permission -> { absolute : Path, relative : Path } -> Task FileSystem.Error { moduleName : String, source : String }
+readSourceFile : FileSystem.Permission -> { absolute : Path, relative : Path } -> Task FileSystem.Error { path : Path, moduleName : String, source : String }
 readSourceFile fsPerm { absolute, relative } =
     FileSystem.readFile fsPerm absolute
         |> Task.map
             (\source ->
-                { moduleName =
+                { path = absolute
+                , moduleName =
                     { relative | extension = "" }
                         |> Path.toPosixString
                         |> String.replace "/" "."
