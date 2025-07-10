@@ -1,12 +1,24 @@
 module Compiler.Paths exposing 
     ( projectRoot
     , projectMetadata
+    --
+    , CacheRoot
+    , cacheRoot
+    , cacheRootToPath
+    , backendBinary
+    , packageSources
+    , repl
+    , exists
     )
 
 
 import FileSystem
 import FileSystem.Path as Path exposing (Path)
 import Task exposing (Task)
+import Dict exposing (Dict)
+import Node
+import Compiler.Backend
+import SemanticVersion exposing (SemanticVersion)
 
 
 projectRoot : FileSystem.Permission -> Task FileSystem.Error Path
@@ -34,3 +46,86 @@ projectMetadataHelp perm dir =
             else
                 Task.fail err
         )
+
+
+type CacheRoot
+    = CacheRoot Path
+
+
+{-| Construct a [CacheRoot](#CacheRoot), a system specific path where the Gren compiler caches
+things like the backend binary and package sources.
+-}
+cacheRoot : Node.Platform -> Dict String String -> Path -> SemanticVersion -> CacheRoot
+cacheRoot platform envVars homeDir grenVersion =
+    let
+        startPath =
+            when platform is
+                Node.Win32 ->
+                    envVars
+                        |> Dict.get "LOCALAPPDATA"
+                        |> Maybe.map Path.fromWin32String
+                        |> Maybe.withDefault (
+                            "AppData/Local"
+                                |> Path.fromPosixString
+                                |> Path.prepend homeDir
+                            )
+
+                Node.Darwin ->
+                    "Library/Caches"
+                        |> Path.fromPosixString
+                        |> Path.prepend homeDir
+
+                _ ->
+                    envVars
+                        |> Dict.get "XDG_CACHE_HOME"
+                        |> Maybe.map Path.fromPosixString
+                        |> Maybe.withDefault (Path.append (Path.fromPosixString ".cache") homeDir)
+
+        
+        endPath =
+            [ "gren"
+            , SemanticVersion.toString grenVersion
+            ]
+                |> String.join "/"
+                |> Path.fromPosixString
+    in
+    CacheRoot (Path.prepend startPath endPath)
+
+
+cacheRootToPath : CacheRoot -> Path
+cacheRootToPath (CacheRoot path) =
+    path
+
+
+backendBinary : Node.Platform -> CacheRoot -> Path
+backendBinary platform (CacheRoot cache) =
+    let
+        binPath =
+            when platform is
+                Node.Win32 ->
+                    Path.fromPosixString "bin/gren.exe"
+
+                _ ->
+                    Path.fromPosixString "bin/gren"
+    in
+    Path.append binPath cache
+
+
+packageSources : CacheRoot -> Path
+packageSources (CacheRoot cache) =
+    Path.prepend cache (Path.fromPosixString "packages")
+
+
+repl : CacheRoot -> Path
+repl (CacheRoot cache) =
+    Path.prepend cache (Path.fromPosixString "repl")
+
+
+{-| Checks to see if the given `Path` points to a real file.
+-}
+exists : FileSystem.Permission -> Path -> Task x Bool
+exists permission path =
+    path
+        |> FileSystem.checkAccess permission []
+        |> Task.map (\_ -> True)
+        |> Task.onError (\_ -> Task.succeed False)

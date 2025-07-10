@@ -16,8 +16,6 @@ module Compiler.Backend exposing
     , UnsupportedPlatform(..)
     , downloadUrl
     , download
-    , cachePath
-    , isCached
     )
 
 
@@ -110,65 +108,6 @@ download permission url =
     HttpClient.get url
         |> HttpClient.expectBytes
         |> HttpClient.send permission
-
-
-{-| Construct a `Path` where we'd expect to find the compiler blob if it has been downloaded
-previously.
--}
-cachePath : Node.Platform -> Dict String String -> Path -> Path
-cachePath platform envVars homeDir =
-    let
-        startPath =
-            when platform is
-                Node.Win32 ->
-                    envVars
-                        |> Dict.get "LOCALAPPDATA"
-                        |> Maybe.map Path.fromWin32String
-                        |> Maybe.withDefault (
-                            "AppData/Local"
-                                |> Path.fromPosixString
-                                |> Path.prepend homeDir
-                            )
-
-                Node.Darwin ->
-                    "Library/Caches"
-                        |> Path.fromPosixString
-                        |> Path.prepend homeDir
-
-                _ ->
-                    envVars
-                        |> Dict.get "XDG_CACHE_HOME"
-                        |> Maybe.map Path.fromPosixString
-                        |> Maybe.withDefault (Path.append (Path.fromPosixString ".cache") homeDir)
-
-        filename =
-            when platform is
-                Node.Win32 ->
-                    "gren.exe"
-
-                _ ->
-                    "gren"
-        
-        endPath =
-            [ "gren"
-            , version
-            , "bin"
-            , filename
-            ]
-                |> String.join "/"
-                |> Path.fromPosixString
-    in
-    Path.prepend startPath endPath
-
-
-{-| Checks if the compiler blob exist on this system.
--}
-isCached : FileSystem.Permission -> Node.Platform -> Dict String String -> Path -> Task x Bool
-isCached permission platform envVars homeDir =
-    cachePath platform envVars homeDir
-        |> FileSystem.checkAccess permission []
-        |> Task.map (\_ -> True)
-        |> Task.onError (\_ -> Task.succeed False)
 
 
 -- Compiler Commands
