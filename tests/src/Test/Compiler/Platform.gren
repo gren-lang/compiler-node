@@ -1,0 +1,27 @@
+module Test.Compiler.Platform exposing (tests)
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import Fuzz exposing (Fuzzer)
+import Compiler.Platform as P
+
+
+tests : Test
+tests =
+    describe "Platform"
+        [ describe "isCompatible"
+            [ test "equals" <| \{} ->
+                Expect.all
+                    [ \_ -> Expect.equal True (P.isCompatible P.Node P.Node)
+                    , \_ -> Expect.equal True (P.isCompatible P.Browser P.Browser)
+                    , \_ -> Expect.equal True (P.isCompatible P.Common P.Common)
+                    ]
+                    {}
+            , test "common is always compatible" <| \{} ->
+                Expect.all
+                    [ \_ -> Expect.equal True (P.isCompatible P.Node P.Common)
+                    , \_ -> Expect.equal True (P.isCompatible P.Browser P.Common)
+                    ]
+                    {}
+            ]
+        ]

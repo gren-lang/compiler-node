@@ -9,6 +9,7 @@ import Test.SemanticVersionRange as SemanticVersionRange
 import Test.Compiler.Dependencies as Dependencies
 import Test.Compiler.PackageName as PackageName
 import Test.Compiler.ModuleName as ModuleName
+import Test.Compiler.Platform as Platform
 import Test.String.EditDistance as EditDistance
 import Node exposing (Program)
 
@@ -24,5 +25,6 @@ main =
             , SemanticVersionRange.tests
             , PackageName.tests
             , ModuleName.tests
+            , Platform.tests
             , EditDistance.tests
             ]

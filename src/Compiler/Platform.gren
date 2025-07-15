@@ -1,5 +1,8 @@
 module Compiler.Platform exposing
     ( Platform(..)
+    , isCompatible
+    --
+    , toString
     , toJson
     , jsonDecoder
     )
@@ -13,6 +16,19 @@ type Platform
     = Node
     | Browser
     | Common
+
+
+isCompatible : Platform -> Platform -> Bool
+isCompatible a b =
+    a == b || b == Common
+
+
+toString : Platform -> String
+toString platform =
+    when platform is
+        Common -> "common"
+        Browser -> "browser"
+        Node -> "node"
 
 
 toJson : Platform -> Encode.Value
