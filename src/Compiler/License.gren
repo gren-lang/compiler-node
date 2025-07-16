@@ -8,31 +8,46 @@ module Compiler.License exposing
     )
 
 
+{-| A module for working with OSI approved licenses.
+
+@docs License, bsd3, toString, toJson, jsonDecoder, findMostSimilar
+-}
+
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 import String.EditDistance as EditDistance
 
 
+{-| An OSI approved license.
+-}
 type License
     = License String
 
 
+{-| The BSD 3 Clause license.
+-}
 bsd3 : License
 bsd3 =
     License "BSD-3-Clause"
 
 
+{-| `String` representation for a [License](#License).
+-}
 toString : License -> String
 toString (License value) =
     value
 
 
+{-| JSON Encoder for [License](#License).
+-}
 toJson : License -> Encode.Value
 toJson license =
     Encode.string (toString license)
 
 
+{-| JSON Decoder for [License](#License).
+-}
 jsonDecoder : Decoder License
 jsonDecoder =
     Decode.string
@@ -48,6 +63,9 @@ decodeHelper givenCode =
         Decode.fail ("Invalid license name: " ++ givenCode)
 
 
+{-| Find the three most similar licenses to the given `String`. Useful if you have a
+mistyped license string and wish to suggest the correct typing.
+-}
 findMostSimilar : String -> Array String
 findMostSimilar givenCode =
     EditDistance.findMostSimilar
@@ -58,9 +76,9 @@ findMostSimilar givenCode =
         givenCode
 
 
-{-|
--- OSI approved licenses in SPDX format.
--- <https://spdx.org/licenses/>
+{-| OSI approved licenses in SPDX format.
+
+Read more at <https://spdx.org/licenses/>.
 -}
 osiApprovedSpdxLicenses : Dict String String
 osiApprovedSpdxLicenses =

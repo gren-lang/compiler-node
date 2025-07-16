@@ -23,9 +23,9 @@ module Compiler.Backend exposing
 
 @docs version
 
-@docs UnsupportedPlatform, downloadUrl, download, cachePath, isCached
+@docs UnsupportedPlatform, downloadUrl, download
 
-@docs Command, InitFlags, ReplFlags, MakeFlags, MakeOutput, DocsFlags, DocsOutput, DiffArgs, Platform, encodeCommand, run
+@docs Command, ReplFlags, MakeFlags, MakeOutput, DocsFlags, DocsOutput, PackageValidateFlags, PackageDiffFlags, SourceFile, encodeCommand, run
 
 -}
 
@@ -141,6 +141,7 @@ type alias ReplFlags =
     }
 
 
+{-|-}
 type alias SourceFile =
     { path : Path
     , data : String

@@ -1,5 +1,5 @@
 module Compiler.Platform exposing
-    ( Platform(..)
+    ( Platform (..)
     , isCompatible
     --
     , toString
@@ -8,21 +8,39 @@ module Compiler.Platform exposing
     )
 
 
+{-| Functions for working with a project's target platform.
+
+@docs Platform, isCompatible
+
+## Value conversion
+
+@docs toString, toJson, jsonDecoder
+-}
+
 import Json.Encode as Encode
 import Json.Decode as Decode exposing (Decoder)
 
 
+{-| The platform targetted by a project. You'll read this value
+from a gren.json file.
+-}
 type Platform
     = Node
     | Browser
     | Common
 
 
+{-| Check if two [Platform](#Platform) values are compatible.
+
+`Common` is compatible with all other platforms.
+-}
 isCompatible : Platform -> Platform -> Bool
 isCompatible a b =
     a == b || b == Common
 
 
+{-| Return the `String` representation for a [Platform](#Platform).
+-}
 toString : Platform -> String
 toString platform =
     when platform is
@@ -31,14 +49,15 @@ toString platform =
         Node -> "node"
 
 
+{-| Convert a [Platform](#Platform) value to it's JSON representation.
+-}
 toJson : Platform -> Encode.Value
 toJson platform =
-    when platform is
-        Common -> Encode.string "common"
-        Browser -> Encode.string "browser"
-        Node -> Encode.string "node"
+    Encode.string (toString platform)
 
 
+{-| JSON decoder for [Platform](#Platform).
+-}
 jsonDecoder : Decoder Platform
 jsonDecoder =
     Decode.string

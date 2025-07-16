@@ -5,6 +5,11 @@ module Compiler.Dependencies exposing
     )
 
 
+{-| The algorithm for calculating the required dependencies of a project.
+
+@docs SimplifiedOutline, Solution, solve
+-}
+
 import Compiler.Outline as Outline exposing (Outline)
 import Compiler.PackageName as PackageName exposing (PackageName)
 import Dict exposing (Dict)
@@ -12,6 +17,8 @@ import SemanticVersion exposing (SemanticVersion)
 import SemanticVersionRange exposing (SemanticVersionRange)
 
 
+{-| A simlified outline only contains the information that is required by the algorithm.
+-}
 type alias SimplifiedOutline =
     { name : PackageName
     , version : SemanticVersionRange
@@ -19,12 +26,17 @@ type alias SimplifiedOutline =
     }
 
 
+{-| Return value of [solve](#solve). Let's you know if you've got all the required dependencies,
+or if you're missing something.
+-}
 type Solution
     = Complete
     | Missing { name : PackageName, version : SemanticVersionRange }
     | Conflict { name : PackageName, version1 : SemanticVersionRange, version2 : SemanticVersionRange }
 
 
+{-| Calculate the required dependencies of a project.
+-}
 solve : Array { name : PackageName, version : SemanticVersionRange } -> Dict String SimplifiedOutline -> Solution
 solve rootRequirements loadedOutlines =
     solveHelp rootRequirements Dict.empty loadedOutlines

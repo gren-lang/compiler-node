@@ -14,6 +14,15 @@ module Compiler.Outline exposing
     )
 
 
+{-| Module for working with `gren.json` files.
+
+@docs Outline, AppOutline, PkgOutline, VersionConstraint, Exposed, defaultSummary, findSourceFiles
+
+## JSON
+
+@docs jsonDecoder, pkgJsonDecoder, toJson
+-}
+
 import Bytes
 import SemanticVersion exposing (SemanticVersion)
 import SemanticVersionRange exposing (SemanticVersionRange)
@@ -29,11 +38,13 @@ import Dict exposing (Dict)
 import Task exposing (Task)
 
 
+{-|-}
 type Outline
     = App AppOutline
     | Pkg PkgOutline
 
 
+{-|-}
 type alias AppOutline =
     { platform : Platform
     , sourceDirectories : Array Path
@@ -45,6 +56,7 @@ type alias AppOutline =
     }
 
 
+{-|-}
 type alias PkgOutline =
     { platform : Platform
     , name : PackageName
@@ -57,23 +69,29 @@ type alias PkgOutline =
     }
 
 
+{-| Exposed modules in [PkgOutline](#PkgOutline).
+-}
 type Exposed
     = ExposedArray (Array ModuleName)
     | ExposedDict (Dict String (Array ModuleName))
 
 
+{-| A dependency version constraint. Either a `SemanticVersion`, `SemanticVersionRange` or a `Path` for a local dependency.
+-}
 type VersionConstraint a
     = Version a
     | LocalPath Path
 
 
+{-| The default summary created by `gren init`.
+-}
 defaultSummary : String
 defaultSummary =
     "helpful summary of your project, less than 80 characters"
 
 
--- TODO: Ignore hidden directories
--- More info: https://github.com/gren-lang/compiler/pull/287
+{-| Find the source files of a given project.
+-}
 findSourceFiles : FileSystem.Permission -> Outline -> Path -> Task FileSystem.Error (Array { path : Path, moduleName : String, source : String })
 findSourceFiles fsPerm outline outlinePath =
     let
@@ -138,6 +156,8 @@ readSourceFile fsPerm { absolute, relative } =
             )
 
 
+{-| JSON Decoder for [Outline](#Outline).
+-}
 jsonDecoder : Decoder Outline
 jsonDecoder =
     Decode.field "type" Decode.string    
@@ -151,6 +171,8 @@ jsonDecoder =
             )
 
 
+{-| JSON Decoder for [PkgOutline](#PkgOutline).
+-}
 pkgJsonDecoder : Decoder PkgOutline
 pkgJsonDecoder =
     jsonDecoder
@@ -301,6 +323,8 @@ pkgDependenciesEncoder deps =
     Encode.dict identity (constraintEncoder SemanticVersionRange.toJson) deps
 
 
+{-| JSON Encoder for [Outline](#Outline).
+-}
 toJson : Outline -> Encode.Value
 toJson outline =
     when outline is

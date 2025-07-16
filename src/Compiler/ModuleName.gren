@@ -7,14 +7,31 @@ module Compiler.ModuleName exposing
     )
 
 
+{-| A module for working with Gren module names.
+
+@docs ModuleName
+
+## Constructors
+
+@docs fromString, jsonDecoder
+
+## Conversions
+
+@docs toString, toJson
+-}
+
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 
 
+{-|-}
 type ModuleName
     = ModuleName String
 
 
+{-| Construct a [ModuleName](#ModuleName) from a `String`. Will return `Nothing`
+if the `String` doesn't represent a valid [ModuleName](#ModuleName).
+-}
 fromString : String -> Maybe ModuleName
 fromString str =
     let
@@ -36,6 +53,8 @@ fromString str =
         Nothing
 
 
+{-| JSON Decoder for [ModuleName](#ModuleName).
+-}
 jsonDecoder : Decoder ModuleName
 jsonDecoder =
     Decode.string
@@ -50,11 +69,15 @@ jsonDecoder =
             )
 
 
+{-| `String` representation for [ModuleName](#ModuleName).
+-}
 toString : ModuleName -> String
 toString (ModuleName name) =
     name
 
 
+{-| JSON Encoder for [ModuleName](#ModuleName).
+-}
 toJson : ModuleName -> Encode.Value
 toJson moduleName =
     Encode.string (toString moduleName)

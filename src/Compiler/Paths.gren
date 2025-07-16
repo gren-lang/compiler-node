@@ -1,6 +1,6 @@
 module Compiler.Paths exposing 
     ( projectRoot
-    , projectMetadata
+    , projectOutline
     --
     , CacheRoot
     , cacheRoot
@@ -12,6 +12,12 @@ module Compiler.Paths exposing
     )
 
 
+{-| Paths commonly used by the compiler.
+
+@docs projectRoot, projectOutline, CacheRoot, cacheRoot, cacheRootToPath, backendBinary, packageSources, repl, exists
+-}
+
+
 import FileSystem
 import FileSystem.Path as Path exposing (Path)
 import Task exposing (Task)
@@ -21,39 +27,47 @@ import Compiler.Backend
 import SemanticVersion exposing (SemanticVersion)
 
 
+{-| Search the filesystem for the root of a Gren project, starting with the current working
+directory and moving up towards the filesystem root.
+-}
 projectRoot : FileSystem.Permission -> Task FileSystem.Error Path
 projectRoot perm =
-    projectMetadata perm
+    projectOutline perm
         |> Task.map (\grenJsonPath -> Maybe.withDefault Path.empty (Path.parentPath grenJsonPath))
 
 
-projectMetadata : FileSystem.Permission -> Task FileSystem.Error Path
-projectMetadata perm =
+{-| Similar to [projectRoot](#projectRoot), but returns the `Path` to the `gren.json` file of a project.
+-}
+projectOutline : FileSystem.Permission -> Task FileSystem.Error Path
+projectOutline perm =
     FileSystem.currentWorkingDirectory perm
-        |> Task.andThen (\workingDir -> projectMetadataHelp perm workingDir)
+        |> Task.andThen (\workingDir -> projectOutlineHelp perm workingDir)
     
 
-projectMetadataHelp : FileSystem.Permission -> Path -> Task FileSystem.Error Path
-projectMetadataHelp perm dir =
+projectOutlineHelp : FileSystem.Permission -> Path -> Task FileSystem.Error Path
+projectOutlineHelp perm dir =
     Path.append (Path.fromPosixString "gren.json") dir
         |> FileSystem.checkAccess perm []
         |> Task.onError (\err ->
             if dir /= Path.empty && FileSystem.errorIsNoSuchFileOrDirectory err then
                 Path.parentPath dir
                     |> Maybe.withDefault Path.empty
-                    |> projectMetadataHelp perm
+                    |> projectOutlineHelp perm
             
             else
                 Task.fail err
         )
 
 
+{-| A system specific `Path` to a directory where it's common to cache things. The compiler
+will use this path to store package sources and the backend binary.
+-}
 type CacheRoot
     = CacheRoot Path
 
 
-{-| Construct a [CacheRoot](#CacheRoot), a system specific path where the Gren compiler caches
-things like the backend binary and package sources.
+{-| Construct a [CacheRoot](#CacheRoot) using the current `Platform`, environment variables,
+the user's home directory and the current compiler version.
 -}
 cacheRoot : Node.Platform -> Dict String String -> Path -> SemanticVersion -> CacheRoot
 cacheRoot platform envVars homeDir grenVersion =
@@ -92,11 +106,15 @@ cacheRoot platform envVars homeDir grenVersion =
     CacheRoot (Path.prepend startPath endPath)
 
 
+{-| Convert the [CacheRoot](#CacheRoot) to a `Path`.
+-}
 cacheRootToPath : CacheRoot -> Path
 cacheRootToPath (CacheRoot path) =
     path
 
 
+{-| The `Path` where we'll store the backend binary.
+-}
 backendBinary : Node.Platform -> CacheRoot -> Path
 backendBinary platform (CacheRoot cache) =
     let
@@ -111,11 +129,16 @@ backendBinary platform (CacheRoot cache) =
     Path.append binPath cache
 
 
+{-| The `Path` where we'll store package sources prior to turning them into
+`gren_packages` bundles.
+-}
 packageSources : CacheRoot -> Path
 packageSources (CacheRoot cache) =
     Path.prepend cache (Path.fromPosixString "packages")
 
 
+{-| The `Path` for the project that backs the `gren repl` command.
+-}
 repl : CacheRoot -> Path
 repl (CacheRoot cache) =
     Path.prepend cache (Path.fromPosixString "repl")

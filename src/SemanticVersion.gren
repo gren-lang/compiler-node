@@ -13,7 +13,19 @@ module SemanticVersion exposing
 meaning. This module makes no attempt to enforce the semantic versioning
 rules.
 
-@docs SemanticVersion, fromString, cliParser, jsonDecoder, toString, toJson
+@docs SemanticVersion
+
+## Constructors
+
+@docs fromString, cliParser, jsonDecoder
+
+## Queries
+
+@docs compare
+
+## Conversions
+
+@docs toString, toJson
 -}
 
 
@@ -36,6 +48,8 @@ type alias SemanticVersion =
     }
 
 
+{-| Compare two [SemanticVersion](#SemanticVersion).
+-}
 compare : SemanticVersion -> SemanticVersion -> Order
 compare left right =
     when Basics.compare left.major right.major is

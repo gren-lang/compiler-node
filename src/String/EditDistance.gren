@@ -3,13 +3,23 @@ module String.EditDistance exposing
     , findMostSimilar
     )
 
-{- Based on code from wikipedia article on [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance)
+{-| Functions for working with [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance) on `String`s.
 
-TODO: deletion/insertion should only add a distance of 0.5
-TODO: add support for transposition
-TODO: performance?
+The Levenshtein distance can be used as a metric for how similar two `String`s are. We can use this to suggest alternatives
+when the user has given us a value we don't recognize.
+
+Based on code from wikipedia article on [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance)
+
+@docs calculate, findMostSimilar
 -}
 
+--TODO: deletion/insertion should only add a distance of 0.5
+--TODO: add support for transposition
+--TODO: performance?
+
+
+{-| Calculate the Levenshtein distance between two `String`s.
+-}
 calculate : String -> String -> Int
 calculate left right =
     when String.popFirst left is
@@ -36,6 +46,8 @@ calculate left right =
                             )
 
 
+{-| Given an `Array` of `String`, find the value that is most similar to the given `String`.
+-}
 findMostSimilar : { maxAmount : Int, maxDistance : Int, from : Array String } -> String -> Array String
 findMostSimilar { maxAmount, maxDistance, from } str =
     let

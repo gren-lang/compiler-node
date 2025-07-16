@@ -14,15 +14,40 @@ module SemanticVersionRange exposing
     )
 
 
+{-| A module for working with ranges of semantic versions, like `1.0.0 <= v < 2.0.0`.
+
+@docs SemanticVersionRange, example
+
+## Construction
+
+@docs of, fromExact, compatibleWith, fromString, jsonDecoder
+
+## Query
+
+@docs lowerBound, upperBound, intersect
+
+## Conversion
+
+@docs toString, toJson
+-}
+
+
 import SemanticVersion exposing (SemanticVersion)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 
 
+{-| A range of `SemanticVersion` values between a lower value (inclusive) and an upper
+value (exclusive).
+-}
 type SemanticVersionRange
     = SemanticVersionRange { lower : SemanticVersion, upper : SemanticVersion }
 
 
+{-| Construct a [SemanticVersionRange](#SemanticVersionRange) between the two provided
+`SemanticVersion`s. This function will return `Nothing` if the first value is less than
+or equal to the second.
+-}
 of : SemanticVersion -> SemanticVersion -> Maybe SemanticVersionRange
 of lower upper =
     if SemanticVersion.compare lower upper /= GT then
@@ -31,7 +56,8 @@ of lower upper =
     else
         Nothing
 
-
+{-| An example range. More specifically, the range `1.0.0 <= v < 2.0.0`.
+-}
 example : SemanticVersionRange
 example =
     SemanticVersionRange
@@ -40,16 +66,24 @@ example =
         }
 
 
+{-| Returns the lowest `SemanticVersion` of a [SemanticVersionRange](#SemanticVersionRange).
+-}
 lowerBound : SemanticVersionRange -> SemanticVersion
 lowerBound (SemanticVersionRange { lower }) =
     lower
 
 
+{-| Returns the lowest `SemanticVersion` which is higher than all other versions of the
+[SemanticVersionRange](#SemanticVersionRange).
+-}
 upperBound : SemanticVersionRange -> SemanticVersion
 upperBound (SemanticVersionRange { upper }) =
     upper
 
 
+{-| Construct a [SemanticVersionRange](#SemanticVersionRange) that forms the intersection
+of the two provided values.
+-}
 intersect : SemanticVersionRange -> SemanticVersionRange -> Maybe SemanticVersionRange
 intersect left right =
     let
@@ -104,6 +138,11 @@ intersect left right =
                             SemanticVersionRange { lower = lowerRight, upper = upperRight }
 
 
+{-| Construct a [SemanticVersionRange](#SemanticVersionRange) that is compatible with the
+provided `SemanticVersion`, and other semantically compatible versions.
+
+Using this function with the version `1.2.3` will return the range `1.2.0 <= v < 2.0.0`.
+-}
 compatibleWith : SemanticVersion -> SemanticVersionRange
 compatibleWith ver =
     if ver.major < 1 then
@@ -119,6 +158,11 @@ compatibleWith ver =
             }
 
 
+{-| Construct a [SemanticVersionRange](#SemanticVersionRange) where the provided
+`SemanticVersion` is the only contained value.
+
+Using the function with the version `1.5.0` will return the range `1.5.0 <= v < 1.5.1`.
+-}
 fromExact : SemanticVersion -> SemanticVersionRange
 fromExact ({ major, minor, patch } as lower) =
     SemanticVersionRange
@@ -127,6 +171,8 @@ fromExact ({ major, minor, patch } as lower) =
         }
 
 
+{-| Convert a `String` formatted like `1.0.0 <= v < 2.0.0` to a [SemanticVerisonRange](#SemanticVersionRange).
+-}
 fromString : String -> Maybe SemanticVersionRange
 fromString str =
     when str |> String.keepIf (\char -> char /= ' ') |> String.split "<=v<" is
@@ -146,6 +192,8 @@ fromString str =
             Nothing
 
 
+{-| JSON Decoder for a [SemanticVersionRange](#SemanticVersionRange).
+-}
 jsonDecoder : Decoder SemanticVersionRange
 jsonDecoder =
     Decode.string
@@ -160,11 +208,15 @@ jsonDecoder =
             )    
 
 
+{-| Create a `String` representation of a [SemanticVersionRange](#SemanticVersionRange).
+-}
 toString : SemanticVersionRange -> String
 toString (SemanticVersionRange { lower, upper }) =
     SemanticVersion.toString lower ++ " <= v < " ++ SemanticVersion.toString upper
 
 
+{-| Encode a [SemanticVersionRange](#SemanticVersionRange) as JSON.
+-}
 toJson : SemanticVersionRange -> Encode.Value
 toJson range =
     Encode.string (toString range)

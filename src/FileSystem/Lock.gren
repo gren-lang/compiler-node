@@ -2,15 +2,29 @@ module FileSystem.Lock exposing
     ( Model
     , Msg
     , UpdateResult(..)
+    , RetryOptions
     , init
     , update
+    --
     , aquire
     , release
     , getLocks
     )
 
 
-{-| Based on [proper-lockfile](https://www.npmjs.com/package/proper-lockfile)
+{-| A module for creating lockfiles. A lockfile can only be held by a single
+process at a time, and can thus be used to avoid having two or more programs
+working on a set of files simultaniously.
+
+This implementation is based on [proper-lockfile](https://www.npmjs.com/package/proper-lockfile).
+
+## TEA
+
+@docs Model, RetryOptions, init, Msg, UpdateResult, update
+
+## Operations
+
+@docs aquire, release, getLocks
 -}
 
 
@@ -22,18 +36,14 @@ import Process
 import Time
 
 
+{-|-}
 type alias Model =
     { locks : Set String
     , retryOptions : Maybe RetryOptions
     }
 
 
-type alias RetryOptions =
-    { attempts : Int
-    , millisecondsBetween : Int
-    }
-
-
+{-|-}
 type Msg
     = Lock { path : Path, attempt : Int }
     | LockAttempt { path : Path, attempt : Int, result : Result FileSystem.Error Path }
@@ -43,6 +53,8 @@ type Msg
     | Unlock Path
 
 
+{-| The different possible results returned by [update](#update).
+-}
 type UpdateResult
     = Working (Cmd Msg)
     | UnexpectedError { path : Path, error : FileSystem.Error }
@@ -51,6 +63,15 @@ type UpdateResult
     | AlreadyLocked Path
 
 
+{-| How often, and at what interval, to retry aquiring a lock.
+-}
+type alias RetryOptions =
+    { attempts : Int
+    , millisecondsBetween : Int
+    }
+
+
+{-|-}
 init : Maybe RetryOptions -> Model
 init maybeRetryOptions =
     { locks = Set.empty
@@ -58,18 +79,26 @@ init maybeRetryOptions =
     }
 
 
+{-| Attempt to aquire a lock with the given `Path`. Once aquired, other
+processes will fail to aquire the same lock until you release it.
+-}
 aquire : Path -> Cmd Msg
 aquire path =
     Task.succeed (Lock { path = path, attempt = 0 })
         |> Task.perform identity
 
 
+{-| Release the lock provided by the specific `Path`. This will allow other
+processes to aquire the same lock.
+-}
 release : Path -> Cmd Msg
 release path =
     Task.succeed (Unlock path)
         |> Task.perform identity
 
 
+{-| Get an `Array` of the currently held locks.
+-}
 getLocks : Model -> Array Path
 getLocks model =
     model.locks
@@ -78,6 +107,7 @@ getLocks model =
         |> Array.map (\path -> Path.parentPath path |> Maybe.withDefault path)
 
 
+{-|-}
 update : FileSystem.Permission -> Msg -> Model -> UpdateResult
 update fsPerm msg model =
     when msg is

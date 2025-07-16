@@ -20,7 +20,19 @@ module Compiler.PackageName exposing
 
 {-| Functions for working with package identifiers.
 
-@docs Package, example, author, name, fromString, cliParser, jsonDecoder, toString, toJson
+@docs PackageName, example
+
+## Constructors
+
+@docs fromString, cliParser, jsonDecoder
+
+## Queries
+
+@docs author, name
+
+## Conversions
+
+@docs toString, toJson
 
 ## Common package names
 
@@ -130,6 +142,8 @@ cliParser =
     }
 
 
+{-| A JSON decoder for [PackageName](#PackageName)
+-}
 jsonDecoder : Decoder PackageName
 jsonDecoder =
     Decode.string
