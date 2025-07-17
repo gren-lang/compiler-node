@@ -52,7 +52,7 @@ as the Haskell- and Gren-parts are versioned seperatly.
 -}
 version : String
 version =
-    "0.5.2"
+    "0.6.0"
 
 
 -- Binary
