@@ -4,6 +4,7 @@ app: Makefile gren.json node_modules
 
 .PHONY: test
 test: app node_modules
+	rm -r .lock || true
 	npm test
 
 node_modules: package.json package-lock.json
