@@ -4,11 +4,11 @@
     "source-directories": [
         "src"
     ],
-    "gren-version": "0.5.2",
+    "gren-version": "0.5.3",
     "dependencies": {
         "direct": {
             "gren-lang/core": "6.0.1",
-            "gren-lang/node": "5.0.0",
+            "gren-lang/node": "5.0.4",
             "gren-lang/compiler-node": "local:.."
         },
         "indirect": {

@@ -54,7 +54,7 @@ init env =
                 Just "find gren.json" ->
                     { model = initModel fsPerm Nothing env.stdout
                     , command =
-                        Paths.projectMetadata fsPerm
+                        Paths.projectOutline fsPerm
                             |> Task.map Path.toPosixString
                             |> Task.onError (\fsErr -> Task.succeed (FileSystem.errorCode fsErr))
                             |> Task.andThen (\output -> 
@@ -67,7 +67,7 @@ init env =
                 Just "parse gren.json" ->
                     { model = initModel fsPerm Nothing env.stdout
                     , command =
-                        Paths.projectMetadata fsPerm
+                        Paths.projectOutline fsPerm
                             |> Task.andThen (\grenJsonPath ->
                                 FileSystem.readFile fsPerm grenJsonPath
                                     |> Task.map (Maybe.withDefault "" << Bytes.toString)

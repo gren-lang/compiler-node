@@ -5,8 +5,6 @@
   },
   "dependencies": {
     "clet": "^1.0.1",
-    "gren-lang": "^0.5.2",
-    "mocha": "^10.2.0",
-    "prettier": "^3.4.2"
+    "mocha": "^10.2.0"
   }
 }
