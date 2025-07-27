@@ -124,8 +124,12 @@ findSourceFilesHelp fsPerm local root =
                                     Just <| findSourceFilesHelp fsPerm (Path.append entry.path local) (Path.append entry.path root)
 
                                 FileSystem.File ->
-                                    if entry.path.extension == "js" || entry.path.extension == "gren" then
-                                        Just <| Task.succeed [ { absolute = Path.append entry.path root, relative = Path.append entry.path local } ]
+                                    let
+                                        fullLocalPath =
+                                            Path.append entry.path local
+                                    in
+                                    if entry.path.extension == "gren" || isKernelCode fullLocalPath then
+                                        Just <| Task.succeed [ { absolute = Path.append entry.path root, relative = fullLocalPath } ]
 
                                     else
                                         Nothing
@@ -136,6 +140,25 @@ findSourceFilesHelp fsPerm local root =
                     |> Task.sequence
                     |> Task.map Array.flatten
             )
+
+
+isKernelCode : Path -> Bool
+isKernelCode path =
+    if path.extension == "js" then
+        when Path.parentPath path is
+            Just parent ->
+                parent == kernelCodePrefixPath
+
+            Nothing ->
+                False
+
+    else
+        False
+
+
+kernelCodePrefixPath : Path
+kernelCodePrefixPath =
+    Path.fromPosixString "Gren/Kernel"
 
 
 readSourceFile : FileSystem.Permission -> { absolute : Path, relative : Path } -> Task FileSystem.Error { path : Path, moduleName : String, source : String }
