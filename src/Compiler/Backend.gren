@@ -326,7 +326,7 @@ commandEncoder interactive pathToString command =
         
         PackageValidate flags ->
             Json.object
-                [ { key = "command", value = Json.string "packageBump" }
+                [ { key = "command", value = Json.string "packageValidate" }
                 , { key = "interactive", value = Json.bool interactive }
                 , { key = "known-versions", value = Json.array SemanticVersion.toJson flags.knownVersions }
                 , { key = "project-path", value = Json.string <| pathToString flags.projectPath }
