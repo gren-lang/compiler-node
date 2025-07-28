@@ -272,18 +272,18 @@ tests =
                     testCmdOneOfArgs =
                         cmdBuilder
                             (Parser.oneOfArgs
-                                [ Parser.twoArgs
-                                    (\path file -> 
-                                        { path = path, file = file }
-                                    )
-                                    Parser.pathParser
-                                    Parser.grenFileParser
-                                , Parser.noArgs
+                                [ Parser.noArgs
                                     |> Parser.mapArgs (\{} ->
                                             { path = Path.fromPosixString ""
                                             , file = Path.fromPosixString ""
                                             }
                                         )
+                                , Parser.twoArgs
+                                    (\path file -> 
+                                        { path = path, file = file }
+                                    )
+                                    Parser.pathParser
+                                    Parser.grenFileParser
                                 ]
                             )
                             testFlags
@@ -314,10 +314,17 @@ tests =
                     runCommand testCmdOneOfArgs [ "make", "src/Dest" ]
                         |> Expect.equal
                             (Parser.BadArguments <| Parser.ArgumentParserWrongArity 
-                                { expected = 2
+                                { expected = 0
                                 , actual = 1
                                 }
                             )
+                , test "Tries to find error of matching arity" <| \{} ->
+                    when runCommand testCmdOneOfArgs [ "make", "out.txt", "src/Dest" ] is
+                        Parser.BadArguments (Parser.ArgumentParserInvalidArgument _) ->
+                            Expect.pass
+
+                        _ ->
+                            Expect.fail "Expected parsing to fail with an invalid argument error"
                 ]
             ]
         , describe "Flags"

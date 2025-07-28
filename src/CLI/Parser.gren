@@ -485,7 +485,7 @@ noArgs =
         { description = ""
         , parseFn = \args ->
             if Array.length args /= 0 then
-                Err <| ArgumentParserWrongArity { expected = 0, actual = (Array.length args) }
+                Err <| ArgumentParserWrongArity { expected = 0, actual = Array.length args }
 
             else
                 Ok {}
@@ -644,7 +644,27 @@ oneOfArgs argParsers =
                     Ok result
 
                 Nothing ->
-                    Array.first parseResults
+                    parseResults
+                        |> Array.findFirst
+                            (\result ->
+                                when result is
+                                    Ok _ ->
+                                        False
+
+                                    Err (ArgumentParserWrongArity _) ->
+                                        False
+
+                                    _ ->
+                                        True
+                            )
+                        |> (\maybeErr ->
+                            when maybeErr is
+                                Nothing ->
+                                    Array.first parseResults
+
+                                Just err ->
+                                    Just err.value
+                        )
                         |> Maybe.withDefault 
                             (Err <| ArgumentParserInvalidArgument
                                 { argument = String.join " " args
