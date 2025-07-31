@@ -1,6 +1,10 @@
 # Changelog
 
 
+## 3.0.5
+
+* Bump backend version to 0.6.1
+
 ## 3.0.4
 
 * CLI.Parser.oneOfArgs now return's first error that is not an arity error, if possible, to
