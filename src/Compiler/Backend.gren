@@ -52,7 +52,9 @@ as the Haskell- and Gren-parts are versioned seperatly.
 -}
 version : String
 version =
-    "0.6.2"
+    -- TODO: Let's get rid of this.
+    -- We're already planning to keep backend and frontend releases in sync moving forward
+    "0.6.3"
 
 
 -- Binary
