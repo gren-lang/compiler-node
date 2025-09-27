@@ -2,8 +2,9 @@ import * as path from "node:path";
 import * as os from "node:os";
 import * as fs from "node:fs";
 import * as fsProm from "node:fs/promises";
+import { describe, it } from "node:test";
 import * as childProc from "node:child_process";
-import { runner, KEYS } from "clet";
+import { runner } from "clet";
 
 const rootDir = path.resolve();
 const packageDir = path.resolve("..");
@@ -92,7 +93,7 @@ describe("compiler-node", () => {
         .stdout("Already Locked")
         .expect(async () => {
           proc.kill();
-          fsProm.rm(".lock", { recursive: true });
+          await fsProm.rm(".lock", { recursive: true });
         });
     });
 
@@ -126,7 +127,11 @@ describe("compiler-node", () => {
         .stdout("Lock Released")
         .expect(async () => {
           proc.kill();
-          fsProm.rm(".lock", { recursive: true });
+          try {
+            await fsProm.rm(".lock", { recursive: true });
+          } catch (e) {
+            // .lock probably didn't exist, which means the application cleaned it up
+          }
         });
     });
   });

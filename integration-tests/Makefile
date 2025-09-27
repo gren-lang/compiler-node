@@ -1,14 +1,14 @@
-app: Makefile gren.json node_modules
-	gren make src/Main.gren --output=bin/app
+node_modules: package.json package-lock.json
+	npm ci
+
+bin/app: Makefile gren.json node_modules
+	gren make Main --output=bin/app
 	chmod +x bin/app
 
 .PHONY: test
-test: app node_modules
+test: bin/app node_modules
 	rm -r .lock || true
 	npm test
-
-node_modules: package.json package-lock.json
-	npm ci
 
 .PHONY: clean
 clean:
