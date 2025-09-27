@@ -24,6 +24,23 @@ tests =
                 run "-012"
                     |> expectErr PN.LeadingZero
             ]
+        , describe "Floats"
+            [ fuzz (Fuzz.floatRange 0 32000) "Can parse regular floats" <| \float ->
+                run (String.fromFloat float)
+                    |> Result.map
+                        (\outcome ->
+                            when outcome is
+                                PN.Integer { value } -> 
+                                    PN.FloatingPoint (toFloat value)
+
+                                _ ->
+                                    outcome
+                        )
+                    |> Expect.equal (Ok (PN.FloatingPoint float))
+            , test "Requires a number after ." <| \{} ->
+                run "0."
+                    |> expectErr PN.TerminatingDot
+            ]
         ]
 
 

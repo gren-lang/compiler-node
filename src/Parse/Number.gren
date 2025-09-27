@@ -16,17 +16,18 @@ type Format
 
 type Outcome
     = Integer { format: Format, value : Int }
+    | FloatingPoint Float
 
 
 type Error
     = NotANumber
     | LeadingZero
+    | TerminatingDot
 
 
 parser : Parser c Error Outcome
 parser =
-    Parser.succeed {}
-        |> Parser.skip (Parser.chompIf (\c -> c == '-' || Char.isDigit c) NotANumber)
+    Parser.chompIf (\c -> c == '-' || Char.isDigit c) NotANumber
         |> Parser.skip (Parser.chompWhile Char.isDigit)
         |> Parser.getChompedString
         |> Parser.andThen
@@ -40,9 +41,27 @@ parser =
                             Parser.problem NotANumber
 
                         Just num ->
-                            { format = Decimal
-                            , value = num
-                            }
-                                |> Integer
-                                |> Parser.succeed
+                            Parser.oneOf
+                                [ Parser.chompIf (\c -> c == '.') NotANumber
+                                    |> Parser.skip (Parser.chompWhile Char.isDigit)
+                                    |> Parser.getChompedString
+                                    |> Parser.andThen
+                                        (\postDot ->
+                                            if postDot == "." then
+                                                Parser.problem TerminatingDot
+
+                                            else
+                                                when String.toFloat (str ++ postDot) is
+                                                    Nothing ->
+                                                        Parser.problem NotANumber
+
+                                                    Just float ->
+                                                        Parser.succeed (FloatingPoint float)
+                                        )
+                                , Parser.succeed <|
+                                    Integer
+                                        { format = Decimal
+                                        , value = num
+                                        }
+                                ]
             )
