@@ -106,9 +106,9 @@ findSourceFiles fsPerm outline outlinePath =
     in
     Array.map (\srcDir -> Path.append srcDir outlinePath) sourceDirs
         |> Array.map (findSourceFilesHelp fsPerm Path.empty)
-        |> Task.sequence
+        |> Task.concurrent
         |> Task.map Array.flatten
-        |> Task.andThen (\paths -> Task.sequence <| Array.map (readSourceFile fsPerm) paths)
+        |> Task.andThen (\paths -> Task.concurrent <| Array.map (readSourceFile fsPerm) paths)
 
 
 findSourceFilesHelp : FileSystem.Permission -> Path -> Path -> Task FileSystem.Error (Array { absolute : Path, relative : Path })
@@ -137,7 +137,7 @@ findSourceFilesHelp fsPerm local root =
                                 _ ->
                                     Nothing
                         )
-                    |> Task.sequence
+                    |> Task.concurrent
                     |> Task.map Array.flatten
             )
 
