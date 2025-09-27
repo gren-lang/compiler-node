@@ -14,10 +14,34 @@ tests =
             [ fuzz Fuzz.int "Can parse regular integers" <| \int ->
                 run (String.fromInt int)
                     |> Expect.equal (Ok (PN.Integer { format = PN.Decimal, value = int }))
+            , test "empty string fails" <| \{} ->
+                run ""
+                    |> expectErr PN.NotANumber
+            , test "leading 0 fails" <| \{} ->
+                run "012"
+                    |> expectErr PN.LeadingZero
+            , test "leading negative 0 fails" <| \{} ->
+                run "-012"
+                    |> expectErr PN.LeadingZero
             ]
         ]
 
 
-run : String -> Result (Array (Parser.DeadEnd c {})) PN.Outcome
+run : String -> Result (Array (Parser.DeadEnd c PN.Error)) PN.Outcome
 run str =
     Parser.run PN.parser str
+
+
+expectErr : PN.Error -> Result (Array (Parser.DeadEnd c PN.Error)) PN.Outcome -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."

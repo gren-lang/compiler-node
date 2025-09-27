@@ -1,4 +1,9 @@
-module Parse.Number exposing (Format (..), Outcome (..), parser)
+module Parse.Number exposing
+    ( Format (..)
+    , Outcome (..)
+    , Error (..)
+    , parser
+    )
 
 
 import Parser.Advanced as Parser exposing (Parser)
@@ -13,6 +18,31 @@ type Outcome
     = Integer { format: Format, value : Int }
 
 
-parser : Parser c {} Outcome
+type Error
+    = NotANumber
+    | LeadingZero
+
+
+parser : Parser c Error Outcome
 parser =
-    Parser.succeed (Integer { format = Decimal, value = 0 })
+    Parser.succeed {}
+        |> Parser.skip (Parser.chompIf (\c -> c == '-' || Char.isDigit c) NotANumber)
+        |> Parser.skip (Parser.chompWhile Char.isDigit)
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\str ->
+                if String.count str > 1 && (String.startsWith "0" str || String.startsWith "-0" str) then
+                    Parser.problem LeadingZero
+
+                else
+                    when String.toInt str is
+                        Nothing ->
+                            Parser.problem NotANumber
+
+                        Just num ->
+                            { format = Decimal
+                            , value = num
+                            }
+                                |> Integer
+                                |> Parser.succeed
+            )
