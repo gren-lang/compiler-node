@@ -1,0 +1,23 @@
+module Test.Parse.Number exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Fuzz exposing (Fuzzer)
+import Parser.Advanced as Parser
+import Parse.Number as PN
+
+
+tests : Test
+tests =
+    describe "Parse.Number"
+        [ describe "Integers"
+            [ fuzz Fuzz.int "Can parse regular integers" <| \int ->
+                run (String.fromInt int)
+                    |> Expect.equal (Ok (PN.Integer { format = PN.Decimal, value = int }))
+            ]
+        ]
+
+
+run : String -> Result (Array (Parser.DeadEnd c {})) PN.Outcome
+run str =
+    Parser.run PN.parser str

@@ -1,0 +1,18 @@
+module Parse.Number exposing (Format (..), Outcome (..), parser)
+
+
+import Parser.Advanced as Parser exposing (Parser)
+
+
+type Format
+    = Decimal
+    | Hex
+
+
+type Outcome
+    = Integer { format: Format, value : Int }
+
+
+parser : Parser c {} Outcome
+parser =
+    Parser.succeed (Integer { format = Decimal, value = 0 })
