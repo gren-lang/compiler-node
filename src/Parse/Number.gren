@@ -1,6 +1,5 @@
 module Parse.Number exposing
-    ( Format (..)
-    , Outcome (..)
+    ( Outcome (..)
     , Error (..)
     , parser
     )
@@ -9,14 +8,10 @@ module Parse.Number exposing
 import Parser.Advanced as Parser exposing (Parser)
 
 
-type Format
-    = Decimal
-    | Hex
-
-
 type Outcome
-    = Integer { format: Format, value : Int }
+    = Integer Int
     | FloatingPoint Float
+    | Hex Int
 
 
 type Error
@@ -27,15 +22,59 @@ type Error
 
 parser : Parser c Error Outcome
 parser =
-    Parser.chompIf (\c -> c == '-' || Char.isDigit c) NotANumber
-        |> Parser.skip (Parser.chompWhile Char.isDigit)
-        |> Parser.getChompedString
-        |> Parser.andThen
-            (\str ->
-                if String.count str > 1 && (String.startsWith "0" str || String.startsWith "-0" str) then
-                    Parser.problem LeadingZero
+    Parser.oneOf
+        [ Parser.succeed
+            (\outcome ->
+                when outcome is
+                    Integer int ->
+                        Integer (negate int)
 
-                else
+                    FloatingPoint float ->
+                        FloatingPoint (negate float)
+
+                    Hex hex ->
+                        Hex (negate hex)
+            )
+            |> Parser.skip (Parser.symbol negateSign)
+            |> Parser.keep numParser
+        , numParser
+        ]
+        |> Parser.andThen
+            (\successCase ->
+                Parser.oneOf
+                    [ Parser.chompIf Char.isAlpha NotANumber
+                        |> Parser.andThen (\_ -> Parser.problem NotANumber)
+                    , Parser.succeed successCase
+                    ]
+            )
+
+
+negateSign : Parser.Token Error
+negateSign =
+    Parser.Token { str = "-", expecting = NotANumber }
+
+
+numParser : Parser c Error Outcome
+numParser =
+    Parser.oneOf
+        [ Parser.chompIf (\c -> c == '0') NotANumber
+            |> Parser.andThen
+                (\_ ->
+                    Parser.oneOf
+                        [ Parser.chompIf (\c -> c == 'x') NotANumber
+                            |> Parser.andThen (\_ -> Parser.succeed (Hex 0))
+                        , Parser.chompIf (\c -> c == '.') NotANumber
+                            |> Parser.andThen (\_ -> fractalParser "0")
+                        , Parser.chompIf Char.isDigit NotANumber
+                            |> Parser.andThen (\_ -> Parser.problem LeadingZero)
+                        , Parser.succeed (Integer 0)
+                        ]
+                )
+        , Parser.chompIf Char.isDigit NotANumber
+            |> Parser.skip (Parser.chompWhile Char.isDigit)
+            |> Parser.getChompedString
+            |> Parser.andThen
+                (\str ->
                     when String.toInt str is
                         Nothing ->
                             Parser.problem NotANumber
@@ -43,25 +82,24 @@ parser =
                         Just num ->
                             Parser.oneOf
                                 [ Parser.chompIf (\c -> c == '.') NotANumber
-                                    |> Parser.skip (Parser.chompWhile Char.isDigit)
-                                    |> Parser.getChompedString
-                                    |> Parser.andThen
-                                        (\postDot ->
-                                            if postDot == "." then
-                                                Parser.problem TerminatingDot
-
-                                            else
-                                                when String.toFloat (str ++ postDot) is
-                                                    Nothing ->
-                                                        Parser.problem NotANumber
-
-                                                    Just float ->
-                                                        Parser.succeed (FloatingPoint float)
-                                        )
-                                , Parser.succeed <|
-                                    Integer
-                                        { format = Decimal
-                                        , value = num
-                                        }
+                                    |> Parser.andThen (\_ -> fractalParser str)
+                                , Parser.succeed (Integer num)
                                 ]
+                )
+        ]
+
+
+fractalParser : String -> Parser c Error Outcome
+fractalParser str =
+    Parser.chompIf Char.isDigit TerminatingDot
+        |> Parser.skip (Parser.chompWhile Char.isDigit)
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\postDot ->
+                when String.toFloat (str ++ "." ++ postDot) is
+                    Nothing ->
+                        Parser.problem NotANumber
+
+                    Just float ->
+                        Parser.succeed (FloatingPoint float)
             )

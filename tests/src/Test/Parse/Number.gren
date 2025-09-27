@@ -13,7 +13,7 @@ tests =
         [ describe "Integers"
             [ fuzz Fuzz.int "Can parse regular integers" <| \int ->
                 run (String.fromInt int)
-                    |> Expect.equal (Ok (PN.Integer { format = PN.Decimal, value = int }))
+                    |> Expect.equal (Ok (PN.Integer int))
             , test "empty string fails" <| \{} ->
                 run ""
                     |> expectErr PN.NotANumber
@@ -23,6 +23,9 @@ tests =
             , test "leading negative 0 fails" <| \{} ->
                 run "-012"
                     |> expectErr PN.LeadingZero
+            , test "when followed by letter, it fails" <| \{} ->
+                run "123a"
+                    |> expectErr PN.NotANumber
             ]
         , describe "Floats"
             [ fuzz (Fuzz.floatRange 0 32000) "Can parse regular floats" <| \float ->
@@ -30,7 +33,7 @@ tests =
                     |> Result.map
                         (\outcome ->
                             when outcome is
-                                PN.Integer { value } -> 
+                                PN.Integer value -> 
                                     PN.FloatingPoint (toFloat value)
 
                                 _ ->
@@ -40,6 +43,14 @@ tests =
             , test "Requires a number after ." <| \{} ->
                 run "0."
                     |> expectErr PN.TerminatingDot
+            , test "when followed by letter, it fails" <| \{} ->
+                run "0.15a"
+                    |> expectErr PN.NotANumber
+            ]
+        , describe "Hex"
+            [ test "Can parse hex" <| \{} ->
+                run "0xAFFE"
+                    |> Expect.equal (Ok (PN.Hex 45054))
             ]
         ]
 
