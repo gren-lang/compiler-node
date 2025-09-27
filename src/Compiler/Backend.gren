@@ -1,7 +1,5 @@
 module Compiler.Backend exposing 
-    ( version
-    --
-    , Command(..)
+    ( Command(..)
     , ReplFlags
     , MakeFlags
     , MakeOutput(..)
@@ -47,19 +45,6 @@ import HttpClient
 import Process
 
 
-{-| Version of the compiler blob. This might not match the version of the Gren compiler as a whole,
-as the Haskell- and Gren-parts are versioned seperatly.
--}
-version : String
-version =
-    -- TODO: Let's get rid of this.
-    -- We're already planning to keep backend and frontend releases in sync moving forward
-    "0.6.3"
-
-
--- Binary
-
-
 {-| Type used to signal that the given platform isn't supported. Meaning that there doesn't exist
 a pre-built compiler blob.
 -}
@@ -70,8 +55,8 @@ type UnsupportedPlatform
 {-| Construct a URL from which you can download a compiler blob compatible with the given
 platform and cpu architecture.
 -}
-downloadUrl : Node.Platform -> Node.CpuArchitecture -> Result UnsupportedPlatform String
-downloadUrl platform cpuArch =
+downloadUrl : SemanticVersion -> Node.Platform -> Node.CpuArchitecture -> Result UnsupportedPlatform String
+downloadUrl version platform cpuArch =
     let
         maybeFilename =
             when { platform = platform, cpuArch = cpuArch } is
@@ -95,7 +80,7 @@ downloadUrl platform cpuArch =
             Ok <|
                 String.join "/"
                     [ "https://github.com/gren-lang/compiler/releases/download"
-                    , version
+                    , SemanticVersion.toString version
                     , filename
                     ]
 
