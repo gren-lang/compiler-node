@@ -17,7 +17,8 @@ type Outcome
 type Error
     = NotANumber
     | LeadingZero
-    | TerminatingDot
+    | ExpectedInt
+    | ExpectedHex
 
 
 parser : Parser c Error Outcome
@@ -62,7 +63,7 @@ numParser =
                 (\_ ->
                     Parser.oneOf
                         [ Parser.chompIf (\c -> c == 'x') NotANumber
-                            |> Parser.andThen (\_ -> Parser.succeed (Hex 0))
+                            |> Parser.andThen (\_ -> hexParser)
                         , Parser.chompIf (\c -> c == '.') NotANumber
                             |> Parser.andThen (\_ -> fractalParser "0")
                         , Parser.chompIf Char.isDigit NotANumber
@@ -91,7 +92,7 @@ numParser =
 
 fractalParser : String -> Parser c Error Outcome
 fractalParser str =
-    Parser.chompIf Char.isDigit TerminatingDot
+    Parser.chompIf Char.isDigit ExpectedInt
         |> Parser.skip (Parser.chompWhile Char.isDigit)
         |> Parser.getChompedString
         |> Parser.andThen
@@ -103,3 +104,37 @@ fractalParser str =
                     Just float ->
                         Parser.succeed (FloatingPoint float)
             )
+
+hexParser : Parser c Error Outcome
+hexParser =
+    Parser.chompIf Char.isHexDigit ExpectedHex
+        |> Parser.skip (Parser.chompWhile Char.isHexDigit)
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\hexString ->
+                String.foldl hexFolder 0 hexString
+                    |> Hex
+                    |> Parser.succeed
+            )
+
+
+hexFolder : Char -> Int -> Int
+hexFolder char acc =
+    let
+        charCode =
+            Char.toCode char
+    in
+    if charCode >= 48 && charCode <= 57 then
+        -- 0-9
+        16 * acc + charCode - 48
+
+    else if charCode >= 65 && charCode <= 70 then
+        -- A-F
+        16 * acc + 10 + charCode - 65
+
+    else if charCode >= 97 && charCode <= 102 then
+        -- a-f
+        16 * acc + 10 + charCode - 97
+
+    else
+        acc

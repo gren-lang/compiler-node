@@ -42,7 +42,7 @@ tests =
                     |> Expect.equal (Ok (PN.FloatingPoint float))
             , test "Requires a number after ." <| \{} ->
                 run "0."
-                    |> expectErr PN.TerminatingDot
+                    |> expectErr PN.ExpectedInt
             , test "when followed by letter, it fails" <| \{} ->
                 run "0.15a"
                     |> expectErr PN.NotANumber
@@ -51,6 +51,12 @@ tests =
             [ test "Can parse hex" <| \{} ->
                 run "0xAFFE"
                     |> Expect.equal (Ok (PN.Hex 45054))
+            , test "Requires a hex digit after 0x" <| \{} ->
+                run "0x"
+                    |> expectErr PN.ExpectedHex
+            , test "When followed by illegal character, it fails" <| \{} ->
+                run "0xABZ"
+                    |> expectErr PN.NotANumber
             ]
         ]
 
