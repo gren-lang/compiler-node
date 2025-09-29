@@ -12,7 +12,8 @@
             "gren-lang/compiler-node": "local:.."
         },
         "indirect": {
-            "gren-lang/url": "6.0.0"
+            "gren-lang/url": "6.0.0",
+            "gren-lang/parser": "6.1.0"
         }
     }
 }
