@@ -1,0 +1,36 @@
+module Test.Parse.String exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Fuzz exposing (Fuzzer)
+import Parser.Advanced as Parser
+import Parse.String as PS
+
+
+tests : Test
+tests =
+    describe "Parse.String"
+        [ describe "Characters"
+            [ fuzz Fuzz.char "Can parse unicode chars" <| \char ->
+                Parser.run PS.char ("\'" ++ String.fromChar char ++ "\'")
+                    |> Expect.equal (Ok char)
+            , test "There is no such thing as an empty char" <| \{} ->
+                Parser.run PS.char "\'\'"
+                    |> expectCharErr PS.ExpectedQuote
+            ]
+        ]
+
+
+expectCharErr : PS.Error -> Result (Array (Parser.DeadEnd c PS.Error)) Char -> Expectation
+expectCharErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."

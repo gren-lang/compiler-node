@@ -18,6 +18,7 @@
         "Compiler.License",
         "FileSystem.Lock",
         "Parse.Number",
+        "Parse.String",
         "SemanticVersion",
         "SemanticVersionRange",
         "String.EditDistance"

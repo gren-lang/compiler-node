@@ -1,0 +1,37 @@
+module Parse.String exposing
+    ( Error (..)
+    , char
+    )
+
+
+import Parser.Advanced as Parser exposing (Parser)
+
+
+type Error
+    = ExpectedQuote
+    | ExpectedChar
+
+
+char : Parser c Error Char
+char =
+    Parser.succeed identity
+        |> Parser.skip (Parser.symbol charQuote)
+        |> Parser.keep
+            (Parser.chompIf (\_ -> True) ExpectedChar
+                |> Parser.getChompedString
+                |> Parser.andThen
+                    (\str ->
+                        when String.popFirst str is
+                            Nothing ->
+                                Parser.problem ExpectedChar
+
+                            Just { first = c } ->
+                                Parser.succeed c
+                    )
+            )
+        |> Parser.skip (Parser.symbol charQuote)
+
+
+charQuote : Parser.Token Error
+charQuote =
+    Parser.Token { str = "\'", expecting = ExpectedQuote }
