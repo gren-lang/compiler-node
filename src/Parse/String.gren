@@ -1,6 +1,7 @@
 module Parse.String exposing
     ( Error (..)
     , char
+    , string
     )
 
 
@@ -21,60 +22,63 @@ char : Parser c Error Char
 char =
     Parser.succeed identity
         |> Parser.skip (Parser.symbol charQuote)
-        |> Parser.keep
-            (Parser.oneOf
-                [ Parser.chompIf (\c -> c == '\\') ExpectedChar
-                    |> Parser.andThen
-                        (\_ ->
-                            Parser.oneOf
-                                [ Parser.chompIf (\c -> c == 'n') ExpectedChar
-                                    |> Parser.map (\_ -> '\n')
-                                , Parser.chompIf (\c -> c == 'r') ExpectedChar
-                                    |> Parser.map (\_ -> '\r')
-                                , Parser.chompIf (\c -> c == 't') ExpectedChar
-                                    |> Parser.map (\_ -> '\t')
-                                , Parser.chompIf (\c -> c == '\\') ExpectedChar
-                                    |> Parser.map (\_ -> '\\')
-                                , Parser.chompIf (\c -> c == '\'') ExpectedChar
-                                    |> Parser.map (\_ -> '\'')
-                                , Parser.chompIf (\c -> c == '\"') ExpectedChar
-                                    |> Parser.map (\_ -> '\"')
-                                , Parser.succeed identity
-                                    |> Parser.skip (Parser.symbol unicodeOpening)
-                                    |> Parser.keep (Number.hexParser ExpectedValidUnicode)
-                                    |> Parser.skip (Parser.chompIf (\c -> c == '}') ExpectedUnicodeClosing)
-                                    |> Parser.andThen
-                                        (\num ->
-                                            let
-                                                character =
-                                                    Char.fromCode num
-                                            in
-                                            -- Check if char is valid (replacement character)
-                                            if character == '\u{FFFD}' then
-                                                Parser.problem ExpectedValidUnicode
-
-                                            else
-                                                Parser.succeed character
-                                        )
-                                , Parser.chompIf (\_ -> True)  ExpectedChar
-                                    |> Parser.getChompedString
-                                    |> Parser.andThen (Parser.problem << ExpectedEscapeChar)
-                                ]
-                        )
-                , Parser.chompIf (\_ -> True) ExpectedChar
-                    |> Parser.getChompedString
-                    |> Parser.andThen
-                        (\str ->
-                            when String.popFirst str is
-                                Nothing ->
-                                    Parser.problem ExpectedChar
-
-                                Just { first = c } ->
-                                    Parser.succeed c
-                        )
-                ]
-            )
+        |> Parser.keep coreParser
         |> Parser.skip (Parser.symbol charQuote)
+
+
+coreParser : Parser c Error Char
+coreParser =
+    Parser.oneOf
+        [ Parser.chompIf (\c -> c == '\\') ExpectedChar
+            |> Parser.andThen
+                (\_ ->
+                    Parser.oneOf
+                        [ Parser.chompIf (\c -> c == 'n') ExpectedChar
+                            |> Parser.map (\_ -> '\n')
+                        , Parser.chompIf (\c -> c == 'r') ExpectedChar
+                            |> Parser.map (\_ -> '\r')
+                        , Parser.chompIf (\c -> c == 't') ExpectedChar
+                            |> Parser.map (\_ -> '\t')
+                        , Parser.chompIf (\c -> c == '\\') ExpectedChar
+                            |> Parser.map (\_ -> '\\')
+                        , Parser.chompIf (\c -> c == '\'') ExpectedChar
+                            |> Parser.map (\_ -> '\'')
+                        , Parser.chompIf (\c -> c == '\"') ExpectedChar
+                            |> Parser.map (\_ -> '\"')
+                        , Parser.succeed identity
+                            |> Parser.skip (Parser.symbol unicodeOpening)
+                            |> Parser.keep (Number.hexParser ExpectedValidUnicode)
+                            |> Parser.skip (Parser.chompIf (\c -> c == '}') ExpectedUnicodeClosing)
+                            |> Parser.andThen
+                                (\num ->
+                                    let
+                                        character =
+                                            Char.fromCode num
+                                    in
+                                    -- Check if char is valid (replacement character)
+                                    if character == '\u{FFFD}' then
+                                        Parser.problem ExpectedValidUnicode
+
+                                    else
+                                        Parser.succeed character
+                                )
+                        , Parser.chompIf (\_ -> True)  ExpectedChar
+                            |> Parser.getChompedString
+                            |> Parser.andThen (Parser.problem << ExpectedEscapeChar)
+                        ]
+                )
+        , Parser.chompIf (\_ -> True) ExpectedChar
+            |> Parser.getChompedString
+            |> Parser.andThen
+                (\str ->
+                    when String.popFirst str is
+                        Nothing ->
+                            Parser.problem ExpectedChar
+
+                        Just { first = c } ->
+                            Parser.succeed c
+                )
+        ]
 
 
 charQuote : Parser.Token Error
@@ -82,6 +86,30 @@ charQuote =
     Parser.Token { str = "\'", expecting = ExpectedQuote }
 
 
+strQuote : Parser.Token Error
+strQuote =
+    Parser.Token { str = "\"", expecting = ExpectedQuote }
+
+
 unicodeOpening : Parser.Token Error
 unicodeOpening =
     Parser.Token { str = "u{", expecting = ExpectedUnicodeOpening }
+
+
+
+string : Parser c Error String
+string =
+    Parser.succeed identity
+        |> Parser.skip (Parser.symbol strQuote)
+        |> Parser.keep (Parser.loop "" stringHelp)
+
+
+stringHelp : String -> Parser c Error (Parser.Step String String)
+stringHelp str =
+    Parser.oneOf
+        [ Parser.succeed {}
+            |> Parser.skip (Parser.symbol strQuote)
+            |> Parser.map (\_ -> Parser.Done str)
+        , Parser.succeed (\chr -> Parser.Loop (String.pushLast chr str))
+            |> Parser.keep coreParser
+        ]

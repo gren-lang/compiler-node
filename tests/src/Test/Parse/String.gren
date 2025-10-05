@@ -56,6 +56,14 @@ tests =
                 Parser.run PS.char "\'\\a\'"
                     |> expectCharErr (PS.ExpectedEscapeChar "a")
             ]
+        , describe "Strings"
+            [ test "Example" <| \_ ->
+                Parser.run PS.string "\"this is a \\\" Test -String_\""
+                    |> Expect.equal (Ok "this is a \" Test -String_")
+            , test "Example with surrogate pair" <| \_ ->
+                Parser.run PS.string "\"this is a \\\" Test 𤭢 -String_\""
+                    |> Expect.equal (Ok "this is a \" Test 𤭢 -String_")
+            ]
         ]
 
 
