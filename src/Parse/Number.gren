@@ -2,6 +2,7 @@ module Parse.Number exposing
     ( Outcome (..)
     , Error (..)
     , parser
+    , hexParser
     )
 
 
@@ -63,7 +64,8 @@ numParser =
                 (\_ ->
                     Parser.oneOf
                         [ Parser.chompIf (\c -> c == 'x') NotANumber
-                            |> Parser.andThen (\_ -> hexParser)
+                            |> Parser.andThen (\_ -> hexParser ExpectedHex)
+                            |> Parser.map Hex
                         , Parser.chompIf (\c -> c == '.') NotANumber
                             |> Parser.andThen (\_ -> fractalParser "0")
                         , Parser.chompIf Char.isDigit NotANumber
@@ -105,15 +107,14 @@ fractalParser str =
                         Parser.succeed (FloatingPoint float)
             )
 
-hexParser : Parser c Error Outcome
-hexParser =
-    Parser.chompIf Char.isHexDigit ExpectedHex
+hexParser : error -> Parser c error Int
+hexParser err =
+    Parser.chompIf Char.isHexDigit err
         |> Parser.skip (Parser.chompWhile Char.isHexDigit)
         |> Parser.getChompedString
         |> Parser.andThen
             (\hexString ->
                 String.foldl hexFolder 0 hexString
-                    |> Hex
                     |> Parser.succeed
             )
 

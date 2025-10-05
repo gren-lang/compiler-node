@@ -5,11 +5,16 @@ module Parse.String exposing
 
 
 import Parser.Advanced as Parser exposing (Parser)
+import Parse.Number as Number
 
 
 type Error
     = ExpectedQuote
     | ExpectedChar
+    | ExpectedEscapeChar String
+    | ExpectedUnicodeOpening
+    | ExpectedValidUnicode
+    | ExpectedUnicodeClosing
 
 
 char : Parser c Error Char
@@ -17,17 +22,57 @@ char =
     Parser.succeed identity
         |> Parser.skip (Parser.symbol charQuote)
         |> Parser.keep
-            (Parser.chompIf (\_ -> True) ExpectedChar
-                |> Parser.getChompedString
-                |> Parser.andThen
-                    (\str ->
-                        when String.popFirst str is
-                            Nothing ->
-                                Parser.problem ExpectedChar
+            (Parser.oneOf
+                [ Parser.chompIf (\c -> c == '\\') ExpectedChar
+                    |> Parser.andThen
+                        (\_ ->
+                            Parser.oneOf
+                                [ Parser.chompIf (\c -> c == 'n') ExpectedChar
+                                    |> Parser.map (\_ -> '\n')
+                                , Parser.chompIf (\c -> c == 'r') ExpectedChar
+                                    |> Parser.map (\_ -> '\r')
+                                , Parser.chompIf (\c -> c == 't') ExpectedChar
+                                    |> Parser.map (\_ -> '\t')
+                                , Parser.chompIf (\c -> c == '\\') ExpectedChar
+                                    |> Parser.map (\_ -> '\\')
+                                , Parser.chompIf (\c -> c == '\'') ExpectedChar
+                                    |> Parser.map (\_ -> '\'')
+                                , Parser.chompIf (\c -> c == '\"') ExpectedChar
+                                    |> Parser.map (\_ -> '\"')
+                                , Parser.succeed identity
+                                    |> Parser.skip (Parser.symbol unicodeOpening)
+                                    |> Parser.keep (Number.hexParser ExpectedValidUnicode)
+                                    |> Parser.skip (Parser.chompIf (\c -> c == '}') ExpectedUnicodeClosing)
+                                    |> Parser.andThen
+                                        (\num ->
+                                            let
+                                                character =
+                                                    Char.fromCode num
+                                            in
+                                            -- Check if char is valid (replacement character)
+                                            if character == '\u{FFFD}' then
+                                                Parser.problem ExpectedValidUnicode
 
-                            Just { first = c } ->
-                                Parser.succeed c
-                    )
+                                            else
+                                                Parser.succeed character
+                                        )
+                                , Parser.chompIf (\_ -> True)  ExpectedChar
+                                    |> Parser.getChompedString
+                                    |> Parser.andThen (Parser.problem << ExpectedEscapeChar)
+                                ]
+                        )
+                , Parser.chompIf (\_ -> True) ExpectedChar
+                    |> Parser.getChompedString
+                    |> Parser.andThen
+                        (\str ->
+                            when String.popFirst str is
+                                Nothing ->
+                                    Parser.problem ExpectedChar
+
+                                Just { first = c } ->
+                                    Parser.succeed c
+                        )
+                ]
             )
         |> Parser.skip (Parser.symbol charQuote)
 
@@ -35,3 +80,8 @@ char =
 charQuote : Parser.Token Error
 charQuote =
     Parser.Token { str = "\'", expecting = ExpectedQuote }
+
+
+unicodeOpening : Parser.Token Error
+unicodeOpening =
+    Parser.Token { str = "u{", expecting = ExpectedUnicodeOpening }

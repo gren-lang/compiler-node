@@ -12,11 +12,49 @@ tests =
     describe "Parse.String"
         [ describe "Characters"
             [ fuzz Fuzz.char "Can parse unicode chars" <| \char ->
-                Parser.run PS.char ("\'" ++ String.fromChar char ++ "\'")
+                let
+                    charString =
+                        if char == '\\' then
+                            "\\\\"
+
+                        else
+                            String.fromChar char
+                in
+                Parser.run PS.char ("\'" ++ charString ++ "\'")
                     |> Expect.equal (Ok char)
-            , test "There is no such thing as an empty char" <| \{} ->
+            , test "There is no such thing as an empty char" <| \_ ->
                 Parser.run PS.char "\'\'"
                     |> expectCharErr PS.ExpectedQuote
+            , test "Unicode character requiring surrogate pairs" <| \_ ->
+                let
+                    char = '𐐷'
+                in
+                Parser.run PS.char ("\'" ++ String.fromChar char ++ "\'")
+                    |> Expect.equal (Ok char)
+            , test "Unicode character requiring surrogate pairs, using escape sequence" <| \_ ->
+                Parser.run PS.char ("\'\\u{10437}\'")
+                    |> Expect.equal (Ok '𐐷')
+            , test "Escape newline" <| \_ ->
+                Parser.run PS.char "\'\\n\'"
+                    |> Expect.equal (Ok '\n')
+            , test "Escape return" <| \_ ->
+                Parser.run PS.char "\'\\r\'"
+                    |> Expect.equal (Ok '\r')
+            , test "Escape tab" <| \_ ->
+                Parser.run PS.char "\'\\t\'"
+                    |> Expect.equal (Ok '\t')
+            , test "Escape slash" <| \_ ->
+                Parser.run PS.char "\'\\\\'"
+                    |> Expect.equal (Ok '\\')
+            , test "Escape single quote" <| \_ ->
+                Parser.run PS.char "\'\\\'\'"
+                    |> Expect.equal (Ok '\'')
+            , test "Escape double quote" <| \_ ->
+                Parser.run PS.char "\'\\\"\'"
+                    |> Expect.equal (Ok '\"')
+            , test "Bad escape" <| \_ ->
+                Parser.run PS.char "\'\\a\'"
+                    |> expectCharErr (PS.ExpectedEscapeChar "a")
             ]
         ]
 
