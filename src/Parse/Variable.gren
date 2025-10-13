@@ -1,0 +1,21 @@
+module Parse.Variable exposing
+    ( Error (..)
+    , lowerCase
+    )
+
+
+import Parser.Advanced as Parser exposing (Parser)
+
+
+type Error
+    = NotAVariable
+
+
+lowerCase : Parser c Error String
+lowerCase =
+    Parser.succeed {}
+        |> Parser.skip (Parser.chompIf Char.isLower NotAVariable)
+        |> Parser.skip (Parser.chompWhile Char.isLower)
+        |> Parser.getChompedString
+
+-- NOTE TO SELF: Unicode categories like Lu and Ll can be tested with regex

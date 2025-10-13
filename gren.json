@@ -19,6 +19,7 @@
         "FileSystem.Lock",
         "Parse.Number",
         "Parse.String",
+        "Parse.Variable",
         "SemanticVersion",
         "SemanticVersionRange",
         "String.EditDistance"
