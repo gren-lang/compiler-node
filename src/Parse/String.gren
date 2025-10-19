@@ -16,6 +16,7 @@ type Error
     | ExpectedUnicodeOpening
     | ExpectedValidUnicode
     | ExpectedUnicodeClosing
+    | ExpectedNewline
 
 
 char : Parser c Error Char
@@ -86,9 +87,14 @@ charQuote =
     Parser.Token { str = "\'", expecting = ExpectedQuote }
 
 
-strQuote : Parser.Token Error
-strQuote =
+singleLineStrQuote : Parser.Token Error
+singleLineStrQuote =
     Parser.Token { str = "\"", expecting = ExpectedQuote }
+
+
+multiLineStrQuote : Parser.Token Error
+multiLineStrQuote =
+    Parser.Token { str = "\"\"\"", expecting = ExpectedQuote }
 
 
 unicodeOpening : Parser.Token Error
@@ -96,20 +102,38 @@ unicodeOpening =
     Parser.Token { str = "u{", expecting = ExpectedUnicodeOpening }
 
 
+crlf : Parser.Token Error
+crlf =
+    Parser.Token { str = "\r\n", expecting = ExpectedNewline }
+
 
 string : Parser c Error String
 string =
-    Parser.succeed identity
-        |> Parser.skip (Parser.symbol strQuote)
-        |> Parser.keep (Parser.loop "" stringHelp)
+    Parser.oneOf
+        [ Parser.succeed identity
+            |> Parser.skip (Parser.symbol multiLineStrQuote)
+            |> Parser.skip
+                (Parser.oneOf
+                    [ Parser.chompIf (\c -> c == '\n') ExpectedNewline
+                    , Parser.symbol crlf
+                    ]
+                )
+            |> Parser.keep (Parser.loop "" (innerSingleLineString multiLineStrQuote))
+            |> Parser.map String.trimRight
+        , Parser.succeed identity
+            |> Parser.skip (Parser.symbol singleLineStrQuote)
+            |> Parser.keep (Parser.loop "" (innerSingleLineString singleLineStrQuote))
+        ]
 
 
-stringHelp : String -> Parser c Error (Parser.Step String String)
-stringHelp str =
+innerSingleLineString : Parser.Token Error -> String -> Parser c Error (Parser.Step String String)
+innerSingleLineString endToken str =
     Parser.oneOf
         [ Parser.succeed {}
-            |> Parser.skip (Parser.symbol strQuote)
+            |> Parser.skip (Parser.symbol endToken)
             |> Parser.map (\_ -> Parser.Done str)
+        , Parser.succeed (\_ -> Parser.Loop (String.pushLast '\n' str))
+            |> Parser.keep (Parser.symbol crlf)
         , Parser.succeed (\chr -> Parser.Loop (String.pushLast chr str))
             |> Parser.keep coreParser
         ]

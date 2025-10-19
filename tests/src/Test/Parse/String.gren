@@ -63,6 +63,23 @@ tests =
             , test "Example with surrogate pair" <| \_ ->
                 Parser.run PS.string "\"this is a \\\" Test 𤭢 -String_\""
                     |> Expect.equal (Ok "this is a \" Test 𤭢 -String_")
+            , test "crlf is normalized to lf" <| \_ ->
+                Parser.run PS.string "\"\r\n\""
+                    |> Expect.equal (Ok "\n")
+            ]
+        , describe "Multi-line Strings"
+            [ test "Simple case" <| \_ ->
+                Parser.run PS.string "\"\"\"\nnormal string\"\"\""
+                    |> Expect.equal (Ok "normal string")
+            , test "Simple case with crlf" <| \_ ->
+                Parser.run PS.string "\"\"\"\r\nnormal string\"\"\""
+                    |> Expect.equal (Ok "normal string")
+            , test "crlf works in general" <| \_ ->
+                Parser.run PS.string "\"\"\"\r\nstring \r\n with crlf\"\"\""
+                    |> Expect.equal (Ok "string \n with crlf")
+            , test "Final newline is dropped" <| \_ ->
+                Parser.run PS.string "\"\"\"\nnormal string\n\"\"\""
+                    |> Expect.equal (Ok "normal string")
             ]
         ]
 
