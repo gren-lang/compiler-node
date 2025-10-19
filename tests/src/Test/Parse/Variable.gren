@@ -13,6 +13,47 @@ tests =
             [ test "Simple case" <| \_ ->
                 Parser.run PV.lowerCase "myvar"
                     |> Expect.equal (Ok "myvar")
+            , test "unicode" <| \_ ->
+                Parser.run PV.lowerCase "åberg albert"
+                    |> Expect.equal (Ok "åberg")
+            , test "underscore" <| \_ ->
+                Parser.run PV.lowerCase "my_var"
+                    |> Expect.equal (Ok "my_var")
+            , test "with unicode, upper case, digits and underscore" <| \_ ->
+                Parser.run PV.lowerCase "miN_1_Øse"
+                    |> Expect.equal (Ok "miN_1_Øse")
+            , test "no emojis" <| \_ ->
+                Parser.run PV.lowerCase "hey🫵"
+                    |> Expect.equal (Ok "hey")
+            , test "cannot start with digit" <| \_ ->
+                Parser.run PV.lowerCase "1month"
+                    |> expectErr PV.InvalidCharacter
+            , test "cannot start with upper case" <| \_ ->
+                Parser.run PV.lowerCase "Month"
+                    |> expectErr PV.InvalidCharacter
+            ]
+        , describe "Upper case"
+            [ test "Simple case" <| \_ ->
+                Parser.run PV.upperCase "Myvar"
+                    |> Expect.equal (Ok "Myvar")
+            , test "unicode" <| \_ ->
+                Parser.run PV.upperCase "Åberg albert"
+                    |> Expect.equal (Ok "Åberg")
+            , test "underscore" <| \_ ->
+                Parser.run PV.upperCase "My_var"
+                    |> Expect.equal (Ok "My_var")
+            , test "with unicode, upper case, digits and underscore" <| \_ ->
+                Parser.run PV.upperCase "MiN_1_Øse"
+                    |> Expect.equal (Ok "MiN_1_Øse")
+            , test "no emojis" <| \_ ->
+                Parser.run PV.upperCase "Hey🫵"
+                    |> Expect.equal (Ok "Hey")
+            , test "cannot start with digit" <| \_ ->
+                Parser.run PV.upperCase "1month"
+                    |> expectErr PV.InvalidCharacter
+            , test "cannot start with lower case" <| \_ ->
+                Parser.run PV.upperCase "month"
+                    |> expectErr PV.InvalidCharacter
             ]
         ]
 

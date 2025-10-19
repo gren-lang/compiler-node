@@ -26,7 +26,7 @@
     ],
     "gren-version": "0.6.0 <= v < 0.7.0",
     "dependencies": {
-        "gren-lang/core": "7.2.0 <= v < 8.0.0",
+        "gren-lang/core": "7.2.1 <= v < 8.0.0",
         "gren-lang/node": "6.1.0 <= v < 7.0.0",
         "gren-lang/parser": "6.1.1 <= v < 7.0.0"
     }

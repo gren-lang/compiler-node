@@ -1,21 +1,63 @@
 module Parse.Variable exposing
     ( Error (..)
     , lowerCase
+    , upperCase
     )
 
 
 import Parser.Advanced as Parser exposing (Parser)
+import String.Regex as Regex exposing (Regex)
 
 
 type Error
-    = NotAVariable
+    = InvalidCharacter
 
 
 lowerCase : Parser c Error String
 lowerCase =
+    -- TODO: simply stops parsing at invalid character, in lack of better alternatives
+    -- Revisit this once gren-lang/parser has gotten more flexible
     Parser.succeed {}
-        |> Parser.skip (Parser.chompIf Char.isLower NotAVariable)
-        |> Parser.skip (Parser.chompWhile Char.isLower)
+        |> Parser.skip (Parser.chompIf isLowerCaseLetter InvalidCharacter)
+        |> Parser.skip (Parser.chompWhile isInner)
         |> Parser.getChompedString
 
--- NOTE TO SELF: Unicode categories like Lu and Ll can be tested with regex
+
+upperCase : Parser c Error String
+upperCase =
+    Parser.succeed {}
+        |> Parser.skip (Parser.chompIf isUpperCaseLetter InvalidCharacter)
+        |> Parser.skip (Parser.chompWhile isInner)
+        |> Parser.getChompedString
+
+
+lowerCaseLetterRegex : Regex
+lowerCaseLetterRegex =
+    Regex.fromString "\\p{Ll}"
+        |> Maybe.withDefault Regex.never
+
+
+isLowerCaseLetter : Char -> Bool
+isLowerCaseLetter char =
+    String.fromChar char
+        |> Regex.contains lowerCaseLetterRegex
+
+
+upperCaseLetterRegex : Regex
+upperCaseLetterRegex =
+    Regex.fromString "\\p{Lu}"
+        |> Maybe.withDefault Regex.never
+
+
+isUpperCaseLetter : Char -> Bool
+isUpperCaseLetter char =
+    String.fromChar char
+        |> Regex.contains upperCaseLetterRegex
+
+
+isInner : Char -> Bool
+isInner char =
+    Char.isAlphaNum char
+        || char == '_'
+        || isLowerCaseLetter char
+        || isUpperCaseLetter char
