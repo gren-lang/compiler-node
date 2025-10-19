@@ -2,15 +2,18 @@ module Parse.Variable exposing
     ( Error (..)
     , lowerCase
     , upperCase
+    , reservedWords
     )
 
 
 import Parser.Advanced as Parser exposing (Parser)
 import String.Regex as Regex exposing (Regex)
+import Set exposing (Set)
 
 
 type Error
     = InvalidCharacter
+    | ReservedWord String
 
 
 lowerCase : Parser c Error String
@@ -21,6 +24,34 @@ lowerCase =
         |> Parser.skip (Parser.chompIf isLowerCaseLetter InvalidCharacter)
         |> Parser.skip (Parser.chompWhile isInner)
         |> Parser.getChompedString
+        |> Parser.andThen
+            (\word ->
+                if Set.member word reservedWords then
+                    Parser.problem (ReservedWord word)
+
+                else
+                    Parser.succeed word
+            )
+
+
+reservedWords : Set String
+reservedWords =
+    Set.fromArray
+        [ "if"
+        , "then"
+        , "else"
+        , "when"
+        , "is"
+        , "let"
+        , "in"
+        , "type"
+        , "module"
+        , "where"
+        , "import"
+        , "exposing"
+        , "as"
+        , "port"
+        ]
 
 
 upperCase : Parser c Error String

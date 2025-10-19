@@ -4,6 +4,7 @@ import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
 import Parser.Advanced as Parser
 import Parse.Variable as PV
+import Set
 
 
 tests : Test
@@ -31,6 +32,11 @@ tests =
             , test "cannot start with upper case" <| \_ ->
                 Parser.run PV.lowerCase "Month"
                     |> expectErr PV.InvalidCharacter
+            , test "refuses to parse reserved words" <| \_ ->
+                Set.toArray PV.reservedWords
+                    |> Array.map (Parser.run PV.lowerCase)
+                    |> Result.firstOk
+                    |> Expect.equal Nothing
             ]
         , describe "Upper case"
             [ test "Simple case" <| \_ ->
