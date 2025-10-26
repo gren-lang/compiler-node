@@ -17,6 +17,7 @@ type Error
     | ExpectedValidUnicode
     | ExpectedUnicodeClosing
     | ExpectedNewline
+    | MisalignedMultiQuotes
 
 
 char : Parser c Error Char
@@ -110,7 +111,14 @@ crlf =
 string : Parser c Error String
 string =
     Parser.oneOf
-        [ Parser.succeed identity
+        [ Parser.succeed
+            (\startPos str endPos ->
+                { start = startPos
+                , str = String.trimRight str
+                , end = endPos
+                }
+            )
+            |> Parser.keep Parser.getPosition
             |> Parser.skip (Parser.symbol multiLineStrQuote)
             |> Parser.skip
                 (Parser.oneOf
@@ -119,7 +127,41 @@ string =
                     ]
                 )
             |> Parser.keep (Parser.loop "" (innerSingleLineString multiLineStrQuote))
-            |> Parser.map String.trimRight
+            |> Parser.keep Parser.getPosition
+            |> Parser.andThen
+                (\{ start, str, end } ->
+                    if end.col - 3 /= start.col then
+                        Parser.problem MisalignedMultiQuotes
+
+                    else
+                        let
+                            requiredIndent =
+                                start.col - 1
+
+                            lines =
+                                String.split "\n" str
+
+                            linesSufficientlyIndented =
+                                lines
+                                    |> Array.all
+                                        (\line ->
+                                            let
+                                                whiteSpacePortion =
+                                                    String.takeFirst requiredIndent line
+                                            in
+                                            String.count whiteSpacePortion == requiredIndent
+                                                && String.all (\c -> c == ' ') whiteSpacePortion
+                                        )
+                        in
+                        if linesSufficientlyIndented then
+                            lines
+                                |> Array.map (String.dropFirst requiredIndent) 
+                                |> String.join "\n"
+                                |> Parser.succeed
+
+                        else
+                            Parser.problem MisalignedMultiQuotes
+                )
         , Parser.succeed identity
             |> Parser.skip (Parser.symbol singleLineStrQuote)
             |> Parser.keep (Parser.loop "" (innerSingleLineString singleLineStrQuote))
