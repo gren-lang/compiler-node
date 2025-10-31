@@ -13,7 +13,7 @@
         },
         "indirect": {
             "gren-lang/url": "6.0.0",
-            "gren-lang/parser": "6.1.1"
+            "gren-lang/parser": "6.2.0"
         }
     }
 }
