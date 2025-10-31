@@ -1,5 +1,6 @@
 module Parse.Expression exposing
-    ( parser
+    ( Error (..)
+    , parser
     )
 
 
@@ -16,6 +17,7 @@ type Error
     | VariableError Variable.Error
     | NumberError Number.Error
     | StringError String.Error
+    | WildcardAttempt
 
 
 parser : Parser c Error AST.Expression
@@ -43,8 +45,7 @@ term =
         |> Parser.keep Parser.getPosition
         |> Parser.keep
             ( Parser.oneOf
-                [ Variable.lowerCase
-                    |> Parser.mapError VariableError
+                [ lowerCaseVariable
                     |> Parser.map (\name -> AST.Var { name = name, varType = AST.LowVar })
                 , Variable.upperCase
                     |> Parser.mapError VariableError
@@ -58,6 +59,52 @@ term =
                 , String.string
                     |> Parser.mapError StringError
                     |> Parser.map AST.StringLiteral
+                , Parser.succeed AST.Accessor
+                    |> Parser.skip (Parser.chompIf (\c -> c == '.') (ExpectedChar '.'))
+                    |> Parser.keep lowerCaseVariable
+                , Parser.succeed identity
+                    |> Parser.skip (Parser.chompIf (\c -> c == '_') (ExpectedChar '_'))
+                    |> Parser.keep lowerCaseVariable
+                    |> Parser.andThen
+                        (\_ -> Parser.problem WildcardAttempt)
                 ]
             )
         |> Parser.keep Parser.getPosition
+        |> Parser.andThen
+            (\expr ->
+                when expr.value is
+                    AST.Var { varType = AST.LowVar } ->
+                        accessible expr
+
+                    _ ->
+                        Parser.succeed expr
+            )
+
+
+lowerCaseVariable : Parser c Error String
+lowerCaseVariable =
+    Variable.lowerCase
+        |> Parser.mapError VariableError
+
+
+accessible : AST.Expression -> Parser c Error AST.Expression
+accessible currentExpression =
+    Parser.oneOf
+        [ Parser.succeed
+            (\start name end ->
+                SourcePosition.at
+                    start
+                    end
+                    (AST.Access
+                        { accessor = name
+                        , expression = currentExpression
+                        }
+                    )
+            )
+            |> Parser.skip (Parser.chompIf (\c -> c == '.') (ExpectedChar '.'))
+            |> Parser.keep Parser.getPosition
+            |> Parser.keep lowerCaseVariable
+            |> Parser.keep Parser.getPosition
+            |> Parser.andThen accessible
+        , Parser.succeed currentExpression
+        ]

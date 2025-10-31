@@ -67,7 +67,7 @@ type Expression_
   | Accessor String
   | Access
     { expression : Expression
-    , accessor : SourcePosition.Located String
+    , accessor : String
     }
   | Update
     { record : Expression

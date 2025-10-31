@@ -7,6 +7,7 @@ import Parser.Advanced as Parser
 import Parse.Expression as PE
 import Parse.Number as Number
 import AST.Source as AST
+import SourcePosition
 
 
 tests : Test
@@ -43,10 +44,37 @@ tests =
             , test "var name" <| \_ ->
                 Parser.run PE.parser "myvar"
                     |> expectExpression (AST.Var { name = "myvar", varType = AST.LowVar })
+            , test "accessor" <| \_ ->
+                Parser.run PE.parser ".field"
+                    |> expectExpression (AST.Accessor "field")
+            , test "wildcard error" <| \_ ->
+                Parser.run PE.parser "_unused"
+                    |> expectErr PE.WildcardAttempt
+            , test "nested accessors" <| \_ ->
+                Parser.run PE.parser "nested.accessor.expression"
+                    |> expectExpression
+                        (AST.Access
+                            { expression =
+                                { start = { row = 1, col = 8}
+                                , end = { row = 1, col = 16}
+                                , value =
+                                    AST.Access
+                                        { expression =
+                                            { start = { row = 1, col = 1 }
+                                            , end = { row = 1, col = 7 }
+                                            , value = AST.Var { name = "nested", varType = AST.LowVar }
+                                            }
+                                        , accessor = "accessor"
+                                        }
+                                }
+                            , accessor = "expression"
+                            }
+                        )
             ]
         ]
 
 
+expectExpression : a -> Result (Array (Parser.DeadEnd c e)) (SourcePosition.Located a) -> Expectation
 expectExpression expected result =
     when result is
         Err err ->
@@ -54,3 +82,18 @@ expectExpression expected result =
 
         Ok { value } ->
             Expect.equal expected value
+
+
+expectErr : PE.Error -> Result (Array (Parser.DeadEnd c PE.Error)) a -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."
