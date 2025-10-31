@@ -1,17 +1,63 @@
 module Parse.Expression exposing
-    ( run
+    ( parser
     )
 
 
 import Parser.Advanced as Parser exposing (Parser)
 import AST.Source as AST
 import SourcePosition
+import Parse.Number as Number
+import Parse.String as String
+import Parse.Variable as Variable
 
 
 type Error
-    = Error
+    = ExpectedChar Char
+    | VariableError Variable.Error
+    | NumberError Number.Error
+    | StringError String.Error
 
 
-run : Parser c Error AST.Expression
-run =
-    Parser.succeed (SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos (AST.CharLiteral 'a'))
+parser : Parser c Error AST.Expression
+parser =
+    Parser.oneOf
+        [ possiblyNegativeTerm
+        ]
+
+
+possiblyNegativeTerm : Parser c Error AST.Expression
+possiblyNegativeTerm =
+    Parser.oneOf
+        [ Parser.succeed (\start expr end -> SourcePosition.at start end (AST.Negate expr))
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip (Parser.chompIf (\c -> c == '-') (ExpectedChar '-'))
+            |> Parser.keep term
+            |> Parser.keep Parser.getPosition
+        , term
+        ]
+
+
+term : Parser c Error AST.Expression
+term =
+    Parser.succeed (\start expr end -> SourcePosition.at start end expr)
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep
+            ( Parser.oneOf
+                [ Variable.lowerCase
+                    |> Parser.mapError VariableError
+                    |> Parser.map (\name -> AST.Var { name = name, varType = AST.LowVar })
+                , Variable.upperCase
+                    |> Parser.mapError VariableError
+                    |> Parser.map (\name -> AST.Var { name = name, varType = AST.CapVar })
+                , Number.parser
+                    |> Parser.mapError NumberError
+                    |> Parser.map AST.NumberLiteral
+                , String.char
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.CharLiteral
+                , String.string
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.StringLiteral
+                ]
+            )
+        |> Parser.keep Parser.getPosition

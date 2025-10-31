@@ -5,10 +5,52 @@ import Test exposing (Test, describe, test, fuzz)
 import Fuzz exposing (Fuzzer)
 import Parser.Advanced as Parser
 import Parse.Expression as PE
+import Parse.Number as Number
+import AST.Source as AST
 
 
 tests : Test
 tests =
     describe "Parse.Expression"
-        [
+        [ describe "Primitives"
+            [ test "Int" <| \_ ->
+                Parser.run PE.parser "5"
+                    |> expectExpression (AST.NumberLiteral (Number.Integer 5))
+            , test "Negative Int" <| \_ ->
+                Parser.run PE.parser "-15"
+                    |> expectExpression
+                        (AST.Negate
+                            { start = { row = 1, col = 2 }
+                            , end = { row = 1, col = 4 }
+                            , value = AST.NumberLiteral (Number.Integer 15)
+                            }
+                        )
+            , test "Float" <| \_ ->
+                Parser.run PE.parser "3.14"
+                    |> expectExpression (AST.NumberLiteral (Number.FloatingPoint 3.14))
+            , test "Hex" <| \_ ->
+                Parser.run PE.parser "0xDE"
+                    |> expectExpression (AST.NumberLiteral (Number.Hex 0xDE))
+            , test "Char" <| \_ ->
+                Parser.run PE.parser "'z'"
+                    |> expectExpression (AST.CharLiteral 'z')
+            , test "String" <| \_ ->
+                Parser.run PE.parser "\"test\""
+                    |> expectExpression (AST.StringLiteral "test")
+            , test "Ctor" <| \_ ->
+                Parser.run PE.parser "True"
+                    |> expectExpression (AST.Var { name = "True", varType = AST.CapVar })
+            , test "var name" <| \_ ->
+                Parser.run PE.parser "myvar"
+                    |> expectExpression (AST.Var { name = "myvar", varType = AST.LowVar })
+            ]
         ]
+
+
+expectExpression expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok { value } ->
+            Expect.equal expected value

@@ -2,7 +2,7 @@ module SourcePosition exposing
     ( Position
     , emptyPos
     , Region
-    , Located (..)
+    , Located
     , at
     )
 
@@ -27,14 +27,13 @@ type alias Region =
     }
 
 
-type Located a
-    = At
-        { start : Position
-        , end : Position
-        , value : a
-        }
+type alias Located a =
+    { start : Position
+    , end : Position
+    , value : a
+    }
 
 
 at : Position -> Position -> a -> Located a
 at start end a =
-    At { start = start, end = end, value = a }
+    { start = start, end = end, value = a }
