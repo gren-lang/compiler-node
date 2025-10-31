@@ -21,6 +21,7 @@
         "Parse.Expression",
         "Parse.Number",
         "Parse.String",
+        "Parse.Space",
         "Parse.Variable",
         "SemanticVersion",
         "SemanticVersionRange",

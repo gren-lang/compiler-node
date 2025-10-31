@@ -9,6 +9,7 @@ import AST.Source as AST
 import SourcePosition
 import Parse.Number as Number
 import Parse.String as String
+import Parse.Space as Space
 import Parse.Variable as Variable
 
 
@@ -59,6 +60,8 @@ term =
                 , String.string
                     |> Parser.mapError StringError
                     |> Parser.map AST.StringLiteral
+                , arrayParser
+                    |> Parser.map AST.ArrayLiteral
                 , Parser.succeed AST.Accessor
                     |> Parser.skip (Parser.chompIf (\c -> c == '.') (ExpectedChar '.'))
                     |> Parser.keep lowerCaseVariable
@@ -107,4 +110,40 @@ accessible currentExpression =
             |> Parser.keep Parser.getPosition
             |> Parser.andThen accessible
         , Parser.succeed currentExpression
+        ]
+
+
+-- ARRAY
+
+
+arrayParser : Parser c Error (Array AST.Expression)
+arrayParser =
+    Parser.succeed identity
+        |> Parser.skip (Parser.chompIf (\c -> c == '[') (ExpectedChar '['))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed []
+                    |> Parser.skip (Parser.chompIf (\c -> c == ']') (ExpectedChar ']'))
+                , Parser.lazy (\_ -> parser)
+                    |> Parser.andThen
+                        (\firstElement ->
+                            Parser.succeed identity
+                                |> Parser.skip Space.parser
+                                |> Parser.keep (Parser.loop [ firstElement ] innerArrayParser)
+                        )
+                ]
+            )
+
+
+innerArrayParser : Array AST.Expression -> Parser c Error (Parser.Step (Array AST.Expression) (Array AST.Expression))
+innerArrayParser array =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done array)
+            |> Parser.skip (Parser.chompIf (\c -> c == ']') (ExpectedChar ']'))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.skip (Parser.chompIf (\c -> c == ',') (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep (Parser.lazy (\_ -> parser))
+            |> Parser.skip Space.parser
         ]

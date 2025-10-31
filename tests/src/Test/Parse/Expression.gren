@@ -71,6 +71,42 @@ tests =
                             }
                         )
             ]
+        , describe "Array"
+            [ test "Empty array" <| \_ ->
+                Parser.run PE.parser "[]"
+                    |> expectExpression (AST.ArrayLiteral [])
+            , test "Empty array (with whitespace)" <| \_ ->
+                Parser.run PE.parser "[ \n ]"
+                    |> expectExpression (AST.ArrayLiteral [])
+            , test "Singleton" <| \_ ->
+                Parser.run PE.parser "[ 1 ]"
+                    |> expectExpression
+                        (AST.ArrayLiteral
+                            [ { start = { row = 1, col = 3 }
+                              , end = { row = 1, col = 4 }
+                              , value = AST.NumberLiteral (Number.Integer 1)
+                              }
+                            ]
+                        )
+            , test "Multiples" <| \_ ->
+                Parser.run PE.parser "[ \"one\", \"two\", \n \"three\" ]"
+                    |> expectExpression
+                        (AST.ArrayLiteral
+                            [ { start = { row = 1, col = 3 }
+                              , end = { row = 1, col = 8 }
+                              , value = AST.StringLiteral "one"
+                              }
+                            , { start = { row = 1, col = 10 }
+                              , end = { row = 1, col = 15 }
+                              , value = AST.StringLiteral "two"
+                              }
+                            , { start = { row = 2, col = 2 }
+                              , end = { row = 2, col = 9 }
+                              , value = AST.StringLiteral "three"
+                              }
+                            ]
+                        )
+            ]
         ]
 
 
