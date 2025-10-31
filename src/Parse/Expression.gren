@@ -19,6 +19,7 @@ type Error
     | NumberError Number.Error
     | StringError String.Error
     | WildcardAttempt
+    | ExpectedLowerVariable AST.Expression
 
 
 parser : Parser c Error AST.Expression
@@ -62,6 +63,7 @@ term =
                     |> Parser.map AST.StringLiteral
                 , arrayParser
                     |> Parser.map AST.ArrayLiteral
+                , recordParser
                 , Parser.succeed AST.Accessor
                     |> Parser.skip (Parser.chompIf (\c -> c == '.') (ExpectedChar '.'))
                     |> Parser.keep lowerCaseVariable
@@ -145,5 +147,99 @@ innerArrayParser array =
             |> Parser.skip (Parser.chompIf (\c -> c == ',') (ExpectedChar ','))
             |> Parser.skip Space.parser
             |> Parser.keep (Parser.lazy (\_ -> parser))
+            |> Parser.skip Space.parser
+        ]
+
+
+-- RECORD
+
+
+recordParser : Parser c Error AST.Expression_
+recordParser =
+    Parser.succeed identity
+        |> Parser.skip (Parser.chompIf (\c -> c == '{') (ExpectedChar '{'))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed (AST.Record [])
+                    |> Parser.skip (Parser.chompIf (\c -> c == '}') (ExpectedChar '}'))
+                , Parser.succeed identity
+                    |> Parser.keep (Parser.lazy (\_ -> parser))
+                    |> Parser.skip Space.parser
+                    |> Parser.andThen
+                        (\firstVarName ->
+                            Parser.oneOf
+                                [ Parser.succeed identity
+                                    |> Parser.skip (Parser.chompIf (\c -> c == '|') (ExpectedChar '|'))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.keep recordFieldParser
+                                    |> Parser.andThen
+                                        (\firstPair ->
+                                            Parser.succeed
+                                                (\fields ->
+                                                    AST.Update
+                                                        { record = firstVarName
+                                                        , newValues = fields
+                                                        }
+                                                )
+                                                |> Parser.skip Space.parser
+                                                |> Parser.keep (Parser.loop [ firstPair ] innerRecordParser)
+                                        )
+                                , Parser.succeed identity
+                                    |> Parser.skip (Parser.chompIf (\c -> c == '=') (ExpectedChar '='))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.keep (Parser.lazy (\_ -> parser))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.andThen
+                                        (\value ->
+                                            when firstVarName.value is
+                                                AST.Var { name, varType = AST.LowVar } ->
+                                                    let
+                                                        locatedField =
+                                                            SourcePosition.at firstVarName.start firstVarName.end name
+                                                    in
+                                                    Parser.succeed AST.Record
+                                                        |> Parser.skip Space.parser
+                                                        |> Parser.keep
+                                                            (Parser.loop
+                                                                [ { field = locatedField, value = value } ]
+                                                                innerRecordParser
+                                                            )
+
+                                                _ ->
+                                                    Parser.problem (ExpectedLowerVariable firstVarName)
+                                        )
+                                ]
+                        )
+                ]
+            )
+
+
+recordFieldParser : Parser c Error AST.RecordField
+recordFieldParser =
+    Parser.succeed
+        (\fieldStart field fieldEnd value ->
+            { field = SourcePosition.at fieldStart fieldEnd field
+            , value = value
+            }
+        )
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep lowerCaseVariable
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompIf (\c -> c == '=') (ExpectedChar '='))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+
+
+innerRecordParser : Array AST.RecordField -> Parser c Error (Parser.Step (Array AST.RecordField) (Array AST.RecordField))
+innerRecordParser array =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done array)
+            |> Parser.skip (Parser.chompIf (\c -> c == '}') (ExpectedChar '}'))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.skip (Parser.chompIf (\c -> c == ',') (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep recordFieldParser
             |> Parser.skip Space.parser
         ]

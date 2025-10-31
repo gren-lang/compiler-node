@@ -107,6 +107,94 @@ tests =
                             ]
                         )
             ]
+        , describe "Record"
+            [ test "Empty record" <| \_ ->
+                Parser.run PE.parser "{}"
+                    |> expectExpression (AST.Record [])
+            , test "Empty array (with whitespace)" <| \_ ->
+                Parser.run PE.parser "{ \n }"
+                    |> expectExpression (AST.Record [])
+            , test "Singleton" <| \_ ->
+                Parser.run PE.parser "{ field1 = 1 }"
+                    |> expectExpression
+                        (AST.Record
+                            [ { field =
+                                    SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 9 }
+                                        "field1"
+                              , value =
+                                    SourcePosition.at
+                                        { row = 1, col = 12 }
+                                        { row = 1, col = 13 }
+                                        (AST.NumberLiteral (Number.Integer 1))
+                              }
+                            ]
+                        )
+            , test "Multiples" <| \_ ->
+                Parser.run PE.parser "{ field1 = 1, field2 = 10 }"
+                    |> expectExpression
+                        (AST.Record
+                            [ { field =
+                                    SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 9 }
+                                        "field1"
+                              , value =
+                                    SourcePosition.at
+                                        { row = 1, col = 12 }
+                                        { row = 1, col = 13 }
+                                        (AST.NumberLiteral (Number.Integer 1))
+                              }
+                            , { field =
+                                    SourcePosition.at
+                                        { row = 1, col = 15 }
+                                        { row = 1, col = 21 }
+                                        "field2"
+                              , value =
+                                    SourcePosition.at
+                                        { row = 1, col = 24 }
+                                        { row = 1, col = 26 }
+                                        (AST.NumberLiteral (Number.Integer 10))
+                              }
+                            ]
+                        )
+            , test "Update" <| \_ ->
+                Parser.run PE.parser "{ old | field1 = 1, field2 = 10 }"
+                    |> expectExpression
+                        (AST.Update
+                            { record =
+                                SourcePosition.at
+                                    { row = 1, col = 3 }
+                                    { row = 1, col = 6 }
+                                    (AST.Var { name = "old", varType = AST.LowVar })
+                            , newValues =
+                                [ { field =
+                                        SourcePosition.at
+                                            { row = 1, col = 9 }
+                                            { row = 1, col = 15 }
+                                            "field1"
+                                  , value =
+                                        SourcePosition.at
+                                            { row = 1, col = 18 }
+                                            { row = 1, col = 19 }
+                                            (AST.NumberLiteral (Number.Integer 1))
+                                  }
+                                , { field =
+                                        SourcePosition.at
+                                            { row = 1, col = 21 }
+                                            { row = 1, col = 27 }
+                                            "field2"
+                                  , value =
+                                        SourcePosition.at
+                                            { row = 1, col = 30 }
+                                            { row = 1, col = 32 }
+                                            (AST.NumberLiteral (Number.Integer 10))
+                                  }
+                                ]
+                            }
+                        )
+            ]
         ]
 
 
