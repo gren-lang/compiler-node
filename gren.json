@@ -6,6 +6,7 @@
     "license": "BSD-3-Clause",
     "version": "3.0.7",
     "exposed-modules": [
+        "AST.Source",
         "CLI.Parser",
         "CLI.PrettyPrinter",
         "Compiler.Backend",
@@ -17,12 +18,14 @@
         "Compiler.Paths",
         "Compiler.License",
         "FileSystem.Lock",
+        "Parse.Expression",
         "Parse.Number",
         "Parse.String",
         "Parse.Variable",
         "SemanticVersion",
         "SemanticVersionRange",
-        "String.EditDistance"
+        "String.EditDistance",
+        "SourcePosition"
     ],
     "gren-version": "0.6.0 <= v < 0.7.0",
     "dependencies": {

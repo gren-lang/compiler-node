@@ -14,6 +14,7 @@ import Test.String.EditDistance
 import Test.Parse.Number
 import Test.Parse.String
 import Test.Parse.Variable
+import Test.Parse.Expression
 
 
 main : TestRunner.Program
@@ -29,6 +30,7 @@ main =
             , Test.Compiler.ModuleName.tests
             , Test.Compiler.Platform.tests
             , Test.String.EditDistance.tests
+            , Test.Parse.Expression.tests
             , Test.Parse.Number.tests
             , Test.Parse.String.tests
             , Test.Parse.Variable.tests

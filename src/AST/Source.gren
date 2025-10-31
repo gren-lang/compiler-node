@@ -1,0 +1,202 @@
+module AST.Source exposing
+    ( Expression
+    , Expression_ (..)
+    , VarType (..)
+    , BinopsSegment
+    , IfBranch
+    , WhenBranch
+    , RecordField
+    , Def (..)
+    , Pattern
+    , Pattern_ (..)
+    , PRecordField
+    , PRecordField_
+    , Type
+    , Type_
+    , TRecordField
+    )
+
+import SourcePosition
+import Parse.Number as Number
+
+
+type alias Expression =
+    SourcePosition.Located Expression_
+
+
+type Expression_
+  = CharLiteral Char
+  | StringLiteral String
+  | NumberLiteral Number.Outcome
+  | Var
+    { varType : VarType
+    , name : String
+    }
+  | VarQual
+    { varType : VarType
+    , qualifier : String
+    , name : String
+    }
+  | ArrayLiteral (Array Expression)
+  | Operator String
+  | Negate Expression
+  | Binops
+    { segments : Array BinopsSegment
+    , finalExpression : Expression
+    }
+  | Lambda
+    { patterns : Array Pattern
+    , body : Expression
+    }
+  | Call
+    { fn : Expression
+    , args : Array Expression
+    }
+  | Let
+    { defs : Array (SourcePosition.Located Def)
+    , body : Expression
+    }
+  | If
+    { branches : Array IfBranch
+    , elseBranch : Expression
+    }
+  | When
+    { expression : Expression
+    , branches : Array WhenBranch
+    }
+  | Accessor String
+  | Access
+    { expression : Expression
+    , accessor : SourcePosition.Located String
+    }
+  | Update
+    { record : Expression
+    , newValues : Array RecordField
+    }
+  | Record (Array RecordField)
+  | Parens Expression
+
+
+type VarType
+    = LowVar
+    | CapVar
+
+
+type alias BinopsSegment =
+    { leadingExpression : Expression
+    , operatorName : SourcePosition.Located String
+    }
+
+
+type alias IfBranch =
+    { test : Expression
+    , body : Expression
+    }
+
+
+type alias WhenBranch =
+    { pattern : Pattern
+    , body : Expression
+    }
+
+
+type alias RecordField =
+    { field : SourcePosition.Located String
+    , value : Expression
+    }
+
+
+-- DEFINITIONS
+
+
+type Def
+  = Define
+    { name : SourcePosition.Located String
+    , args : Array Pattern
+    , body : Expression
+    , typeSignature : Maybe Type
+    }
+  | Destruct
+    { pattern : Pattern
+    , expression : Expression
+    }
+
+
+-- PATTERN
+
+
+type alias Pattern
+    = SourcePosition.Located Pattern_
+
+
+type Pattern_
+  = PAnything String
+  | PVar String
+  | PRecord (Array PRecordField)
+  | PAlias
+    { pattern : Pattern
+    , name : SourcePosition.Located String
+    }
+  | PCtor
+    { var : SourcePosition.Located String
+    , associatedData : Maybe Pattern
+    }
+  | PCtorQual
+    { varRegion : SourcePosition.Region
+    , qualifier : String
+    , name : String
+    , associatedData : Maybe Pattern
+    }
+  | PArray (Array Pattern)
+  | PChr Char
+  | PStr String
+  | PInt
+    { value : Int
+    , isHex : Bool
+    }
+
+
+type alias PRecordField
+    = SourcePosition.Located PRecordField_
+
+
+type alias PRecordField_ =
+    { field : SourcePosition.Located String
+    , pattern : Pattern
+    }
+
+
+-- TYPE
+
+
+type alias Type =
+    SourcePosition.Located Type_
+
+
+type Type_
+  = TLambda
+    { from : Type
+    , to : Type
+    }
+  | TVar String
+  | TType
+    { name : SourcePosition.Located String
+    , args : Array Type
+    }
+  | TTypeQual
+    { varRegion : SourcePosition.Region
+    , qualifier : String
+    , name : String
+    , args : Array Type
+    }
+  | TRecord
+    { fields : Array TRecordField
+    , extending : Maybe (SourcePosition.Located String)
+    }
+  | TParens Type
+
+
+type alias TRecordField =
+    { field : SourcePosition.Located String
+    , signature : Type
+    }

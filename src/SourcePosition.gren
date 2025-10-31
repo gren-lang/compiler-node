@@ -1,0 +1,40 @@
+module SourcePosition exposing
+    ( Position
+    , emptyPos
+    , Region
+    , Located (..)
+    , at
+    )
+
+
+type alias Position =
+    { row : Int
+    , col : Int
+    }
+
+
+emptyPos : Position
+emptyPos =
+    -- matches initial values of parser position
+    { row = 1
+    , col = 1
+    }
+
+
+type alias Region =
+    { start : Position
+    , end : Position
+    }
+
+
+type Located a
+    = At
+        { start : Position
+        , end : Position
+        , value : a
+        }
+
+
+at : Position -> Position -> a -> Located a
+at start end a =
+    At { start = start, end = end, value = a }

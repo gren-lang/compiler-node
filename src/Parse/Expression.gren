@@ -1,0 +1,17 @@
+module Parse.Expression exposing
+    ( run
+    )
+
+
+import Parser.Advanced as Parser exposing (Parser)
+import AST.Source as AST
+import SourcePosition
+
+
+type Error
+    = Error
+
+
+run : Parser c Error AST.Expression
+run =
+    Parser.succeed (SourcePosition.at SourcePosition.emptyPos SourcePosition.emptyPos (AST.CharLiteral 'a'))
