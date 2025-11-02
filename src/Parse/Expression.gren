@@ -15,6 +15,7 @@ import Parse.Variable as Variable
 
 type Error
     = ExpectedChar Char
+    | ExpectedKeyword String
     | VariableError Variable.Error
     | NumberError Number.Error
     | StringError String.Error
@@ -25,9 +26,64 @@ type Error
 parser : Parser c Error AST.Expression
 parser =
     Parser.oneOf
-        [ possiblyNegativeTerm
+        [ ifParser
+        , possiblyNegativeTerm
         ]
 
+
+-- IF
+
+
+ifParser : Parser c Error AST.Expression
+ifParser =
+    Parser.succeed (\startPos firstBranch -> { startPos = startPos, firstBranch = firstBranch })
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep ifBranchParser
+        |> Parser.andThen
+            (\{ startPos, firstBranch } ->
+                Parser.loop [ firstBranch ] (ifElseLoop startPos)
+            )
+
+
+ifBranchParser : Parser c Error AST.IfBranch
+ifBranchParser =
+    Parser.succeed (\test body -> { test = test, body = body })
+        |> Parser.skip (Parser.keyword (Parser.Token { str = "if", expecting = ExpectedKeyword "if" }))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword (Parser.Token { str = "then", expecting = ExpectedKeyword "then" }))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword (Parser.Token { str = "else", expecting = ExpectedKeyword "else" }))
+        |> Parser.skip Space.parser
+
+
+ifElseLoop : { row : Int, col : Int } -> Array AST.IfBranch -> Parser c Error (Parser.Step (Array AST.IfBranch) AST.Expression)
+ifElseLoop startPos branches =
+    Parser.oneOf
+        [ Parser.succeed (\branch -> Parser.Loop (Array.pushLast branch branches))
+            |> Parser.keep ifBranchParser
+        , Parser.succeed
+            (\expr endPos ->
+                Parser.Done <|
+                    SourcePosition.at
+                        startPos
+                        endPos
+                        (AST.If
+                            { branches = branches
+                            , elseBranch = expr
+                            }
+                        )
+            )
+            |> Parser.keep parser
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip Space.parser
+        ]
+
+
+-- TERM
 
 possiblyNegativeTerm : Parser c Error AST.Expression
 possiblyNegativeTerm =

@@ -195,6 +195,32 @@ tests =
                             }
                         )
             ]
+            , describe "if expressions"
+                [ test "simple test" <| \_ ->
+                    Parser.run PE.parser "if True then 1 else 2"
+                        |> expectExpression
+                            (AST.If
+                                { branches =
+                                    [ { test =
+                                        SourcePosition.at
+                                                { row = 1, col = 4 }
+                                                { row = 1, col = 8 }
+                                                (AST.Var { name = "True", varType = AST.CapVar })
+                                      , body =
+                                        SourcePosition.at
+                                            { row = 1, col = 14 }
+                                            { row = 1, col = 15 }
+                                            (AST.NumberLiteral (Number.Integer 1))
+                                      }
+                                    ]
+                                , elseBranch =
+                                    SourcePosition.at
+                                        { row = 1, col = 21 }
+                                        { row = 1, col = 22 }
+                                        (AST.NumberLiteral (Number.Integer 2))
+                                }
+                            )
+                ]
         ]
 
 
