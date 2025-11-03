@@ -11,6 +11,7 @@ import Parse.Number as Number
 import Parse.String as String
 import Parse.Space as Space
 import Parse.Variable as Variable
+import Parse.Pattern as Pattern
 
 
 type Error
@@ -19,6 +20,7 @@ type Error
     | VariableError Variable.Error
     | NumberError Number.Error
     | StringError String.Error
+    | PatternError Pattern.Error
     | WildcardAttempt
     | ExpectedLowerVariable AST.Expression
 
@@ -27,6 +29,7 @@ parser : Parser c Error AST.Expression
 parser =
     Parser.oneOf
         [ ifParser
+        , function
         , possiblyNegativeTerm
         ]
 
@@ -66,11 +69,11 @@ ifElseLoop startPos branches =
         [ Parser.succeed (\branch -> Parser.Loop (Array.pushLast branch branches))
             |> Parser.keep ifBranchParser
         , Parser.succeed
-            (\expr endPos ->
+            (\expr ->
                 Parser.Done <|
                     SourcePosition.at
                         startPos
-                        endPos
+                        expr.end
                         (AST.If
                             { branches = branches
                             , elseBranch = expr
@@ -78,7 +81,48 @@ ifElseLoop startPos branches =
                         )
             )
             |> Parser.keep parser
-            |> Parser.keep Parser.getPosition
+            |> Parser.skip Space.parser
+        ]
+
+
+-- FUNCTION
+
+
+function : Parser c Error AST.Expression
+function =
+    Parser.succeed (\startPos firstArg -> { startPos = startPos, firstArg = firstArg })
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.chompIf (\c -> c == '\\') (ExpectedChar '\\'))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+        |> Parser.skip Space.parser
+        |> Parser.andThen
+            (\{ startPos, firstArg } ->
+                Parser.succeed
+                    (\args body ->
+                        SourcePosition.at
+                            startPos
+                            body.end
+                            (AST.Lambda
+                                { patterns = args
+                                , body = body
+                                }
+                            )
+                    )
+                    |> Parser.keep (Parser.loop [ firstArg ] functionArgsParser)
+                    |> Parser.skip Space.parser
+                    |> Parser.keep parser
+                    |> Parser.skip Space.parser
+            )
+
+
+functionArgsParser : Array AST.Pattern -> Parser c Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
+functionArgsParser array =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done array)
+            |> Parser.skip (Parser.symbol (Parser.Token { str = "->", expecting = ExpectedKeyword "->" }))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.keep (Parser.mapError PatternError Pattern.parser)
             |> Parser.skip Space.parser
         ]
 

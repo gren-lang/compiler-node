@@ -195,7 +195,7 @@ tests =
                             }
                         )
             ]
-            , describe "if expressions"
+            , describe "if-expressions"
                 [ test "simple test" <| \_ ->
                     Parser.run PE.parser "if True then 1 else 2"
                         |> expectExpression
@@ -218,6 +218,29 @@ tests =
                                         { row = 1, col = 21 }
                                         { row = 1, col = 22 }
                                         (AST.NumberLiteral (Number.Integer 2))
+                                }
+                            )
+                ]
+            , describe "lambdas"
+                [ test "simple test" <| \_ ->
+                    Parser.run PE.parser "\\a b -> a"
+                        |> expectExpression
+                            (AST.Lambda
+                                { patterns =
+                                    [ SourcePosition.at
+                                        { row = 1, col = 2 }
+                                        { row = 1, col = 3 }
+                                        (AST.PVar "a")
+                                    , SourcePosition.at
+                                        { row = 1, col = 4 }
+                                        { row = 1, col = 5 }
+                                        (AST.PVar "b")
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 1, col = 9 }
+                                        { row = 1, col = 10 }
+                                        (AST.Var { name = "a", varType = AST.LowVar })
                                 }
                             )
                 ]
