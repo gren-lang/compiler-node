@@ -14,6 +14,7 @@ import Test.String.EditDistance
 import Test.Parse.Number
 import Test.Parse.String
 import Test.Parse.Variable
+import Test.Parse.Pattern
 import Test.Parse.Expression
 
 
@@ -33,5 +34,6 @@ main =
             , Test.Parse.Expression.tests
             , Test.Parse.Number.tests
             , Test.Parse.String.tests
+            , Test.Parse.Pattern.tests
             , Test.Parse.Variable.tests
             ]

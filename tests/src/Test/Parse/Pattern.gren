@@ -1,0 +1,49 @@
+module Test.Parse.Pattern exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Fuzz exposing (Fuzzer)
+import Parser.Advanced as Parser
+import Parse.Pattern as PT
+import AST.Source as AST
+import SourcePosition
+
+
+tests : Test
+tests =
+    describe "Parse.Pattern"
+        [ test "vars" <| \_ ->
+            Parser.run PT.parser "var"
+                |> expectPattern (AST.PVar "var")
+        , test "wildcard" <| \_ ->
+            Parser.run PT.parser "_"
+                |> expectPattern (AST.PAnything "")
+        , test "wildcard (named)" <| \_ ->
+            Parser.run PT.parser "_test"
+                |> expectPattern (AST.PAnything "test")
+        ]
+
+
+expectPattern : a -> Result (Array (Parser.DeadEnd c e)) (SourcePosition.Located a) -> Expectation
+expectPattern expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok { value } ->
+            Expect.equal expected value
+
+
+expectErr : PT.Error -> Result (Array (Parser.DeadEnd c PT.Error)) a -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."
