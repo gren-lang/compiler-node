@@ -2,6 +2,8 @@ module Parse.Variable exposing
     ( Error (..)
     , lowerCase
     , upperCase
+    , ForeignVar (..)
+    , foreignUpper
     , reservedWords
     )
 
@@ -13,6 +15,7 @@ import Set exposing (Set)
 
 type Error
     = InvalidCharacter
+    | ExpectedDot
     | ReservedWord String
 
 
@@ -60,6 +63,51 @@ upperCase =
         |> Parser.skip (Parser.chompIf isUpperCaseLetter InvalidCharacter)
         |> Parser.skip (Parser.chompWhile isInner)
         |> Parser.getChompedString
+
+
+type ForeignVar
+    = Unqualified String
+    | Qualified { module_ : String, name : String }
+
+
+foreignUpper : Parser c Error ForeignVar
+foreignUpper =
+    upperCase
+        |> Parser.andThen
+            (\first ->
+                Parser.loop { module_ = [], name = first } foreignUpperLoop
+                    |> Parser.map
+                        (\{ module_, name } ->
+                            when module_ is
+                                [] ->
+                                    Unqualified name
+
+                                _ ->
+                                    Qualified
+                                        { module_ = String.join "." module_
+                                        , name = name
+                                        }
+                        )
+            )
+
+
+type alias ForeignUpperStep =
+    { module_ : Array String
+    , name : String
+    }
+
+
+foreignUpperLoop : ForeignUpperStep -> Parser c Error (Parser.Step ForeignUpperStep ForeignUpperStep)
+foreignUpperLoop acc =
+    Parser.oneOf
+        [ Parser.succeed
+            (\next ->
+                Parser.Loop { module_ = Array.pushLast acc.name acc.module_, name = next }
+            )
+            |> Parser.skip (Parser.chompIf (\c -> c == '.') ExpectedDot)
+            |> Parser.keep upperCase
+        , Parser.succeed (Parser.Done acc)
+        ]
 
 
 lowerCaseLetterRegex : Regex

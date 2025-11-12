@@ -61,6 +61,17 @@ tests =
                 Parser.run PV.upperCase "month"
                     |> expectErr PV.InvalidCharacter
             ]
+        , describe "Possibly qualified upper"
+            [ test "Unqualified" <| \_ ->
+                Parser.run PV.foreignUpper "Upper"
+                    |> Expect.equal (Ok (PV.Unqualified "Upper"))
+            , test "Qualified" <| \_ ->
+                Parser.run PV.foreignUpper "My.Upper"
+                    |> Expect.equal (Ok (PV.Qualified { module_ = "My", name = "Upper" }))
+            , test "Qualified (2)" <| \_ ->
+                Parser.run PV.foreignUpper "My.Nested.Upper"
+                    |> Expect.equal (Ok (PV.Qualified { module_ = "My.Nested", name = "Upper" }))
+            ]
         ]
 
 

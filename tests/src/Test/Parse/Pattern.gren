@@ -21,6 +21,31 @@ tests =
         , test "wildcard (named)" <| \_ ->
             Parser.run PT.parser "_test"
                 |> expectPattern (AST.PAnything "test")
+        , test "constructor (unqualified)" <| \_ ->
+            Parser.run PT.parser "Ctor"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg = Nothing
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 5 }
+                                "Ctor"
+                        }
+                    )
+        , test "constructor (qualified)" <| \_ ->
+            Parser.run PT.parser "My.Ctor"
+                |> expectPattern
+                    (AST.PCtorQual
+                        { varRegion =
+                            { start = { row = 1, col = 1 }
+                            , end = { row = 1, col = 8 }
+                            }
+                        , arg = Nothing
+                        , module_ = "My"
+                        , name = "Ctor"
+                        }
+                    )
         ]
 
 

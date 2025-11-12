@@ -37,6 +37,28 @@ parser =
                         )
                 , lowerCaseVariable
                     |> Parser.map AST.PVar
+                , Parser.succeed (\start var end -> SourcePosition.at start end var)
+                    |> Parser.keep Parser.getPosition
+                    |> Parser.keep Variable.foreignUpper
+                    |> Parser.keep Parser.getPosition
+                    |> Parser.map
+                        (\{ start, end, value } ->
+                            when value is
+                                Variable.Unqualified ctor ->
+                                    AST.PCtor
+                                        { name = SourcePosition.at start end ctor
+                                        , arg = Nothing
+                                        }
+
+                                Variable.Qualified { module_, name  } ->
+                                    AST.PCtorQual
+                                        { varRegion = { start = start, end = end }
+                                        , module_ = module_
+                                        , name = name
+                                        , arg = Nothing
+                                        }
+                        )
+                    |> Parser.mapError VariableError
                 ]
             )
         |> Parser.keep Parser.getPosition

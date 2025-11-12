@@ -138,14 +138,14 @@ type Pattern_
     , name : SourcePosition.Located String
     }
   | PCtor
-    { var : SourcePosition.Located String
-    , associatedData : Maybe Pattern
+    { name : SourcePosition.Located String
+    , arg : Maybe Pattern
     }
   | PCtorQual
     { varRegion : SourcePosition.Region
-    , qualifier : String
+    , module_ : String
     , name : String
-    , associatedData : Maybe Pattern
+    , arg : Maybe Pattern
     }
   | PArray (Array Pattern)
   | PChr Char
