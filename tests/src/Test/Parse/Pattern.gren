@@ -33,6 +33,23 @@ tests =
                                 "Ctor"
                         }
                     )
+        , test "constructor (with args)" <| \_ ->
+            Parser.run PT.parser "Ctor arg"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 9 }
+                                    (AST.PVar "arg")
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 5 }
+                                "Ctor"
+                        }
+                    )
         , test "constructor (qualified)" <| \_ ->
             Parser.run PT.parser "My.Ctor"
                 |> expectPattern
@@ -46,6 +63,22 @@ tests =
                         , name = "Ctor"
                         }
                     )
+        , test "ints" <| \_ ->
+            Parser.run PT.parser "160"
+                |> expectPattern
+                    (AST.PInt { isHex = False, value = 160 })
+        , test "ints (hex)" <| \_ ->
+            Parser.run PT.parser "0xAB"
+                |> expectPattern
+                    (AST.PInt { isHex = True, value = 171 })
+        , test "string" <| \_ ->
+            Parser.run PT.parser "\"some String\""
+                |> expectPattern
+                    (AST.PStr "some String")
+        , test "char" <| \_ ->
+            Parser.run PT.parser "'z'"
+                |> expectPattern
+                    (AST.PChr 'z')
         ]
 
 

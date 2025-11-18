@@ -11,6 +11,7 @@ import Parse.Number as Number
 import Parse.String as String
 import Parse.Space as Space
 import Parse.Variable as Variable
+import Parse.Number as Number
 
 
 type Error
@@ -18,6 +19,7 @@ type Error
     | ExpectedKeyword String
     | VariableError Variable.Error
     | NumberError Number.Error
+    | FloatNotSupported
     | StringError String.Error
 
 
@@ -37,17 +39,26 @@ parser =
                         )
                 , lowerCaseVariable
                     |> Parser.map AST.PVar
-                , Parser.succeed (\start var end -> SourcePosition.at start end var)
+                , Parser.succeed (\start var end arg -> { ctor = SourcePosition.at start end var, arg = arg })
                     |> Parser.keep Parser.getPosition
                     |> Parser.keep Variable.foreignUpper
+                    |> Parser.mapError VariableError
                     |> Parser.keep Parser.getPosition
+                    |> Parser.skip Space.parser
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ Parser.lazy (\_ -> parser)
+                                |> Parser.map Just
+                            , Parser.succeed Nothing
+                            ]
+                        )
                     |> Parser.map
-                        (\{ start, end, value } ->
+                        (\{ ctor = { start, end, value }, arg } ->
                             when value is
                                 Variable.Unqualified ctor ->
                                     AST.PCtor
                                         { name = SourcePosition.at start end ctor
-                                        , arg = Nothing
+                                        , arg = arg
                                         }
 
                                 Variable.Qualified { module_, name  } ->
@@ -55,10 +66,29 @@ parser =
                                         { varRegion = { start = start, end = end }
                                         , module_ = module_
                                         , name = name
-                                        , arg = Nothing
+                                        , arg = arg
                                         }
                         )
-                    |> Parser.mapError VariableError
+                , Number.parser
+                    |> Parser.mapError NumberError
+                    |> Parser.andThen
+                        (\num ->
+                            when num is
+                                Number.Integer int ->
+                                    Parser.succeed <| AST.PInt { isHex = False, value = int }
+
+                                Number.Hex int ->
+                                    Parser.succeed <| AST.PInt { isHex = True, value = int }
+
+                                Number.FloatingPoint _ ->
+                                    Parser.problem FloatNotSupported
+                        )
+                , String.string
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.PStr
+                , String.char
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.PChr
                 ]
             )
         |> Parser.keep Parser.getPosition
