@@ -50,6 +50,23 @@ tests =
                                 "Ctor"
                         }
                     )
+        , test "constructor (parenthesized with args)" <| \_ ->
+            Parser.run PT.parser "(Ctor arg)"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 7 }
+                                    { row = 1, col = 10 }
+                                    (AST.PVar "arg")
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 2 }
+                                { row = 1, col = 6 }
+                                "Ctor"
+                        }
+                    )
         , test "constructor (qualified)" <| \_ ->
             Parser.run PT.parser "My.Ctor"
                 |> expectPattern
@@ -79,6 +96,88 @@ tests =
             Parser.run PT.parser "'z'"
                 |> expectPattern
                     (AST.PChr 'z')
+        , test "array (empty)" <| \_ ->
+            Parser.run PT.parser "[]"
+                |> expectPattern
+                    (AST.PArray [])
+        , test "array" <| \_ ->
+            Parser.run PT.parser "[ a, 2, b ]"
+                |> expectPattern
+                    (AST.PArray
+                        [ SourcePosition.at
+                            { row = 1, col = 3 }
+                            { row = 1, col = 4 }
+                            (AST.PVar "a")
+                        , SourcePosition.at
+                            { row = 1, col = 6 }
+                            { row = 1, col = 7 }
+                            (AST.PInt { isHex = False, value = 2 })
+                        , SourcePosition.at
+                            { row = 1, col = 9 }
+                            { row = 1, col = 10 }
+                            (AST.PVar "b")
+                        ]
+                    )
+        , test "record (empty)" <| \_ ->
+            Parser.run PT.parser "{}"
+                |> expectPattern
+                    (AST.PRecord [])
+        , test "record" <| \_ ->
+            Parser.run PT.parser "{ a = 1, b = _ }"
+                |> expectPattern
+                    (AST.PRecord
+                        [ { field =
+                               SourcePosition.at
+                                   { row = 1, col = 3 }
+                                   { row = 1, col = 4 }
+                                   "a"
+                           , pattern =
+                               Just <|
+                                   SourcePosition.at
+                                       { row = 1, col = 7 }
+                                       { row = 1, col = 8 }
+                                       (AST.PInt { isHex = False, value = 1 })
+                           }
+                        , { field =
+                               SourcePosition.at
+                                   { row = 1, col = 10 }
+                                   { row = 1, col = 11 }
+                                   "b"
+                           , pattern =
+                               Just <|
+                                   SourcePosition.at
+                                       { row = 1, col = 14 }
+                                       { row = 1, col = 15 }
+                                       (AST.PAnything "")
+                           }
+                        ]
+                    )
+        , test "record (shorthand)" <| \_ ->
+            Parser.run PT.parser "{ a, b = _ }"
+                |> expectPattern
+                    (AST.PRecord
+                        [ { field =
+                               SourcePosition.at
+                                   { row = 1, col = 3 }
+                                   { row = 1, col = 4 }
+                                   "a"
+                           , pattern =
+                                Nothing
+                           }
+                        , { field =
+                               SourcePosition.at
+                                   { row = 1, col = 6 }
+                                   { row = 1, col = 7 }
+                                   "b"
+                           , pattern =
+                               Just <|
+                                   SourcePosition.at
+                                       { row = 1, col = 10 }
+                                       { row = 1, col = 11 }
+                                       (AST.PAnything "")
+                           }
+                        ]
+                    )
         ]
 
 

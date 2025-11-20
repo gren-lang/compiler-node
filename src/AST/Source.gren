@@ -10,7 +10,6 @@ module AST.Source exposing
     , Pattern
     , Pattern_ (..)
     , PRecordField
-    , PRecordField_
     , Type
     , Type_
     , TRecordField
@@ -156,13 +155,9 @@ type Pattern_
     }
 
 
-type alias PRecordField
-    = SourcePosition.Located PRecordField_
-
-
-type alias PRecordField_ =
+type alias PRecordField =
     { field : SourcePosition.Located String
-    , pattern : Pattern
+    , pattern : Maybe Pattern
     }
 
 
