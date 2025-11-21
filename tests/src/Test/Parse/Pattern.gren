@@ -50,6 +50,18 @@ tests =
                                 "Ctor"
                         }
                     )
+        , test "constructor (terminated by ->)" <| \_ ->
+            Parser.run PT.parser "Ctor ->"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg = Nothing
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 5 }
+                                "Ctor"
+                        }
+                    )
         , test "constructor (parenthesized with args)" <| \_ ->
             Parser.run PT.parser "(Ctor arg)"
                 |> expectPattern

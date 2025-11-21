@@ -194,7 +194,7 @@ tests =
                                 ]
                             }
                         )
-            ]
+                ]
             , describe "if-expressions"
                 [ test "simple test" <| \_ ->
                     Parser.run PE.parser "if True then 1 else 2"
@@ -241,6 +241,91 @@ tests =
                                         { row = 1, col = 9 }
                                         { row = 1, col = 10 }
                                         (AST.Var { name = "a", varType = AST.LowVar })
+                                }
+                            )
+                ]
+            , describe "when-is"
+                [ test "simple test" <| \_ ->
+                    Parser.run PE.parser "when myVar is A -> 'a'"
+                        |> expectExpression
+                            (AST.When
+                                { expression =
+                                    SourcePosition.at
+                                        { row = 1, col = 6 }
+                                        { row = 1, col = 11 }
+                                        (AST.Var { name = "myVar", varType = AST.LowVar })
+                                , branches =
+                                    [ { pattern =
+                                          SourcePosition.at
+                                              { row = 1, col = 15 }
+                                              { row = 1, col = 17 }
+                                              (AST.PCtor
+                                                  { name =
+                                                      SourcePosition.at
+                                                          { row = 1, col = 15 }
+                                                          { row = 1, col = 16 }
+                                                          "A"
+                                                  , arg = Nothing
+                                                  }
+                                              )
+                                      , body =
+                                          SourcePosition.at
+                                              { row = 1, col = 20 }
+                                              { row = 1, col = 23 }
+                                              (AST.CharLiteral 'a')
+                                      }
+                                    ]
+                                }
+                            )
+                , test "multiple branches" <| \_ ->
+                    Parser.run PE.parser "when myVar is A -> 'a' B -> 'b'"
+                        |> expectExpression
+                            (AST.When
+                                { expression =
+                                    SourcePosition.at
+                                        { row = 1, col = 6 }
+                                        { row = 1, col = 11 }
+                                        (AST.Var { name = "myVar", varType = AST.LowVar })
+                                , branches =
+                                    [ { pattern =
+                                          SourcePosition.at
+                                              { row = 1, col = 15 }
+                                              { row = 1, col = 17 }
+                                              (AST.PCtor
+                                                  { name =
+                                                      SourcePosition.at
+                                                          { row = 1, col = 15 }
+                                                          { row = 1, col = 16 }
+                                                          "A"
+                                                  , arg = Nothing
+                                                  }
+                                              )
+                                      , body =
+                                          SourcePosition.at
+                                              { row = 1, col = 20 }
+                                              { row = 1, col = 23 }
+                                              (AST.CharLiteral 'a')
+                                      }
+                                    , { pattern =
+                                          SourcePosition.at
+                                              { row = 1, col = 24 }
+                                              { row = 1, col = 26 }
+                                              (AST.PCtor
+                                                  { name =
+                                                      SourcePosition.at
+                                                          { row = 1, col = 24 }
+                                                          { row = 1, col = 25 }
+                                                          "B"
+                                                  , arg = Nothing
+                                                  }
+                                              )
+                                      , body =
+                                          SourcePosition.at
+                                              { row = 1, col = 29 }
+                                              { row = 1, col = 32 }
+                                              (AST.CharLiteral 'b')
+                                      }
+                                    ]
                                 }
                             )
                 ]

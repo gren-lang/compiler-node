@@ -29,6 +29,7 @@ parser : Parser c Error AST.Expression
 parser =
     Parser.oneOf
         [ ifParser
+        , whenParser
         , function
         , possiblyNegativeTerm
         ]
@@ -82,6 +83,59 @@ ifElseLoop startPos branches =
             )
             |> Parser.keep parser
             |> Parser.skip Space.parser
+        ]
+
+
+-- WHEN IS
+
+
+whenParser : Parser c Error AST.Expression
+whenParser =
+    Parser.succeed (\start expr firstBranch -> { start = start, expr = expr, firstBranch = firstBranch })
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.keyword (Parser.Token { str = "when", expecting = ExpectedKeyword "when" }))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword (Parser.Token { str = "is", expecting = ExpectedKeyword "is" }))
+        |> Parser.skip Space.parser
+        |> Parser.keep whenBranchParser
+        |> Parser.andThen
+            (\{ start, expr, firstBranch } ->
+                Parser.loop [ firstBranch ] whenBranchLoopParser
+                    |> Parser.map
+                        (\branches ->
+                            let
+                                endLocation =
+                                    Array.last branches
+                                        |> Maybe.map .body
+                                        |> Maybe.map .end
+                                        |> Maybe.withDefault { row = 1, col = 1 }
+                            in
+                            SourcePosition.at
+                                start
+                                endLocation
+                                (AST.When { expression = expr, branches = branches })
+                        )
+            )
+
+whenBranchParser : Parser c Error AST.WhenBranch
+whenBranchParser =
+    Parser.succeed (\pattern body -> { pattern = pattern, body = body })
+        |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword (Parser.Token { str = "->", expecting = ExpectedKeyword "->" }))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+
+
+whenBranchLoopParser : Array AST.WhenBranch -> Parser c Error (Parser.Step (Array AST.WhenBranch) (Array AST.WhenBranch))
+whenBranchLoopParser branches =
+    Parser.oneOf
+        [ Parser.succeed (\branch -> Parser.Loop (Array.pushLast branch branches))
+            |> Parser.keep whenBranchParser
+        , Parser.succeed (Parser.Done branches)
         ]
 
 

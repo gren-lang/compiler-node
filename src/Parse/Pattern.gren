@@ -146,6 +146,7 @@ term =
                     |> Parser.keep
                         (Parser.oneOf
                             [ Parser.lazy (\_ -> parser)
+                                |> Parser.backtrackable
                                 |> Parser.map Just
                             , Parser.succeed Nothing
                             ]
