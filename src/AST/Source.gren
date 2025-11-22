@@ -11,7 +11,7 @@ module AST.Source exposing
     , Pattern_ (..)
     , PRecordField
     , Type
-    , Type_
+    , Type_ (..)
     , TRecordField
     )
 

@@ -1,0 +1,204 @@
+module Parse.Type exposing
+    ( Error (..)
+    , expression
+    )
+
+
+import Parser.Advanced as Parser exposing (Parser)
+import SourcePosition
+import AST.Source as AST
+import Parse.Variable as Variable
+import Parse.Space as Space
+
+
+type Error
+    = ExpectedChar Char
+    | ExpectedString String
+    | VariableError Variable.Error
+
+
+expression : Parser c Error AST.Type
+expression =
+    Parser.oneOf
+        [ app
+        , term
+        ]
+        |> Parser.andThen
+            (\tipe ->
+                Parser.oneOf
+                    [ Parser.succeed
+                        (\next ->
+                            SourcePosition.at
+                                tipe.start
+                                next.end
+                                (AST.TLambda { from = tipe, to = next })
+                        )
+                        |> Parser.skip (Parser.symbol (Parser.Token { str = "->", expecting = ExpectedString "->" }))
+                        |> Parser.skip Space.parser
+                        |> Parser.keep (Parser.lazy (\_ -> expression))
+                    , Parser.succeed tipe
+                    ]
+            )
+
+
+app : Parser c Error AST.Type
+app =
+    Parser.succeed
+        (\start var end args ->
+            let
+                argsEnd =
+                    Array.last args
+                        |> Maybe.map .end
+                        |> Maybe.withDefault end
+            in
+            when var is
+                Variable.Unqualified name ->
+                    SourcePosition.at start argsEnd <|
+                        AST.TType
+                            { name = SourcePosition.at start end name
+                            , args = args
+                            }
+
+                Variable.Qualified { module_, name } ->
+                    SourcePosition.at start argsEnd <|
+                    AST.TTypeQual
+                        { varRegion = { start = start, end = end }
+                        , qualifier = module_
+                        , name = name
+                        , args = args
+                        }
+        )
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep (Parser.mapError VariableError Variable.foreignUpper)
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] typeArgsParser)
+
+
+typeArgsParser : Array AST.Type -> Parser c Error (Parser.Step (Array AST.Type) (Array AST.Type))
+typeArgsParser array =
+    Parser.oneOf
+        [ Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.keep expression
+            |> Parser.skip Space.parser
+        , Parser.succeed (Parser.Done array)
+        ]
+
+
+term : Parser c Error AST.Type
+term =
+    Parser.getPosition
+        |> Parser.andThen
+            (\start ->
+                Parser.oneOf
+                    [ Parser.succeed
+                        (\var end ->
+                            SourcePosition.at
+                                start
+                                end
+                                (when var is
+                                    Variable.Unqualified name ->
+                                        AST.TType
+                                            { name = SourcePosition.at start end name
+                                            , args = []
+                                            }
+
+                                    Variable.Qualified { module_, name } ->
+                                        AST.TTypeQual
+                                            { varRegion = { start = start, end = end }
+                                            , qualifier = module_
+                                            , name = name
+                                            , args = []
+                                            }
+                                )
+                        )
+                        |> Parser.keep (Parser.mapError VariableError Variable.foreignUpper)
+                        |> Parser.keep Parser.getPosition
+                    , Parser.succeed (\var end -> SourcePosition.at start end (AST.TVar var))
+                        |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
+                        |> Parser.keep Parser.getPosition
+                    , Parser.succeed (\expr end -> SourcePosition.at start end (AST.TParens expr))
+                        |> Parser.skip (Parser.chompIf (\c -> c == '(') (ExpectedChar '('))
+                        |> Parser.skip Space.parser
+                        |> Parser.keep expression
+                        |> Parser.keep Parser.getPosition
+                        |> Parser.skip (Parser.chompIf (\c -> c == ')') (ExpectedChar ')'))
+                    , Parser.succeed (\record end -> SourcePosition.at start end record)
+                        |> Parser.keep recordParser
+                        |> Parser.keep Parser.getPosition
+                    ]
+                    |> Parser.skip Space.parser
+            )
+
+
+recordParser : Parser c Error AST.Type_
+recordParser =
+    Parser.succeed identity
+        |> Parser.skip (Parser.chompIf (\c -> c == '{') (ExpectedChar '{'))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed (AST.TRecord { fields = [], extending = Nothing })
+                    |> Parser.skip (Parser.chompIf (\c -> c == '}') (ExpectedChar '}'))
+                , Parser.succeed (\start var end -> SourcePosition.at start end var)
+                    |> Parser.keep Parser.getPosition
+                    |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
+                    |> Parser.keep Parser.getPosition
+                    |> Parser.skip Space.parser
+                    |> Parser.andThen
+                        (\var ->
+                            Parser.oneOf
+                                [ Parser.succeed identity
+                                    |> Parser.skip (Parser.chompIf (\c -> c == '|') (ExpectedChar '|'))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.keep recordFieldParser
+                                    |> Parser.skip Space.parser
+                                    |> Parser.andThen
+                                        (\firstPair ->
+                                            Parser.loop [ firstPair ] innerRecordParser
+                                        )
+                                    |> Parser.map (\fields -> AST.TRecord { fields = fields, extending = Just var })
+                                , Parser.succeed identity
+                                    |> Parser.skip (Parser.chompIf (\c -> c == ':') (ExpectedChar ':'))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.keep expression
+                                    |> Parser.skip Space.parser
+                                    |> Parser.andThen
+                                        (\expr ->
+                                            Parser.loop [ { field = var, signature = expr } ] innerRecordParser
+                                        )
+                                    |> Parser.map (\fields -> AST.TRecord { fields = fields, extending = Nothing })
+                                ]
+                        )
+                ]
+            )
+
+
+recordFieldParser : Parser c Error AST.TRecordField
+recordFieldParser =
+    Parser.succeed
+        (\fieldStart field fieldEnd signature ->
+            { field = SourcePosition.at fieldStart fieldEnd field
+            , signature = signature
+            }
+        )
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompIf (\c -> c == ':') (ExpectedChar ':'))
+        |> Parser.skip Space.parser
+        |> Parser.keep expression
+
+
+innerRecordParser : Array AST.TRecordField -> Parser c Error (Parser.Step (Array AST.TRecordField) (Array AST.TRecordField))
+innerRecordParser array =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done array)
+            |> Parser.skip (Parser.chompIf (\c -> c == '}') (ExpectedChar '}'))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.skip (Parser.chompIf (\c -> c == ',') (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep recordFieldParser
+            |> Parser.skip Space.parser
+        ]
