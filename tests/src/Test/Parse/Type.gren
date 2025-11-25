@@ -253,6 +253,27 @@ tests =
                                 )
                         }
                     )
+        , test "Stop when variable appears on a fresh line" <| \_ ->
+            Parser.run PT.expression
+                """
+                Test a
+                b
+                """
+                |> expectExpression
+                    (AST.TType
+                        { name =
+                            SourcePosition.at
+                                { row = 1 , col = 1 }
+                                { row = 1 , col = 5 }
+                                "Test"
+                        , args =
+                            [ SourcePosition.at
+                                { row = 1, col = 6 }
+                                { row = 1, col = 7 }
+                                (AST.TVar "a")
+                            ]
+                        }
+                    )
         ]
 
 

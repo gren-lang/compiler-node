@@ -1,5 +1,6 @@
 module Parse.Space exposing
     ( parser
+    , checkIndent
     )
 
 
@@ -8,4 +9,19 @@ import Parser.Advanced as Parser exposing (Parser)
 
 parser : Parser c err {}
 parser =
-    Parser.chompWhile (\c -> c == ' ' || c == '\t' || c == '\n' || c == '\r')
+    Parser.chompWhile (\c -> c == ' ' || c == '\n' || c == '\r')
+
+
+checkIndent : Parser c {} {}
+checkIndent =
+    Parser.succeed (\indent col -> { indent = indent, col = col })
+        |> Parser.keep Parser.getIndent
+        |> Parser.keep Parser.getCol
+        |> Parser.andThen
+            (\{ indent, col } ->
+                if col > indent && col > 1 then
+                    Parser.succeed {}
+
+                else
+                    Parser.problem {}
+            )

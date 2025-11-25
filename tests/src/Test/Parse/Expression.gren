@@ -329,6 +329,220 @@ tests =
                                 }
                             )
                 ]
+            , describe "let-in"
+                [ test "Simple case" <| \_ ->
+                    Parser.run PE.parser
+                        """
+                        let
+                            num =
+                                1
+                        in
+                        num
+                        """
+                        |> expectExpression
+                            (AST.Let
+                                { defs =
+                                    [ SourcePosition.at
+                                        { row = 2, col = 5 }
+                                        { row = 3, col = 10 }
+                                        (AST.Define
+                                            { name =
+                                                SourcePosition.at
+                                                    { row = 2, col = 5 }
+                                                    { row = 2, col = 8 }
+                                                    "num"
+                                            , args = []
+                                            , typeSignature = Nothing
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 3, col = 9 }
+                                                    { row = 3, col = 10 }
+                                                    (AST.NumberLiteral (Number.Integer 1))
+                                            }
+                                        )
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 5, col = 1 }
+                                        { row = 5, col = 4 }
+                                        (AST.Var { name = "num", varType = AST.LowVar })
+                                }
+                            )
+                , test "With function" <| \_ ->
+                    Parser.run PE.parser
+                        """
+                        let
+                            unused =
+                                5
+
+                            id a =
+                                a
+                        in
+                        id
+                        """
+                        |> expectExpression
+                            (AST.Let
+                                { defs =
+                                    [ SourcePosition.at
+                                        { row = 2, col = 5 }
+                                        { row = 3, col = 10 }
+                                        (AST.Define
+                                            { name =
+                                                SourcePosition.at
+                                                    { row = 2, col = 5 }
+                                                    { row = 2, col = 11 }
+                                                    "unused"
+                                            , args = []
+                                            , typeSignature = Nothing
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 3, col = 9 }
+                                                    { row = 3, col = 10 }
+                                                    (AST.NumberLiteral (Number.Integer 5))
+                                            }
+                                        )
+                                    , SourcePosition.at
+                                        { row = 5, col = 5 }
+                                        { row = 6, col = 10 }
+                                        (AST.Define
+                                            { name =
+                                                SourcePosition.at
+                                                    { row = 5, col = 5 }
+                                                    { row = 5, col = 7 }
+                                                    "id"
+                                            , args =
+                                                [ SourcePosition.at
+                                                    { row = 5, col = 8 }
+                                                    { row = 5, col = 9 }
+                                                    (AST.PVar "a")
+                                                ]
+                                            , typeSignature = Nothing
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 6, col = 9 }
+                                                    { row = 6, col = 10 }
+                                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                            }
+                                        )
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 8, col = 1 }
+                                        { row = 8, col = 3 }
+                                        (AST.Var { name = "id", varType = AST.LowVar })
+                                }
+                            )
+                , test "With signature" <| \_ ->
+                    Parser.run PE.parser
+                        """
+                        let
+                            num : Int
+                            num =
+                                1
+                        in
+                        num
+                        """
+                        |> expectExpression
+                            (AST.Let
+                                { defs =
+                                    [ SourcePosition.at
+                                        { row = 2, col = 5 }
+                                        { row = 4, col = 10 }
+                                        (AST.Define
+                                            { name =
+                                                SourcePosition.at
+                                                    { row = 2, col = 5 }
+                                                    { row = 2, col = 8 }
+                                                    "num"
+                                            , args = []
+                                            , typeSignature =
+                                                Just <|
+                                                    SourcePosition.at
+                                                        { row = 2, col = 11 }
+                                                        { row = 2, col = 14 }
+                                                        (AST.TType
+                                                            { args = []
+                                                            , name =
+                                                                SourcePosition.at
+                                                                    { row = 2, col = 11 }
+                                                                    { row = 2, col = 14 }
+                                                                    "Int"
+                                                            }
+                                                        )
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 4, col = 9 }
+                                                    { row = 4, col = 10 }
+                                                    (AST.NumberLiteral (Number.Integer 1))
+                                            }
+                                        )
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 6, col = 1 }
+                                        { row = 6, col = 4 }
+                                        (AST.Var { name = "num", varType = AST.LowVar })
+                                }
+                            )
+                , test "Destructuring" <| \_ ->
+                    Parser.run PE.parser
+                        """
+                        let
+                            { a } =
+                                { a = 5 }
+                        in
+                        a
+                        """
+                        |> expectExpression
+                            (AST.Let
+                                { defs =
+                                    [ SourcePosition.at
+                                        { row = 2, col = 5 }
+                                        { row = 3, col = 18 }
+                                        (AST.Destruct
+                                            { pattern =
+                                                SourcePosition.at
+                                                    { row = 2, col = 5 }
+                                                    { row = 2, col = 10 }
+                                                    (AST.PRecord
+                                                        [ { field =
+                                                              SourcePosition.at
+                                                                  { row = 2, col = 7 }
+                                                                  { row = 2, col = 8 }
+                                                                  "a"
+                                                          , pattern = Nothing
+                                                          }
+                                                        ]
+                                                    )
+                                            , body =
+                                                SourcePosition.at
+                                                    { row = 3, col = 9 }
+                                                    { row = 3, col = 18 }
+                                                    (AST.Record
+                                                        [ { field =
+                                                              SourcePosition.at
+                                                                  { row = 3, col = 11 }
+                                                                  { row = 3, col = 12 }
+                                                                  "a"
+                                                          , value =
+                                                              SourcePosition.at
+                                                                  { row = 3, col = 15 }
+                                                                  { row = 3, col = 16 }
+                                                                  (AST.NumberLiteral (Number.Integer 5))
+                                                          }
+                                                        ]
+                                                    )
+                                            }
+                                        )
+                                    ]
+                                , body =
+                                    SourcePosition.at
+                                        { row = 5, col = 1 }
+                                        { row = 5, col = 2 }
+                                        (AST.Var { name = "a", varType = AST.LowVar })
+                                }
+                            )
+                ]
         ]
 
 

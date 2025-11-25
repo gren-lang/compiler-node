@@ -117,7 +117,7 @@ type Def
     }
   | Destruct
     { pattern : Pattern
-    , expression : Expression
+    , body : Expression
     }
 
 

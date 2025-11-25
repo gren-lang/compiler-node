@@ -15,6 +15,7 @@ type Error
     = ExpectedChar Char
     | ExpectedString String
     | VariableError Variable.Error
+    | ExpectedIndent
 
 
 expression : Parser c Error AST.Type
@@ -33,6 +34,7 @@ expression =
                                 next.end
                                 (AST.TLambda { from = tipe, to = next })
                         )
+                        |> Parser.skip (Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent)
                         |> Parser.skip (Parser.symbol (Parser.Token { str = "->", expecting = ExpectedString "->" }))
                         |> Parser.skip Space.parser
                         |> Parser.keep (Parser.lazy (\_ -> expression))
@@ -61,12 +63,12 @@ app =
 
                 Variable.Qualified { module_, name } ->
                     SourcePosition.at start argsEnd <|
-                    AST.TTypeQual
-                        { varRegion = { start = start, end = end }
-                        , qualifier = module_
-                        , name = name
-                        , args = args
-                        }
+                        AST.TTypeQual
+                            { varRegion = { start = start, end = end }
+                            , qualifier = module_
+                            , name = name
+                            , args = args
+                            }
         )
         |> Parser.keep Parser.getPosition
         |> Parser.keep (Parser.mapError VariableError Variable.foreignUpper)
@@ -79,6 +81,7 @@ typeArgsParser : Array AST.Type -> Parser c Error (Parser.Step (Array AST.Type) 
 typeArgsParser array =
     Parser.oneOf
         [ Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.skip (Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent)
             |> Parser.keep expression
             |> Parser.skip Space.parser
         , Parser.succeed (Parser.Done array)

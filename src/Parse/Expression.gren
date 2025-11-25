@@ -12,6 +12,7 @@ import Parse.String as String
 import Parse.Space as Space
 import Parse.Variable as Variable
 import Parse.Pattern as Pattern
+import Parse.Type as Type
 
 
 type Error
@@ -21,8 +22,10 @@ type Error
     | NumberError Number.Error
     | StringError String.Error
     | PatternError Pattern.Error
+    | TypeError Type.Error
     | WildcardAttempt
     | ExpectedLowerVariable AST.Expression
+    | NameMismatch { first : String, second : String }
 
 
 parser : Parser c Error AST.Expression
@@ -30,8 +33,133 @@ parser =
     Parser.oneOf
         [ ifParser
         , whenParser
+        , letParser
         , function
         , possiblyNegativeTerm
+        ]
+
+
+-- LET
+
+
+letParser : Parser c Error AST.Expression
+letParser =
+    Parser.succeed
+        (\start firstDef defs body end ->
+            SourcePosition.at
+                start
+                end
+                (AST.Let
+                    { defs = Array.pushFirst firstDef defs
+                    , body = body
+                    }
+                )
+        )
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.keyword (Parser.Token { str = "let", expecting = ExpectedKeyword "let" }))
+        |> Parser.skip Space.parser
+        |> Parser.keep letDefParser
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] letDefLoopParser)
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.keep Parser.getPosition
+
+
+letDefParser : Parser c Error (SourcePosition.Located AST.Def)
+letDefParser =
+    Parser.oneOf
+        [ letDefNamedParser
+        , letDefDestructParser
+        ]
+
+
+letDefNamedParser : Parser c Error (SourcePosition.Located AST.Def)
+letDefNamedParser =
+    Parser.succeed (\nameStart name nameEnd -> SourcePosition.at nameStart nameEnd name )
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep lowerCaseVariable
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.andThen
+            (\var ->
+                Parser.succeed
+                    (\signature args body ->
+                        let
+                            bodyEnd =
+                                body.end
+                        in
+                        SourcePosition.at
+                            var.start
+                            bodyEnd
+                            (AST.Define
+                                { name = var
+                                , args = args
+                                , body = body
+                                , typeSignature = signature
+                                }
+                            )
+                    )
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ Parser.succeed Just
+                                |> Parser.skip (Parser.chompIf (\c -> c == ':') (ExpectedChar ':'))
+                                |> Parser.skip Space.parser
+                                |> Parser.keep (Parser.mapError TypeError (Parser.withIndent var.start.col Type.expression))
+                                |> Parser.skip
+                                    ( lowerCaseVariable
+                                        |> Parser.andThen
+                                            (\var2 ->
+                                                if var.value /= var2 then
+                                                    Parser.problem <|
+                                                        NameMismatch
+                                                            { first = var.value
+                                                            , second = var2
+                                                            }
+
+                                                else
+                                                    Parser.succeed {}
+                                            )
+                                
+                                    )
+                                |> Parser.skip Space.parser
+                            , Parser.succeed Nothing
+                            ]
+                        )
+                    |> Parser.keep (Parser.loop [] (functionArgsParser "="))
+                    |> Parser.skip Space.parser
+                    |> Parser.keep (Parser.lazy (\_ -> parser))
+            )
+
+
+letDefDestructParser : Parser c Error (SourcePosition.Located AST.Def)
+letDefDestructParser =
+    Parser.succeed
+        (\pattern body ->
+            SourcePosition.at
+                pattern.start
+                body.end
+                (AST.Destruct
+                    { pattern = pattern
+                    , body = body
+                    }
+                )
+        )
+        |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompIf (\c -> c == '=') (ExpectedChar '='))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+
+
+letDefLoopParser : Array (SourcePosition.Located AST.Def) -> Parser c Error (Parser.Step (Array (SourcePosition.Located AST.Def)) (Array (SourcePosition.Located AST.Def)))
+letDefLoopParser defs =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done defs)
+            |> Parser.skip (Parser.keyword (Parser.Token { str = "in", expecting = ExpectedKeyword "in" }))
+        , Parser.succeed (\def -> Parser.Loop <| Array.pushLast def defs)
+            |> Parser.keep letDefParser
+            |> Parser.skip Space.parser
         ]
 
 
@@ -163,18 +291,18 @@ function =
                                 }
                             )
                     )
-                    |> Parser.keep (Parser.loop [ firstArg ] functionArgsParser)
+                    |> Parser.keep (Parser.loop [ firstArg ] (functionArgsParser "->"))
                     |> Parser.skip Space.parser
                     |> Parser.keep parser
                     |> Parser.skip Space.parser
             )
 
 
-functionArgsParser : Array AST.Pattern -> Parser c Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
-functionArgsParser array =
+functionArgsParser : String -> Array AST.Pattern -> Parser c Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
+functionArgsParser terminator array =
     Parser.oneOf
         [ Parser.succeed (Parser.Done array)
-            |> Parser.skip (Parser.symbol (Parser.Token { str = "->", expecting = ExpectedKeyword "->" }))
+            |> Parser.skip (Parser.symbol (Parser.Token { str = terminator, expecting = ExpectedKeyword terminator }))
         , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
             |> Parser.keep (Parser.mapError PatternError Pattern.parser)
             |> Parser.skip Space.parser
