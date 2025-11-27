@@ -26,6 +26,7 @@ type Error
     | WildcardAttempt
     | ExpectedLowerVariable AST.Expression
     | NameMismatch { first : String, second : String }
+    | IndentError
 
 
 parser : Parser c Error AST.Expression
@@ -36,6 +37,39 @@ parser =
         , letParser
         , function
         , possiblyNegativeTerm
+            |> Parser.andThen
+                (\firstTerm ->
+                    Parser.succeed
+                        (\args ->
+                            if Array.isEmpty args then
+                                firstTerm
+
+                            else
+                                let
+                                    end =
+                                        Array.last args
+                                            |> Maybe.map .end
+                                            |> Maybe.withDefault firstTerm.end
+                                in
+                                SourcePosition.at
+                                    firstTerm.start
+                                    end
+                                    (AST.Call { fn = firstTerm, args = args })
+                        )
+                    |> Parser.skip Space.parser
+                    |> Parser.keep (Parser.withIndent firstTerm.start.col (Parser.loop [] argOrOperatorLoop))
+                )
+        ]
+
+
+argOrOperatorLoop : Array AST.Expression -> Parser c Error (Parser.Step (Array AST.Expression) (Array AST.Expression))
+argOrOperatorLoop args =
+    Parser.oneOf
+        [ Parser.succeed (\arg -> Parser.Loop <| Array.pushLast arg args)
+            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
+            |> Parser.keep possiblyNegativeTerm
+            |> Parser.skip Space.parser
+        , Parser.succeed (Parser.Done args)
         ]
 
 

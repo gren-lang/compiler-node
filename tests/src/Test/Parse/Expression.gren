@@ -70,6 +70,27 @@ tests =
                             , accessor = "expression"
                             }
                         )
+            , test "function calls" <| \_ ->
+                Parser.run PE.parser "func a b"
+                    |> expectExpression
+                        (AST.Call
+                            { fn =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 5 }
+                                    (AST.Var { name = "func", varType = AST.LowVar })
+                            , args =
+                                [ SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 7 }
+                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                , SourcePosition.at
+                                    { row = 1, col = 8 }
+                                    { row = 1, col = 9 }
+                                    (AST.Var { name = "b", varType = AST.LowVar })
+                                ]
+                            }
+                        )
             ]
         , describe "Array"
             [ test "Empty array" <| \_ ->
@@ -278,7 +299,12 @@ tests =
                                 }
                             )
                 , test "multiple branches" <| \_ ->
-                    Parser.run PE.parser "when myVar is A -> 'a' B -> 'b'"
+                    Parser.run PE.parser
+                        """
+                        when myVar is
+                            A -> 'a'
+                            B -> 'b'
+                        """
                         |> expectExpression
                             (AST.When
                                 { expression =
@@ -289,40 +315,40 @@ tests =
                                 , branches =
                                     [ { pattern =
                                           SourcePosition.at
-                                              { row = 1, col = 15 }
-                                              { row = 1, col = 17 }
+                                              { row = 2, col = 5 }
+                                              { row = 2, col = 7 }
                                               (AST.PCtor
                                                   { name =
                                                       SourcePosition.at
-                                                          { row = 1, col = 15 }
-                                                          { row = 1, col = 16 }
+                                                          { row = 2, col = 5 }
+                                                          { row = 2, col = 6 }
                                                           "A"
                                                   , arg = Nothing
                                                   }
                                               )
                                       , body =
                                           SourcePosition.at
-                                              { row = 1, col = 20 }
-                                              { row = 1, col = 23 }
+                                              { row = 2, col = 10 }
+                                              { row = 2, col = 13 }
                                               (AST.CharLiteral 'a')
                                       }
                                     , { pattern =
                                           SourcePosition.at
-                                              { row = 1, col = 24 }
-                                              { row = 1, col = 26 }
+                                              { row = 3, col = 5 }
+                                              { row = 3, col = 7 }
                                               (AST.PCtor
                                                   { name =
                                                       SourcePosition.at
-                                                          { row = 1, col = 24 }
-                                                          { row = 1, col = 25 }
+                                                          { row = 3, col = 5 }
+                                                          { row = 3, col = 6 }
                                                           "B"
                                                   , arg = Nothing
                                                   }
                                               )
                                       , body =
                                           SourcePosition.at
-                                              { row = 1, col = 29 }
-                                              { row = 1, col = 32 }
+                                              { row = 3, col = 10 }
+                                              { row = 3, col = 13 }
                                               (AST.CharLiteral 'b')
                                       }
                                     ]

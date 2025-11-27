@@ -35,6 +35,9 @@ lowerCase =
                 else
                     Parser.succeed word
             )
+        -- TODO: uncertain if this `backtrackable` work the way I intend
+        -- ideally, we'd only backtrack on reserved words
+        |> Parser.backtrackable
 
 
 reservedWords : Set String
