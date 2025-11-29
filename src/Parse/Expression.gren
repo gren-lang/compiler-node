@@ -13,6 +13,7 @@ import Parse.Space as Space
 import Parse.Variable as Variable
 import Parse.Pattern as Pattern
 import Parse.Type as Type
+import Set exposing (Set)
 
 
 type Error
@@ -27,6 +28,8 @@ type Error
     | ExpectedLowerVariable AST.Expression
     | NameMismatch { first : String, second : String }
     | IndentError
+    | BadOperator String
+    | InvalidOperatorChar
 
 
 parser : Parser c Error AST.Expression
@@ -39,38 +42,167 @@ parser =
         , possiblyNegativeTerm
             |> Parser.andThen
                 (\firstTerm ->
-                    Parser.succeed
-                        (\args ->
-                            if Array.isEmpty args then
-                                firstTerm
-
-                            else
+                    Parser.succeed identity
+                        |> Parser.skip Space.parser
+                        |> Parser.keep
+                            (Parser.withIndent
+                                firstTerm.start.col
+                                (Parser.loop
+                                    { currentTerm = firstTerm, currentArgs = [], binopSegments = [] }
+                                    argOrOperatorLoop
+                                )
+                            )
+                        |> Parser.map
+                            (\state ->
                                 let
-                                    end =
-                                        Array.last args
-                                            |> Maybe.map .end
-                                            |> Maybe.withDefault firstTerm.end
+                                    finalExpression =
+                                        toCall state.currentTerm state.currentArgs
                                 in
-                                SourcePosition.at
-                                    firstTerm.start
-                                    end
-                                    (AST.Call { fn = firstTerm, args = args })
-                        )
-                    |> Parser.skip Space.parser
-                    |> Parser.keep (Parser.withIndent firstTerm.start.col (Parser.loop [] argOrOperatorLoop))
+                                if Array.isEmpty state.binopSegments then
+                                    finalExpression
+
+                                else
+                                    let
+                                        expressionStart =
+                                            Array.first state.binopSegments
+                                                |> Maybe.map (\segment -> segment.leadingExpression.start)
+                                                |> Maybe.withDefault finalExpression.start
+                                    in
+                                    SourcePosition.at
+                                        expressionStart
+                                        finalExpression.end
+                                        (AST.Binops
+                                            { segments = state.binopSegments
+                                            , finalExpression = finalExpression
+                                            }
+                                        )
+                            )
                 )
         ]
 
 
-argOrOperatorLoop : Array AST.Expression -> Parser c Error (Parser.Step (Array AST.Expression) (Array AST.Expression))
-argOrOperatorLoop args =
+type alias ArgOrOperatorState =
+    { currentTerm : AST.Expression
+    , currentArgs : Array AST.Expression
+    , binopSegments : Array AST.BinopsSegment
+    }
+
+
+argOrOperatorLoop : ArgOrOperatorState -> Parser c Error (Parser.Step ArgOrOperatorState ArgOrOperatorState)
+argOrOperatorLoop state =
     Parser.oneOf
-        [ Parser.succeed (\arg -> Parser.Loop <| Array.pushLast arg args)
+        [ Parser.succeed (\start value end -> SourcePosition.at start end value)
             |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
-            |> Parser.keep possiblyNegativeTerm
+            |> Parser.keep Parser.getPosition
+            |> Parser.keep operatorParser
+            |> Parser.keep Parser.getPosition
             |> Parser.skip Space.parser
-        , Parser.succeed (Parser.Done args)
+            |> Parser.andThen
+                (\operator ->
+                    if operator.value == "-" then
+                        Parser.getPosition
+                            |> Parser.andThen
+                                (\pos ->
+                                    if operator.end.col == pos.col then
+                                        -- negated term (no space between operator)
+                                        Parser.succeed (\term_ -> Parser.Loop <| pushStateArg (SourcePosition.at operator.start term_.end (AST.Negate term_)) state)
+                                            |> Parser.keep term
+
+                                    else
+                                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
+                                            |> Parser.keep possiblyNegativeTerm
+                                )
+
+                    else
+                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
+                            |> Parser.skip Space.parser
+                            |> Parser.keep possiblyNegativeTerm
+                )
+                |> Parser.skip Space.parser
+        , Parser.succeed (\arg -> Parser.Loop <| pushStateArg arg state)
+            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
+            |> Parser.keep term
+            |> Parser.skip Space.parser
+        , Parser.succeed (Parser.Done state)
         ]
+
+
+pushStateArg : AST.Expression -> ArgOrOperatorState -> ArgOrOperatorState 
+pushStateArg arg state =
+    { state | currentArgs = Array.pushLast arg state.currentArgs }
+
+
+pushStateSegment : AST.Expression -> SourcePosition.Located String -> ArgOrOperatorState -> ArgOrOperatorState 
+pushStateSegment expr operator state =
+    { currentTerm = expr
+    , currentArgs = []
+    , binopSegments =
+        Array.pushLast
+            { leadingExpression = toCall state.currentTerm state.currentArgs
+            , operatorName = operator
+            }
+            state.binopSegments
+    }
+
+
+toCall : AST.Expression -> Array AST.Expression -> AST.Expression
+toCall fn args =
+    if Array.isEmpty args then
+        fn
+
+    else
+        let
+            argsEnd =
+                Array.last args
+                    |> Maybe.map .end
+                    |> Maybe.withDefault fn.end
+        in
+        SourcePosition.at
+            fn.start
+            argsEnd
+            (AST.Call { fn = fn, args = args })
+
+
+operatorChars : Set Char
+operatorChars =
+    Set.fromArray
+        [ '+'
+        , '-'
+        , '/'
+        , '*'
+        , '='
+        , '.'
+        , '<'
+        , '>'
+        , ':'
+        , '&'
+        , '|'
+        , '^'
+        , '?'
+        , '%'
+        , '!'
+        ]
+
+
+operatorParser : Parser c Error String
+operatorParser =
+    Parser.oneOf
+        [ Parser.symbol (Parser.Token { str = ".", expecting = BadOperator "."})
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "."))
+        , Parser.symbol (Parser.Token { str = "|", expecting = BadOperator "|"})
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "|"))
+        , Parser.symbol (Parser.Token { str = "->", expecting = BadOperator "->"})
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "->"))
+        , Parser.symbol (Parser.Token { str = "=", expecting = BadOperator "="})
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "="))
+        , Parser.symbol (Parser.Token { str = ":", expecting = BadOperator ":"})
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator ":"))
+        , Parser.succeed identity
+            |> Parser.skip (Parser.chompIf (\c -> Set.member c operatorChars) InvalidOperatorChar)
+            |> Parser.skip (Parser.chompWhile (\c -> Set.member c operatorChars))
+            |> Parser.getChompedString
+        ]
+        |> Parser.backtrackable
 
 
 -- LET

@@ -91,6 +91,107 @@ tests =
                                 ]
                             }
                         )
+            , test "operators" <| \_ ->
+                Parser.run PE.parser "func a + b - c"
+                    |> expectExpression
+                        (AST.Binops
+                            { segments =
+                                [ { leadingExpression =
+                                    SourcePosition.at
+                                        { row = 1, col = 1 }
+                                        { row = 1, col = 7 }
+                                        (AST.Call
+                                            { fn =
+                                                SourcePosition.at
+                                                    { row = 1, col = 1 }
+                                                    { row = 1, col = 5 }
+                                                    (AST.Var { name = "func", varType = AST.LowVar })
+                                            , args =
+                                                [ SourcePosition.at
+                                                    { row = 1, col = 6 }
+                                                    { row = 1, col = 7 }
+                                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                                ]
+                                            }
+                                        )
+                                    , operatorName =
+                                        SourcePosition.at
+                                            { row = 1, col = 8 }
+                                            { row = 1, col = 9 }
+                                            "+"
+                                  }
+                                , { leadingExpression =
+                                        SourcePosition.at
+                                            { row = 1, col = 10 }
+                                            { row = 1, col = 11 }
+                                            (AST.Var { name = "b", varType = AST.LowVar })
+                                    , operatorName =
+                                        SourcePosition.at
+                                            { row = 1, col = 12 }
+                                            { row = 1, col = 13 }
+                                            "-"
+                                  }
+                                ]
+                            , finalExpression =
+                                SourcePosition.at
+                                    { row = 1, col = 14 }
+                                    { row = 1, col = 15 }
+                                    (AST.Var { name = "c", varType = AST.LowVar })
+                            }
+                        )
+            , test "operators (with negated var)" <| \_ ->
+                Parser.run PE.parser "func a + -b - c"
+                    |> expectExpression
+                        (AST.Binops
+                            { segments =
+                                [ { leadingExpression =
+                                    SourcePosition.at
+                                        { row = 1, col = 1 }
+                                        { row = 1, col = 7 }
+                                        (AST.Call
+                                            { fn =
+                                                SourcePosition.at
+                                                    { row = 1, col = 1 }
+                                                    { row = 1, col = 5 }
+                                                    (AST.Var { name = "func", varType = AST.LowVar })
+                                            , args =
+                                                [ SourcePosition.at
+                                                    { row = 1, col = 6 }
+                                                    { row = 1, col = 7 }
+                                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                                ]
+                                            }
+                                        )
+                                    , operatorName =
+                                        SourcePosition.at
+                                            { row = 1, col = 8 }
+                                            { row = 1, col = 9 }
+                                            "+"
+                                  }
+                                , { leadingExpression =
+                                        SourcePosition.at
+                                            { row = 1, col = 10}
+                                            { row = 1, col = 12}
+                                            (AST.Negate <|
+                                                SourcePosition.at
+                                                    { row = 1, col = 11 }
+                                                    { row = 1, col = 12 }
+                                                    (AST.Var { name = "b", varType = AST.LowVar })
+                                            )
+                                    , operatorName =
+                                        SourcePosition.at
+                                            { row = 1, col = 13 }
+                                            { row = 1, col = 14 }
+                                            "-"
+                                  }
+                                ]
+                            , finalExpression =
+                                SourcePosition.at
+                                    { row = 1, col = 15 }
+                                    { row = 1, col = 16 }
+                                    (AST.Var { name = "c", varType = AST.LowVar })
+                            }
+                        )
             ]
         , describe "Array"
             [ test "Empty array" <| \_ ->
