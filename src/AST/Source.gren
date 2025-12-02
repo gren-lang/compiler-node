@@ -13,7 +13,11 @@ module AST.Source exposing
     , Type
     , Type_ (..)
     , TRecordField
+    , Alias
+    , Union
+    , UnionVariant
     )
+
 
 import SourcePosition
 import Parse.Number as Number
@@ -195,3 +199,24 @@ type alias TRecordField =
     { field : SourcePosition.Located String
     , signature : Type
     }
+
+
+-- Module
+
+
+type alias Alias =
+  { name : SourcePosition.Located String
+  , vars : Array (SourcePosition.Located String)
+  , type_ : Type
+  }
+
+type alias Union =
+  { name : SourcePosition.Located String
+  , vars : Array (SourcePosition.Located String)
+  , variants : Array (SourcePosition.Located UnionVariant)
+  }
+
+type alias UnionVariant =
+  { name : SourcePosition.Located String
+  , payload : Maybe Type
+  }

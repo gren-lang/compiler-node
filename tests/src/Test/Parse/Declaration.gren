@@ -1,0 +1,191 @@
+module Test.Parse.Declaration exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Parser.Advanced as Parser
+import Parse.Declaration as PD
+import SourcePosition
+import AST.Source as AST
+
+
+tests : Test
+tests =
+    describe "Parse.Declaration"
+        [ describe "type alias"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    type alias Name = String
+                    """
+                    |> expect
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 12 }
+                                    { row = 1, col = 16 }
+                                    "Name"
+                            , vars = []
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 1, col = 19 }
+                                    { row = 1, col = 25 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 19 }
+                                                { row = 1, col = 25 }
+                                                "String"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
+            , test "With doc comment" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    {-| Docs for Name
+                    -}
+                    type alias Name = String
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            "Docs for Name"
+                        )
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 12 }
+                                    { row = 3, col = 16 }
+                                    "Name"
+                            , vars = []
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 3, col = 19 }
+                                    { row = 3, col = 25 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 3, col = 19 }
+                                                { row = 3, col = 25 }
+                                                "String"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
+            , test "Args" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    type alias MyDict k v = Dict k v
+                    """
+                    |> expect
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 12 }
+                                    { row = 1, col = 18 }
+                                    "MyDict"
+                            , vars =
+                                [ SourcePosition.at
+                                    { row = 1, col = 19 }
+                                    { row = 1, col = 20 }
+                                    "k"
+                                , SourcePosition.at
+                                    { row = 1, col = 21 }
+                                    { row = 1, col = 22 }
+                                    "v"
+                                ]
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 1, col = 25 }
+                                    { row = 1, col = 33 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 25 }
+                                                { row = 1, col = 29 }
+                                                "Dict"
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 30 }
+                                                { row = 1, col = 31 }
+                                                (AST.TVar "k")
+                                            , SourcePosition.at
+                                                { row = 1, col = 32 }
+                                                { row = 1, col = 33 }
+                                                (AST.TVar "v")
+                                            ]
+                                        }
+                                    )
+                            }
+                        )
+            ]
+        , describe "type union"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    type Direction
+                        = Left
+                        | Right
+                    """
+                    |> expect
+                        (PD.Union
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 15 }
+                                    "Direction"
+                            , vars = []
+                            , variants =
+                                [ SourcePosition.at
+                                    { row = 2, col = 7 }
+                                    { row = 2, col = 11 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 2, col = 7 }
+                                            { row = 2, col = 11 }
+                                            "Left"
+                                    , payload = Nothing
+                                    }
+                                , SourcePosition.at
+                                    { row = 3, col = 7 }
+                                    { row = 3, col = 12 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 3, col = 7 }
+                                            { row = 3, col = 12 }
+                                            "Right"
+                                    , payload = Nothing
+                                    }
+                                ]
+                            }
+                        )
+            ]
+        ]
+
+
+expect : PD.DeclarationValue -> Result (Array (Parser.DeadEnd c e)) PD.Declaration -> Expectation
+expect expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok decl ->
+            Expect.equal expected decl.value
+
+
+expectDoc : SourcePosition.Located String -> PD.DeclarationValue -> Result (Array (Parser.DeadEnd c e)) PD.Declaration -> Expectation
+expectDoc expectedDocs expectedValue result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok decl ->
+            Expect.equal
+                { docs = Just expectedDocs
+                , value = expectedValue
+                }
+                decl
+

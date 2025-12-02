@@ -18,6 +18,7 @@
         "Compiler.Paths",
         "Compiler.License",
         "FileSystem.Lock",
+        "Parse.Declaration",
         "Parse.Expression",
         "Parse.Number",
         "Parse.String",

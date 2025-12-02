@@ -17,6 +17,7 @@ import Test.Parse.Variable
 import Test.Parse.Pattern
 import Test.Parse.Expression
 import Test.Parse.Type
+import Test.Parse.Declaration
 
 
 main : TestRunner.Program
@@ -38,4 +39,5 @@ main =
             , Test.Parse.Pattern.tests
             , Test.Parse.Variable.tests
             , Test.Parse.Type.tests
+            , Test.Parse.Declaration.tests
             ]
