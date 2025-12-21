@@ -258,6 +258,190 @@ tests =
                             }
                         )
             ]
+        , describe "Values"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    foo = "bar"
+                    """
+                    |> expect
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 4 }
+                                    "foo"
+                            , signature = Nothing
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 1, col = 7 }
+                                    { row = 1, col = 12 }
+                                    (AST.StringLiteral "bar")
+                            }
+                        )
+            , test "Simple case with docs" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    {-| value test
+                    -}
+                    foo = "bar"
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            "value test"
+                        )
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 1 }
+                                    { row = 3, col = 4 }
+                                    "foo"
+                            , signature = Nothing
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 3, col = 7 }
+                                    { row = 3, col = 12 }
+                                    (AST.StringLiteral "bar")
+                            }
+                        )
+            , test "Simple case with type" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    foo : String
+                    foo = "bar"
+                    """
+                    |> expect
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 4 }
+                                    "foo"
+                            , signature =
+                                Just <|
+                                    SourcePosition.at
+                                        { row = 1, col = 7 }
+                                        { row = 1, col = 13 }
+                                        (AST.TType
+                                            { name =
+                                                SourcePosition.at
+                                                    { row = 1, col = 7 }
+                                                    { row = 1, col = 13 }
+                                                    "String"
+                                            , args = []
+                                            }
+                                        )
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 2, col = 7 }
+                                    { row = 2, col = 12 }
+                                    (AST.StringLiteral "bar")
+                            }
+                        )
+            , test "Complex case" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    {-| Function docs
+                    -}
+                    foo : Int -> String
+                    foo n =
+                        String.repeat n "bar"
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            "Function docs"
+                        )
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 1 }
+                                    { row = 3, col = 4 }
+                                    "foo"
+                            , signature =
+                                Just <|
+                                    SourcePosition.at
+                                        { row = 3, col = 7 }
+                                        { row = 3, col = 20 }
+                                        (AST.TLambda
+                                            { from =
+                                                SourcePosition.at
+                                                    { row = 3, col = 7 }
+                                                    { row = 3, col = 10 }
+                                                    (AST.TType
+                                                        { name =
+                                                            SourcePosition.at
+                                                                { row = 3, col = 7 }
+                                                                { row = 3, col = 10 }
+                                                                "Int"
+                                                        , args = []
+                                                        }
+                                                    )
+                                            , to =
+                                                SourcePosition.at
+                                                    { row = 3, col = 14 }
+                                                    { row = 3, col = 20 }
+                                                    (AST.TType
+                                                        { name =
+                                                            SourcePosition.at
+                                                                { row = 3, col = 14 }
+                                                                { row = 3, col = 20 }
+                                                                "String"
+                                                        , args = []
+                                                        }
+                                                    )
+                                            }
+                                        )
+                            , args =
+                                [ SourcePosition.at
+                                    { row = 4, col = 5 }
+                                    { row = 4, col = 6 }
+                                    (AST.PVar "n")
+                                ]
+                            , body =
+                                SourcePosition.at
+                                    { row = 5, col = 5 }
+                                    { row = 5, col = 26 }
+                                    (AST.Call
+                                        { args =
+                                            [ SourcePosition.at
+                                                { row = 5, col = 11 }
+                                                { row = 5, col = 18 }
+                                                (AST.Accessor "repeat")
+                                            , SourcePosition.at
+                                                { row = 5, col = 19 }
+                                                { row = 5, col = 20 }
+                                                (AST.Var
+                                                    { name = "n"
+                                                    , varType = AST.LowVar
+                                                    }
+                                                )
+                                            , SourcePosition.at
+                                                { row = 5, col = 21 }
+                                                { row = 5, col = 26 }
+                                                (AST.StringLiteral "bar")
+                                            ]
+                                        , fn =
+                                            -- TODO: This is wrong, isn't it?
+                                            SourcePosition.at
+                                                { row = 5, col = 5 }
+                                                { row = 5, col = 11 }
+                                                (AST.Var
+                                                    { name = "String"
+                                                    , varType = AST.CapVar
+                                                    }
+                                                )
+                                        }
+                                    )
+                            }
+                        )
+            ]
         ]
 
 

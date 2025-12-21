@@ -1,6 +1,7 @@
 module Parse.Expression exposing
     ( Error (..)
     , parser
+    , letDefNamedParser
     )
 
 
@@ -236,11 +237,12 @@ letDefParser : Parser c Error (SourcePosition.Located AST.Def)
 letDefParser =
     Parser.oneOf
         [ letDefNamedParser
+            |> Parser.map (\{ start, value, end } -> SourcePosition.at start end (AST.Define value))
         , letDefDestructParser
         ]
 
 
-letDefNamedParser : Parser c Error (SourcePosition.Located AST.Def)
+letDefNamedParser : Parser c Error (SourcePosition.Located AST.DefineRecord)
 letDefNamedParser =
     Parser.succeed (\nameStart name nameEnd -> SourcePosition.at nameStart nameEnd name )
         |> Parser.keep Parser.getPosition
@@ -258,13 +260,11 @@ letDefNamedParser =
                         SourcePosition.at
                             var.start
                             bodyEnd
-                            (AST.Define
-                                { name = var
-                                , args = args
-                                , body = body
-                                , typeSignature = signature
-                                }
-                            )
+                            { name = var
+                            , args = args
+                            , body = body
+                            , typeSignature = signature
+                            }
                     )
                     |> Parser.keep
                         (Parser.oneOf

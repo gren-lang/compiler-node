@@ -7,6 +7,7 @@ module AST.Source exposing
     , WhenBranch
     , RecordField
     , Def (..)
+    , DefineRecord
     , Pattern
     , Pattern_ (..)
     , PRecordField
@@ -16,6 +17,7 @@ module AST.Source exposing
     , Alias
     , Union
     , UnionVariant
+    , Value
     )
 
 
@@ -113,15 +115,18 @@ type alias RecordField =
 
 
 type Def
-  = Define
+  = Define DefineRecord
+  | Destruct
+    { pattern : Pattern
+    , body : Expression
+    }
+
+
+type alias DefineRecord =
     { name : SourcePosition.Located String
     , args : Array Pattern
     , body : Expression
     , typeSignature : Maybe Type
-    }
-  | Destruct
-    { pattern : Pattern
-    , body : Expression
     }
 
 
@@ -210,13 +215,23 @@ type alias Alias =
   , type_ : Type
   }
 
+
 type alias Union =
   { name : SourcePosition.Located String
   , vars : Array (SourcePosition.Located String)
   , variants : Array (SourcePosition.Located UnionVariant)
   }
 
+
 type alias UnionVariant =
   { name : SourcePosition.Located String
   , payload : Maybe Type
+  }
+
+
+type alias Value =
+  { name : SourcePosition.Located String
+  , signature : Maybe Type
+  , args : Array Pattern
+  , body : Expression
   }

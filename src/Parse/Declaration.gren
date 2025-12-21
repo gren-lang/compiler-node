@@ -13,6 +13,7 @@ import Parse.Space as Space
 import Parse.Variable as Variable
 import Parse.Pattern as Pattern
 import Parse.Type as Type
+import Parse.Expression as Expr
 
 
 type alias Declaration =
@@ -24,6 +25,7 @@ type alias Declaration =
 type DeclarationValue
     = Alias AST.Alias
     | Union AST.Union
+    | Value AST.Value
 
 
 type Error
@@ -31,6 +33,7 @@ type Error
     | ExpectedChar Char
     | VariableError Variable.Error
     | TypeError Type.Error
+    | ExprError Expr.Error
 
 
 parser : Parser c Error Declaration
@@ -61,7 +64,22 @@ parser =
                 , Parser.succeed Nothing
                 ]
             )
-        |> Parser.keep typeParser
+        |> Parser.keep
+            (Parser.oneOf
+                [ typeParser
+                , Expr.letDefNamedParser
+                    |> Parser.mapError ExprError
+                    |> Parser.map
+                        (\def ->
+                            Value
+                                { name = def.value.name
+                                , signature = def.value.typeSignature
+                                , args = def.value.args
+                                , body = def.value.body
+                                }
+                        )
+                ]
+            )
 
 
 typeParser : Parser c Error DeclarationValue
