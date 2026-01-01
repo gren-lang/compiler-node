@@ -26,6 +26,7 @@ type DeclarationValue
     = Alias AST.Alias
     | Union AST.Union
     | Value AST.Value
+    | Port AST.Port
 
 
 type Error
@@ -67,6 +68,7 @@ parser =
         |> Parser.keep
             (Parser.oneOf
                 [ typeParser
+                , portParser
                 , Expr.letDefNamedParser
                     |> Parser.mapError ExprError
                     |> Parser.map
@@ -196,3 +198,23 @@ variantLoopParser variants =
             |> Parser.keep variantParser
         , Parser.succeed (Parser.Done variants)
         ]
+
+
+portParser : Parser c Error DeclarationValue
+portParser =
+    Parser.succeed
+        (\nameStart name nameEnd tipe ->
+            Port
+                { name = SourcePosition.at nameStart nameEnd name
+                , signature = tipe
+                }
+        )
+        |> Parser.skip (Parser.token (Parser.Token { str = "port", expecting = ExpectedKeyword "port"}))
+        |> Parser.skip Space.parser
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompIf (\c -> c == ':') (ExpectedChar ':'))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.mapError TypeError Type.expression)

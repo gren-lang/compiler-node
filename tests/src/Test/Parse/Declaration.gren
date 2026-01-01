@@ -442,6 +442,35 @@ tests =
                             }
                         )
             ]
+        , describe "Ports"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser
+                    """
+                    port myOutput : String
+                    """
+                    |> expect
+                        (PD.Port
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 14 }
+                                    "myOutput"
+                            , signature =
+                                SourcePosition.at
+                                    { row = 1, col = 17 }
+                                    { row = 1, col = 23 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 17 }
+                                                { row = 1, col = 23 }
+                                                "String"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
+            ]
         ]
 
 

@@ -18,6 +18,7 @@ module AST.Source exposing
     , Union
     , UnionVariant
     , Value
+    , Port
     )
 
 
@@ -234,4 +235,10 @@ type alias Value =
   , signature : Maybe Type
   , args : Array Pattern
   , body : Expression
+  }
+
+
+type alias Port =
+  { name : SourcePosition.Located String
+  , signature : Type
   }
