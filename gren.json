@@ -20,6 +20,7 @@
         "FileSystem.Lock",
         "Parse.Declaration",
         "Parse.Expression",
+        "Parse.Module",
         "Parse.Number",
         "Parse.String",
         "Parse.Space",

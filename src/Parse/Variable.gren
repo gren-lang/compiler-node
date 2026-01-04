@@ -3,6 +3,7 @@ module Parse.Variable exposing
     , lowerCase
     , upperCase
     , ForeignVar (..)
+    , foreignVarToString
     , foreignUpper
     , reservedWords
     )
@@ -71,6 +72,16 @@ upperCase =
 type ForeignVar
     = Unqualified String
     | Qualified { module_ : String, name : String }
+
+
+foreignVarToString : ForeignVar -> String
+foreignVarToString fv =
+    when fv is
+        Unqualified str ->
+            str
+
+        Qualified { module_, name } ->
+            module_ ++ "." ++ name
 
 
 foreignUpper : Parser c Error ForeignVar

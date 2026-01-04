@@ -19,6 +19,14 @@ module AST.Source exposing
     , UnionVariant
     , Value
     , Port
+    , Module
+    , Exposing (..)
+    , Exposed (..)
+    , Privacy (..)
+    , Import
+    , Effects (..)
+    , Manager (..)
+    , BinopAssociativity (..)
     )
 
 
@@ -207,7 +215,7 @@ type alias TRecordField =
     }
 
 
--- Module
+-- Declarations
 
 
 type alias Alias =
@@ -242,3 +250,68 @@ type alias Port =
   { name : SourcePosition.Located String
   , signature : Type
   }
+
+
+-- Module
+
+
+type alias Module =
+  { name : SourcePosition.Located String
+  , exports : Exposing
+  , docs : Maybe String
+  , imports : Array (SourcePosition.Located Import)
+  , values : Array (SourcePosition.Located Value)
+  , unions : Array (SourcePosition.Located Union)
+  , aliases : Array (SourcePosition.Located Alias)
+  , binops : Array (SourcePosition.Located Infix)
+  , effects : Effects
+  }
+
+
+type Exposing
+  = Open
+  | Explicit (Array Exposed)
+
+
+type Exposed
+  = ExposedLower (SourcePosition.Located String)
+  | ExposedUpper { name : SourcePosition.Located String, privacy : Privacy }
+  | ExposedOperator (SourcePosition.Located String)
+
+
+type Privacy
+  = Public SourcePosition.Region
+  | Private
+
+
+type alias Import =
+  { module_ : SourcePosition.Located String
+  , alias : Maybe String
+  , expose : Exposing
+  }
+
+
+type Effects
+  = NoEffects
+  | Ports (Array Port)
+  | Manager Manager
+
+
+type Manager
+  = Cmd (SourcePosition.Located String)
+  | Sub (SourcePosition.Located String)
+  | Fx { cmd : SourcePosition.Located String, sub : SourcePosition.Located String }
+  
+
+type alias Infix =
+  { fn : String
+  , symbol : String
+  , associativity : BinopAssociativity
+  , precedence : Int
+  }
+
+
+type BinopAssociativity
+  = OpALeft
+  | OpANone
+  | OpARight

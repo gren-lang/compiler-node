@@ -1,0 +1,44 @@
+module Test.Parse.Module exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Parser.Advanced as Parser
+import Parse.Module as PM
+import SourcePosition
+import AST.Source as AST
+
+
+tests : Test
+tests =
+    describe "Parse.Module"
+        [ test "Empty module" <| \_ ->
+            Parser.run PM.parser
+                """
+                module MyModule exposing (..)
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        ]
+
+
+expect : AST.Module -> Result (Array (Parser.DeadEnd c e)) AST.Module -> Expectation
+expect expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok res ->
+            Expect.equal expected res

@@ -1,0 +1,46 @@
+module Parse.Module exposing
+    ( Error (..)
+    , parser
+    )
+
+
+import Parser.Advanced as Parser exposing (Parser)
+import AST.Source as AST
+import SourcePosition
+import Parse.Space as Space
+import Parse.Variable as Variable
+
+
+type Error
+    = ExpectedKeyword String
+    | ModuleNameError Variable.Error
+
+
+parser : Parser c Error AST.Module
+parser =
+    Parser.succeed
+        (\nameStart name nameEnd ->
+            { name = SourcePosition.at nameStart nameEnd name
+            , exports = AST.Open
+            , docs = Nothing
+            , imports = []
+            , values = []
+            , unions = []
+            , aliases = []
+            , binops = []
+            , effects = AST.NoEffects
+            }
+        )
+        |> Parser.skip (Parser.token (Parser.Token { str = "module", expecting = ExpectedKeyword "module"}))
+        |> Parser.skip Space.parser
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep
+            ( Variable.foreignUpper
+                |> Parser.mapError ModuleNameError
+                |> Parser.map Variable.foreignVarToString
+            )
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.token (Parser.Token { str = "exposing", expecting = ExpectedKeyword "exposing"}))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.token (Parser.Token { str = "(..)", expecting = ExpectedKeyword "(..)"}))
