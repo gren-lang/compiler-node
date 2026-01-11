@@ -4,7 +4,11 @@ module SourcePosition exposing
     , Region
     , Located
     , at
+    , parser
     )
+
+
+import Parser.Advanced as Parser exposing (Parser)
 
 
 type alias Position =
@@ -37,3 +41,14 @@ type alias Located a =
 at : Position -> Position -> a -> Located a
 at start end a =
     { start = start, end = end, value = a }
+
+
+parser : Parser c e v -> Parser c e (Located v)
+parser p =
+    Parser.succeed
+        (\start v end ->
+            at start end v
+        )
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep p
+        |> Parser.keep Parser.getPosition

@@ -1,0 +1,66 @@
+module Parse.Operator exposing
+  ( parser
+  , Error (..)
+  )
+
+
+import Set exposing (Set)
+import Parser.Advanced as Parser exposing (Parser)
+
+
+type Error
+    = BadDot
+    | BadPipe
+    | BadArrow
+    | BadEquals
+    | BadHasType
+    | BadOperatorCharacter
+
+
+parser : Parser c Error String
+parser =
+    Parser.succeed (String.join "")
+        |> Parser.skip (Parser.chompIf (\c -> Set.member c opCharSet) BadOperatorCharacter)
+        |> Parser.skip (Parser.chompWhile (\c -> Set.member c opCharSet))
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\operator ->
+                when operator is
+                    "." ->
+                        Parser.problem BadDot
+
+                    "|" ->
+                        Parser.problem BadPipe
+
+                    "->" ->
+                        Parser.problem BadArrow
+
+                    "=" ->
+                        Parser.problem BadEquals
+
+                    ":" ->
+                        Parser.problem BadHasType
+
+                    _ ->
+                        Parser.succeed operator
+            )
+
+
+opCharSet : Set Char
+opCharSet =
+    Set.empty
+        |> Set.set '+'
+        |> Set.set '-'
+        |> Set.set '/'
+        |> Set.set '*'
+        |> Set.set '='
+        |> Set.set '.'
+        |> Set.set '<'
+        |> Set.set '>'
+        |> Set.set ':'
+        |> Set.set '&'
+        |> Set.set '|'
+        |> Set.set '^'
+        |> Set.set '?'
+        |> Set.set '%'
+        |> Set.set '!'

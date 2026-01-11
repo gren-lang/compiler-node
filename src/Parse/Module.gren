@@ -9,19 +9,22 @@ import AST.Source as AST
 import SourcePosition
 import Parse.Space as Space
 import Parse.Variable as Variable
+import Parse.Operator as Operator
 
 
 type Error
     = ExpectedKeyword String
-    | ModuleNameError Variable.Error
+    | ExpectedChar Char
+    | VariableError Variable.Error
+    | OperatorError Operator.Error
 
 
 parser : Parser c Error AST.Module
 parser =
     Parser.succeed
-        (\nameStart name nameEnd ->
-            { name = SourcePosition.at nameStart nameEnd name
-            , exports = AST.Open
+        (\name exports ->
+            { name = name
+            , exports = exports
             , docs = Nothing
             , imports = []
             , values = []
@@ -33,14 +36,99 @@ parser =
         )
         |> Parser.skip (Parser.token (Parser.Token { str = "module", expecting = ExpectedKeyword "module"}))
         |> Parser.skip Space.parser
-        |> Parser.keep Parser.getPosition
         |> Parser.keep
-            ( Variable.foreignUpper
-                |> Parser.mapError ModuleNameError
-                |> Parser.map Variable.foreignVarToString
+            ( SourcePosition.parser
+                ( Variable.foreignUpper
+                    |> Parser.mapError VariableError
+                    |> Parser.map Variable.foreignVarToString
+                )
             )
-        |> Parser.keep Parser.getPosition
         |> Parser.skip Space.parser
         |> Parser.skip (Parser.token (Parser.Token { str = "exposing", expecting = ExpectedKeyword "exposing"}))
         |> Parser.skip Space.parser
-        |> Parser.skip (Parser.token (Parser.Token { str = "(..)", expecting = ExpectedKeyword "(..)"}))
+        |> Parser.skip (Parser.chompIf (\c -> c == '(') (ExpectedChar '('))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed AST.Open
+                    |> Parser.skip (Parser.token (Parser.Token { str = "..", expecting = ExpectedKeyword ".."}))
+                    |> Parser.skip Space.parser
+                    |> Parser.skip (Parser.chompIf (\c -> c == ')') (ExpectedChar ')'))
+                , Parser.succeed AST.Explicit
+                    |> Parser.keep
+                        (parseExposingValue
+                            |> Parser.skip Space.parser
+                            |> Parser.andThen
+                                (\firstExposing ->
+                                    Parser.loop [ firstExposing ] parseExposingArray
+                                )
+                        )
+                ]
+            )
+
+
+parseExposingArray : Array AST.Exposed -> Parser c Error (Parser.Step (Array AST.Exposed) (Array AST.Exposed))
+parseExposingArray exps =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done exps)
+            |> Parser.skip (Parser.chompIf (\c -> c == ')') (ExpectedChar ')'))
+        , Parser.succeed (\next -> Parser.Loop <| Array.pushLast next exps)
+            |> Parser.skip (Parser.chompIf (\c -> c == ',') (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep parseExposingValue
+            |> Parser.skip Space.parser
+        ]
+
+
+parseExposingValue : Parser c Error AST.Exposed
+parseExposingValue =
+    Parser.oneOf
+        [ Parser.succeed AST.ExposedLower
+            |> Parser.keep
+                (SourcePosition.parser Variable.lowerCase
+                    |> Parser.mapError VariableError
+                )
+        , Parser.succeed (\name privacy -> AST.ExposedUpper { name = name, privacy = privacy })
+            |> Parser.keep
+                (SourcePosition.parser Variable.upperCase
+                    |> Parser.mapError VariableError
+                )
+            |> Parser.skip Space.parser
+            |> Parser.keep
+                (Parser.oneOf
+                    [ Parser.succeed AST.Public
+                        |> Parser.skip (Parser.chompIf (\c -> c == '(') (ExpectedChar '('))
+                        |> Parser.skip Space.parser
+                        |> Parser.skip (Parser.token (Parser.Token { str = "..", expecting = ExpectedKeyword ".."}))
+                        |> Parser.skip Space.parser
+                        |> Parser.skip (Parser.chompIf (\c -> c == ')') (ExpectedChar ')'))
+                    , Parser.succeed AST.Private
+                    ]
+                )
+        , Parser.succeed AST.ExposedOperator
+            |> Parser.skip (Parser.chompIf (\c -> c == '(') (ExpectedChar '('))
+            |> Parser.keep
+                (SourcePosition.parser Operator.parser
+                    |> Parser.mapError OperatorError
+                )
+            |> Parser.skip (Parser.chompIf (\c -> c == ')') (ExpectedChar ')'))
+        ]
+
+
+-- E.ExposingValue
+-- [ do
+--     name <- Var.lower E.ExposingValue
+--     end <- getPosition
+--     return $ Src.Lower $ A.at start end name,
+--   do
+--     word1 0x28 {-(-} E.ExposingValue
+--     op <- Symbol.operator E.ExposingOperator E.ExposingOperatorReserved
+--     word1 0x29 {-)-} E.ExposingOperatorRightParen
+--     end <- getPosition
+--     return $ Src.Operator (A.Region start end) op,
+--   do
+--     name <- Var.upper E.ExposingValue
+--     end <- getPosition
+--     Space.chompAndCheckIndent E.ExposingSpace E.ExposingIndentEnd
+--     Src.Upper (A.at start end name) <$> privacy
+-- ]
