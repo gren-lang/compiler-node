@@ -10,6 +10,7 @@ import SourcePosition
 import Parse.Space as Space
 import Parse.Variable as Variable
 import Parse.Operator as Operator
+import Parse.Declaration as Declaration
 
 
 type Error
@@ -22,10 +23,10 @@ type Error
 parser : Parser c Error AST.Module
 parser =
     Parser.succeed
-        (\name exports ->
+        (\name exports docs ->
             { name = name
             , exports = exports
-            , docs = Nothing
+            , docs = docs
             , imports = []
             , values = []
             , unions = []
@@ -65,6 +66,8 @@ parser =
                         )
                 ]
             )
+        |> Parser.skip Space.parser
+        |> Parser.keep (Declaration.docParser ExpectedKeyword)
 
 
 parseExposingArray : Array AST.Exposed -> Parser c Error (Parser.Step (Array AST.Exposed) (Array AST.Exposed))

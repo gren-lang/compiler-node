@@ -3,6 +3,7 @@ module Parse.Declaration exposing
     , DeclarationValue (..)
     , Error (..)
     , parser
+    , docParser
     )
 
 
@@ -45,26 +46,7 @@ parser =
             , value = value
             }
         )
-        |> Parser.keep
-            (Parser.oneOf
-                [ Parser.succeed
-                    (\docStart doc docEnd ->
-                        Just <|
-                            SourcePosition.at docStart docEnd doc
-                    )
-                    |> Parser.keep Parser.getPosition
-                    |> Parser.skip (Parser.token (Parser.Token { str = "{-|", expecting = ExpectedKeyword "{-|" }))
-                    |> Parser.skip Space.parser
-                    |> Parser.keep
-                        (Parser.chompUntil (Parser.Token { str = "-}", expecting = ExpectedKeyword "-}" })
-                            |> Parser.getChompedString
-                            |> Parser.map (String.dropLast 2 >> String.trimRight)
-                        )
-                    |> Parser.keep Parser.getPosition
-                    |> Parser.skip Space.parser
-                , Parser.succeed Nothing
-                ]
-            )
+        |> Parser.keep (docParser ExpectedKeyword)
         |> Parser.keep
             (Parser.oneOf
                 [ typeParser
@@ -82,6 +64,28 @@ parser =
                         )
                 ]
             )
+
+
+docParser : (String -> err) -> Parser c err (Maybe (SourcePosition.Located String))
+docParser toErr =
+    Parser.oneOf
+        [ Parser.succeed
+            (\docStart doc docEnd ->
+                Just <|
+                    SourcePosition.at docStart docEnd doc
+            )
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip (Parser.token (Parser.Token { str = "{-|", expecting = toErr "{-|" }))
+            |> Parser.skip Space.parser
+            |> Parser.keep
+                (Parser.chompUntil (Parser.Token { str = "-}", expecting = toErr "-}" })
+                    |> Parser.getChompedString
+                    |> Parser.map (String.dropLast 2 >> String.trimRight)
+                )
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip Space.parser
+        , Parser.succeed Nothing
+        ]
 
 
 typeParser : Parser c Error DeclarationValue

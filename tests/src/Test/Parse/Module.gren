@@ -79,6 +79,33 @@ tests =
                     , binops = []
                     , effects = AST.NoEffects
                     }
+        , test "Docs" <| \_ ->
+            Parser.run PM.parser
+                """
+                module MyModule exposing (..)
+
+                {-| The documentation for MyModule
+                -}
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Just <|
+                        SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 4, col = 3 }
+                            "The documentation for MyModule"
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
         ]
 
 

@@ -258,7 +258,7 @@ type alias Port =
 type alias Module =
   { name : SourcePosition.Located String
   , exports : Exposing
-  , docs : Maybe String
+  , docs : Maybe (SourcePosition.Located String)
   , imports : Array (SourcePosition.Located Import)
   , values : Array (SourcePosition.Located Value)
   , unions : Array (SourcePosition.Located Union)
