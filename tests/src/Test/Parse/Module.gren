@@ -140,6 +140,96 @@ tests =
                     , binops = []
                     , effects = AST.NoEffects
                     }
+        , test "imports with alias" <| \_ ->
+            Parser.run PM.parser
+                """
+                module MyModule exposing (..)
+
+                import Array as A
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 18 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 3, col = 8 }
+                                    { row = 3, col = 13 }
+                                    "Array"
+                            , alias = Just "A"
+                            , expose = AST.Explicit []
+                            }
+                        ]
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        , test "imports with alias and exposing" <| \_ ->
+            Parser.run PM.parser
+                """
+                module MyModule exposing (..)
+
+                import Array exposing (..)
+                import Nested.Module as N.M exposing (T)
+                """
+            |> expect
+                { name =
+                    SourcePosition.at
+                        { row = 1, col = 8 }
+                        { row = 1, col = 16 }
+                        "MyModule"
+                , exports = AST.Open
+                , docs = Nothing
+                , imports =
+                    [ SourcePosition.at
+                        { row = 3, col = 1 }
+                        { row = 3, col = 27 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 3, col = 8 }
+                                { row = 3, col = 13 }
+                                "Array"
+                        , alias = Nothing
+                        , expose = AST.Open
+                        }
+                    , SourcePosition.at
+                        { row = 4, col = 1 }
+                        { row = 4, col = 41 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 4, col = 8 }
+                                { row = 4, col = 21 }
+                                "Nested.Module"
+                        , alias = Just "N.M"
+                        , expose =
+                            AST.Explicit
+                                [ AST.ExposedUpper
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 4, col = 39 }
+                                            { row = 4, col = 40 }
+                                            "T"
+                                    , privacy = AST.Private
+                                    }
+                                ]
+                            }
+                        ]
+                , values = []
+                , unions = []
+                , aliases = []
+                , binops = []
+                , effects = AST.NoEffects
+                }
         ]
 
 
