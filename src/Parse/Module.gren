@@ -1,6 +1,7 @@
 module Parse.Module exposing
     ( Error (..)
     , parser
+    , errorsToString
     )
 
 
@@ -379,3 +380,24 @@ declarationToModulePort decl =
 
         _ ->
             Nothing
+
+
+-- ERROR
+
+
+errorsToString : String -> Array (Parser.DeadEnd Context Error) -> String
+errorsToString src deadEnds =
+  String.join "" <|
+    Parser.renderDeadEnds
+      { text = identity
+      , formatCaret = identity
+      , formatContext = identity
+      , newline = "\n"
+      , linesOfExtraContext = 2
+      }
+      { deadEndToString = \de -> { row = de.row, col = de.col, context = "" }
+      -- TODO: get rid of Debug
+      , problemToString = \err -> Parser.Other (Debug.toString err)
+      }
+      src
+      (Array.map (\de -> { row = de.row, col = de.col, payload = {}, problem = de.problem }) deadEnds)
