@@ -230,6 +230,55 @@ tests =
                 , binops = []
                 , effects = AST.NoEffects
                 }
+        , test "operators" <| \_ ->
+            Parser.run PM.parser
+                """
+                module MyModule exposing (..)
+
+                infix left  0 (|>) = apR
+                infix right 3 (&&) = and
+                infix non   4 (==) = eq
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 25 }
+                            { fn = "apR"
+                            , symbol = "|>"
+                            , associativity = AST.OpALeft
+                            , precedence = 0
+                            }
+                        , SourcePosition.at
+                            { row = 4, col = 1 }
+                            { row = 4, col = 25 }
+                            { fn = "and"
+                            , symbol = "&&"
+                            , associativity = AST.OpARight
+                            , precedence = 3
+                            }
+                        , SourcePosition.at
+                            { row = 5, col = 1 }
+                            { row = 5, col = 24 }
+                            { fn = "eq"
+                            , symbol = "=="
+                            , associativity = AST.OpANone
+                            , precedence = 4
+                            }
+                        ]
+                    , effects = AST.NoEffects
+                    }
         ]
 
 
