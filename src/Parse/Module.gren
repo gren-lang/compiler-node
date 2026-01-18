@@ -12,6 +12,7 @@ import Parse.Variable as Variable
 import Parse.Operator as Operator
 import Parse.Declaration as Declaration
 import Parse.Number as Number
+import Parse.Declaration as Declaration exposing (Declaration)
 
 
 type Error
@@ -20,21 +21,41 @@ type Error
     | VariableError Variable.Error
     | OperatorError Operator.Error
     | ExpectedIntPrecedence
+    | DeclarationError Declaration.Error
 
 
 parser : Parser c Error AST.Module
 parser =
     Parser.succeed
-        (\name exports docs imports binops ->
+        (\name exports docs imports binops decls ->
+            let
+                values =
+                    Array.mapAndKeepJust declarationToModuleValue decls
+
+                unions =
+                    Array.mapAndKeepJust declarationToModuleUnion decls
+
+                aliases =
+                    Array.mapAndKeepJust declarationToModuleAlias decls
+
+                ports =
+                    Array.mapAndKeepJust declarationToModulePort decls
+            in
             { name = name
             , exports = exports
             , docs = docs
             , imports = imports
-            , values = []
-            , unions = []
-            , aliases = []
+            , values = values
+            , unions = unions
+            , aliases = aliases
             , binops = binops
-            , effects = AST.NoEffects
+            , effects =
+                when ports is
+                    [] ->
+                        AST.NoEffects
+
+                    _ ->
+                        AST.Ports ports
             }
         )
         |> Parser.skip (Parser.token (Parser.Token { str = "module", expecting = ExpectedKeyword "module"}))
@@ -48,6 +69,8 @@ parser =
         |> Parser.keep (Parser.loop [] importLoopParser)
         |> Parser.skip Space.parser
         |> Parser.keep (Parser.loop [] operatorLoopParser)
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] declarationLoopParser)
 
 
 moduleNameParser : Parser c Error (SourcePosition.Located String)
@@ -269,3 +292,89 @@ operatorLoopParser ops =
             |> Parser.skip Space.parser
         , Parser.succeed (Parser.Done ops)
         ]
+
+
+declarationLoopParser
+    : Array Declaration.Declaration
+    -> Parser c Error (Parser.Step (Array Declaration.Declaration) (Array Declaration.Declaration))
+declarationLoopParser decls =
+    Parser.oneOf
+        [ Parser.succeed
+            (\decl ->
+                Parser.Loop <|
+                    Array.pushLast decl decls
+            )
+            |> Parser.keep (Parser.mapError DeclarationError Declaration.parser)
+            |> Parser.skip Space.parser
+        , Parser.succeed (Parser.Done decls)
+        ]
+
+
+declarationToModuleValue : Declaration -> Maybe (AST.ModuleDeclaration AST.Value)
+declarationToModuleValue decl =
+    when decl.value is
+        Declaration.Value v ->
+            Just <|
+                SourcePosition.at
+                    v.name.start
+                    v.body.end
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+declarationToModuleAlias : Declaration -> Maybe (AST.ModuleDeclaration AST.Alias)
+declarationToModuleAlias decl =
+    when decl.value is
+        Declaration.Alias v ->
+            Just <|
+                SourcePosition.at
+                    { row = v.name.start.row, col = 1 }
+                    v.type_.end
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+declarationToModuleUnion : Declaration -> Maybe (AST.ModuleDeclaration AST.Union)
+declarationToModuleUnion decl =
+    when decl.value is
+        Declaration.Union v ->
+            let
+                endPos =
+                    Array.last v.variants
+                        |> Maybe.map .end
+                        |> Maybe.withDefault v.name.end
+            in
+            Just <|
+                SourcePosition.at
+                    { row = v.name.start.row, col = 1 }
+                    endPos
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+declarationToModulePort : Declaration -> Maybe (AST.ModuleDeclaration AST.Port)
+declarationToModulePort decl =
+    when decl.value is
+        Declaration.Port v ->
+            Just <|
+                SourcePosition.at
+                    { row = v.name.start.row, col = 1 }
+                    v.signature.end
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing

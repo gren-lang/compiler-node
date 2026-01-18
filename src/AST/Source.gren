@@ -20,6 +20,7 @@ module AST.Source exposing
     , Value
     , Port
     , Module
+    , ModuleDeclaration
     , Exposing (..)
     , Exposed (..)
     , Privacy (..)
@@ -261,12 +262,19 @@ type alias Module =
   , exports : Exposing
   , docs : Maybe (SourcePosition.Located String)
   , imports : Array (SourcePosition.Located Import)
-  , values : Array (SourcePosition.Located Value)
-  , unions : Array (SourcePosition.Located Union)
-  , aliases : Array (SourcePosition.Located Alias)
+  , values : Array (ModuleDeclaration Value)
+  , unions : Array (ModuleDeclaration Union)
+  , aliases : Array (ModuleDeclaration Alias)
   , binops : Array (SourcePosition.Located Infix)
   , effects : Effects
   }
+
+
+type alias ModuleDeclaration v =
+  SourcePosition.Located
+    { docs : Maybe (SourcePosition.Located String)
+    , value : v
+    }
 
 
 type Exposing
@@ -294,7 +302,7 @@ type alias Import =
 
 type Effects
   = NoEffects
-  | Ports (Array Port)
+  | Ports (Array (ModuleDeclaration Port))
   | Manager Manager
 
 
