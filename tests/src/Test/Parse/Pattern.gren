@@ -96,6 +96,10 @@ tests =
             Parser.run PT.parser "160"
                 |> expectPattern
                     (AST.PInt { isHex = False, value = 160 })
+        , test "neagtive int" <| \_ ->
+            Parser.run PT.parser "-10"
+                |> expectPattern
+                    (AST.PInt { isHex = False, value = -10 })
         , test "ints (hex)" <| \_ ->
             Parser.run PT.parser "0xAB"
                 |> expectPattern
