@@ -8,7 +8,7 @@
   "dependencies": {
     "direct": {
       "gren-lang/node": "6.1.0",
-      "gren-lang/core": "7.2.1",
+      "gren-lang/core": "local:../../core",
       "gren-lang/test": "5.0.0",
       "gren-lang/parser": "6.2.0",
       "gren-lang/test-runner-node": "7.0.0",

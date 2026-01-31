@@ -9,9 +9,10 @@ module Parse.Variable exposing
     )
 
 
-import Parser.Advanced as Parser exposing (Parser)
+import String.Parser.Advanced as Parser exposing (Parser)
 import String.Regex as Regex exposing (Regex)
 import Set exposing (Set)
+import Parse.Context exposing (Context)
 
 
 type Error
@@ -20,7 +21,7 @@ type Error
     | ReservedWord String
 
 
-lowerCase : Parser c Error String
+lowerCase : Parser Context Error String
 lowerCase =
     -- TODO: simply stops parsing at invalid character, in lack of better alternatives
     -- Revisit this once gren-lang/parser has gotten more flexible
@@ -61,7 +62,7 @@ reservedWords =
         ]
 
 
-upperCase : Parser c Error String
+upperCase : Parser Context Error String
 upperCase =
     Parser.succeed {}
         |> Parser.skip (Parser.chompIf isUpperCaseLetter InvalidCharacter)
@@ -84,7 +85,7 @@ foreignVarToString fv =
             module_ ++ "." ++ name
 
 
-foreignUpper : Parser c Error ForeignVar
+foreignUpper : Parser Context Error ForeignVar
 foreignUpper =
     upperCase
         |> Parser.andThen
@@ -111,14 +112,14 @@ type alias ForeignUpperStep =
     }
 
 
-foreignUpperLoop : ForeignUpperStep -> Parser c Error (Parser.Step ForeignUpperStep ForeignUpperStep)
+foreignUpperLoop : ForeignUpperStep -> Parser Context Error (Parser.Step ForeignUpperStep ForeignUpperStep)
 foreignUpperLoop acc =
     Parser.oneOf
         [ Parser.succeed
             (\next ->
                 Parser.Loop { module_ = Array.pushLast acc.name acc.module_, name = next }
             )
-            |> Parser.skip (Parser.chompIf (\c -> c == '.') ExpectedDot)
+            |> Parser.skip (Parser.chompChar '.' ExpectedDot)
             |> Parser.keep upperCase
         , Parser.succeed (Parser.Done acc)
         ]

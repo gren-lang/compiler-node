@@ -7,7 +7,7 @@ module Parse.Declaration exposing
     )
 
 
-import Parser.Advanced as Parser exposing (Parser)
+import String.Parser.Advanced as Parser exposing (Parser)
 import AST.Source as AST
 import SourcePosition
 import Parse.Space as Space
@@ -15,6 +15,7 @@ import Parse.Variable as Variable
 import Parse.Pattern as Pattern
 import Parse.Type as Type
 import Parse.Expression as Expr
+import Parse.Context exposing (Context)
 
 
 type alias Declaration =
@@ -38,7 +39,7 @@ type Error
     | ExprError Expr.Error
 
 
-parser : Parser c Error Declaration
+parser : Parser Context Error Declaration
 parser =
     Parser.succeed
         (\docs value ->
@@ -66,7 +67,7 @@ parser =
             )
 
 
-docParser : (String -> err) -> Parser c err (Maybe (SourcePosition.Located String))
+docParser : (String -> err) -> Parser Context err (Maybe (SourcePosition.Located String))
 docParser toErr =
     Parser.oneOf
         [ Parser.succeed
@@ -75,10 +76,10 @@ docParser toErr =
                     SourcePosition.at docStart docEnd doc
             )
             |> Parser.keep Parser.getPosition
-            |> Parser.skip (Parser.token (Parser.Token { str = "{-|", expecting = toErr "{-|" }))
+            |> Parser.skip (Parser.token "{-|" (toErr "{-|"))
             |> Parser.skip Space.parser
             |> Parser.keep
-                (Parser.chompUntil (Parser.Token { str = "-}", expecting = toErr "-}" })
+                (Parser.chompUntil "-}" (toErr "-}")
                     |> Parser.getChompedString
                     |> Parser.map (String.dropLast 2 >> String.trimRight)
                 )
@@ -88,15 +89,15 @@ docParser toErr =
         ]
 
 
-typeParser : Parser c Error DeclarationValue
+typeParser : Parser Context Error DeclarationValue
 typeParser =
     Parser.succeed identity
-        |> Parser.skip (Parser.token (Parser.Token { str = "type", expecting = ExpectedKeyword "type"}))
+        |> Parser.skip (Parser.token "type" (ExpectedKeyword "type"))
         |> Parser.skip Space.parser
         |> Parser.keep (Parser.oneOf [ aliasParser, unionParser ])
 
 
-aliasParser : Parser c Error DeclarationValue
+aliasParser : Parser Context Error DeclarationValue
 aliasParser =
     Parser.succeed
         (\nameStart name nameEnd vars tipe ->
@@ -106,7 +107,7 @@ aliasParser =
                 , type_ = tipe
                 }
         )
-        |> Parser.skip (Parser.token (Parser.Token { str = "alias", expecting = ExpectedKeyword "alias"}))
+        |> Parser.skip (Parser.token "alias" (ExpectedKeyword "alias"))
         |> Parser.skip Space.parser
         |> Parser.keep Parser.getPosition
         |> Parser.keep (Parser.mapError VariableError Variable.upperCase)
@@ -117,11 +118,11 @@ aliasParser =
         |> Parser.keep (Parser.mapError TypeError Type.expression)
 
 
-typeArgLoopParser : Array (SourcePosition.Located String) -> Parser c Error (Parser.Step (Array (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
+typeArgLoopParser : Array (SourcePosition.Located String) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located String)) (Array (SourcePosition.Located String)))
 typeArgLoopParser vars =
     Parser.oneOf
         [ Parser.succeed (Parser.Done vars)
-            |> Parser.skip (Parser.chompIf (\c -> c == '=') (ExpectedChar '='))
+            |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
         , Parser.succeed
             (\varStart var varEnd ->
                 Parser.Loop <|
@@ -134,7 +135,7 @@ typeArgLoopParser vars =
         ]
 
 
-unionParser : Parser c Error DeclarationValue
+unionParser : Parser Context Error DeclarationValue
 unionParser =
     Parser.succeed
         (\nameStart name nameEnd vars variants ->
@@ -159,7 +160,7 @@ unionParser =
             )
 
 
-variantParser : Parser c Error (SourcePosition.Located AST.UnionVariant)
+variantParser : Parser Context Error (SourcePosition.Located AST.UnionVariant)
 variantParser =
     Parser.succeed
         (\nameStart name nameEnd payload ->
@@ -189,7 +190,7 @@ variantParser =
             )
 
 
-variantLoopParser : Array (SourcePosition.Located AST.UnionVariant) -> Parser c Error (Parser.Step (Array (SourcePosition.Located AST.UnionVariant)) (Array (SourcePosition.Located AST.UnionVariant)))
+variantLoopParser : Array (SourcePosition.Located AST.UnionVariant) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.UnionVariant)) (Array (SourcePosition.Located AST.UnionVariant)))
 variantLoopParser variants =
     Parser.oneOf
         [ Parser.succeed
@@ -197,14 +198,14 @@ variantLoopParser variants =
                 Parser.Loop <|
                     Array.pushLast variant variants
             )
-            |> Parser.skip (Parser.chompIf (\c -> c == '|') (ExpectedChar '|'))
+            |> Parser.skip (Parser.chompChar '|' (ExpectedChar '|'))
             |> Parser.skip Space.parser
             |> Parser.keep variantParser
         , Parser.succeed (Parser.Done variants)
         ]
 
 
-portParser : Parser c Error DeclarationValue
+portParser : Parser Context Error DeclarationValue
 portParser =
     Parser.succeed
         (\nameStart name nameEnd tipe ->
@@ -213,12 +214,12 @@ portParser =
                 , signature = tipe
                 }
         )
-        |> Parser.skip (Parser.token (Parser.Token { str = "port", expecting = ExpectedKeyword "port"}))
+        |> Parser.skip (Parser.token "port" (ExpectedKeyword "port"))
         |> Parser.skip Space.parser
         |> Parser.keep Parser.getPosition
         |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
         |> Parser.keep Parser.getPosition
         |> Parser.skip Space.parser
-        |> Parser.skip (Parser.chompIf (\c -> c == ':') (ExpectedChar ':'))
+        |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
         |> Parser.skip Space.parser
         |> Parser.keep (Parser.mapError TypeError Type.expression)

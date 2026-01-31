@@ -2,10 +2,11 @@ module Test.Parse.Declaration exposing ( tests )
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test, fuzz)
-import Parser.Advanced as Parser
+import String.Parser.Advanced as Parser
 import Parse.Declaration as PD
 import SourcePosition
 import AST.Source as AST
+import Parse.Context as Context
 
 
 tests : Test
@@ -13,7 +14,7 @@ tests =
     describe "Parse.Declaration"
         [ describe "type alias"
             [ test "Simple case" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     type alias Name = String
                     """
@@ -41,7 +42,7 @@ tests =
                             }
                         )
             , test "With doc comment" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     {-| Docs for Name
                     -}
@@ -76,7 +77,7 @@ tests =
                             }
                         )
             , test "Args" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     type alias MyDict k v = Dict k v
                     """
@@ -124,7 +125,7 @@ tests =
             ]
         , describe "type union"
             [ test "Simple case" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     type Direction
                         = Left
@@ -163,7 +164,7 @@ tests =
                             }
                         )
             , test "Simple case with docs" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     {-| Docs for union
                     -}
@@ -209,7 +210,7 @@ tests =
                             }
                         )
             , test "With var and payload" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     type Maybe a
                         = Just a
@@ -260,7 +261,7 @@ tests =
             ]
         , describe "Values"
             [ test "Simple case" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     foo = "bar"
                     """
@@ -281,7 +282,7 @@ tests =
                             }
                         )
             , test "Simple case with docs" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     {-| value test
                     -}
@@ -309,7 +310,7 @@ tests =
                             }
                         )
             , test "Simple case with type" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     foo : String
                     foo = "bar"
@@ -344,7 +345,7 @@ tests =
                             }
                         )
             , test "Complex case" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     {-| Function docs
                     -}
@@ -444,7 +445,7 @@ tests =
             ]
         , describe "Ports"
             [ test "Simple case" <| \_ ->
-                Parser.run PD.parser
+                Parser.run PD.parser Context.empty
                     """
                     port myOutput : String
                     """

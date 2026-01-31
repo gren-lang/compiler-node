@@ -6,7 +6,8 @@ module Parse.Number exposing
     )
 
 
-import Parser.Advanced as Parser exposing (Parser)
+import String.Parser.Advanced as Parser exposing (Parser)
+import Parse.Context exposing (Context)
 
 
 type Outcome
@@ -22,7 +23,7 @@ type Error
     | ExpectedHex
 
 
-parser : Parser c Error Outcome
+parser : Parser Context Error Outcome
 parser =
     Parser.oneOf
         [ Parser.succeed
@@ -37,7 +38,7 @@ parser =
                     Hex hex ->
                         Hex (negate hex)
             )
-            |> Parser.skip (Parser.symbol negateSign)
+            |> Parser.skip (Parser.token "-" NotANumber)
             |> Parser.keep numParser
         , numParser
         ]
@@ -51,22 +52,17 @@ parser =
             )
 
 
-negateSign : Parser.Token Error
-negateSign =
-    Parser.Token { str = "-", expecting = NotANumber }
-
-
-numParser : Parser c Error Outcome
+numParser : Parser Context Error Outcome
 numParser =
     Parser.oneOf
-        [ Parser.chompIf (\c -> c == '0') NotANumber
+        [ Parser.chompChar '0' NotANumber
             |> Parser.andThen
                 (\_ ->
                     Parser.oneOf
-                        [ Parser.chompIf (\c -> c == 'x') NotANumber
+                        [ Parser.chompChar 'x' NotANumber
                             |> Parser.andThen (\_ -> hexParser ExpectedHex)
                             |> Parser.map Hex
-                        , Parser.chompIf (\c -> c == '.') NotANumber
+                        , Parser.chompChar '.' NotANumber
                             |> Parser.andThen (\_ -> fractalParser "0")
                         , Parser.chompIf Char.isDigit NotANumber
                             |> Parser.andThen (\_ -> Parser.problem LeadingZero)
@@ -84,7 +80,7 @@ numParser =
 
                         Just num ->
                             Parser.oneOf
-                                [ Parser.chompIf (\c -> c == '.') NotANumber
+                                [ Parser.chompChar '.' NotANumber
                                     |> Parser.andThen (\_ -> fractalParser str)
                                 , Parser.succeed (Integer num)
                                 ]
@@ -92,7 +88,7 @@ numParser =
         ]
 
 
-fractalParser : String -> Parser c Error Outcome
+fractalParser : String -> Parser Context Error Outcome
 fractalParser str =
     Parser.chompIf Char.isDigit ExpectedInt
         |> Parser.skip (Parser.chompWhile Char.isDigit)
@@ -107,7 +103,7 @@ fractalParser str =
                         Parser.succeed (FloatingPoint float)
             )
 
-hexParser : error -> Parser c error Int
+hexParser : error -> Parser Context error Int
 hexParser err =
     Parser.chompIf Char.isHexDigit err
         |> Parser.skip (Parser.chompWhile Char.isHexDigit)

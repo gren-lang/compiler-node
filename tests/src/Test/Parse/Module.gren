@@ -2,18 +2,19 @@ module Test.Parse.Module exposing ( tests )
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test, fuzz)
-import Parser.Advanced as Parser
+import String.Parser.Advanced as Parser
 import Parse.Module as PM
 import Parse.Number as Number
 import SourcePosition
 import AST.Source as AST
+import Parse.Context as Context
 
 
 tests : Test
 tests =
     describe "Parse.Module"
         [ test "Empty module" <| \_ ->
-            Parser.run PM.parser
+            Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing (..)
                 """
@@ -33,7 +34,7 @@ tests =
                     , effects = AST.NoEffects
                     }
         , test "Empty module with exposings (valid when parsing)" <| \_ ->
-            Parser.run PM.parser
+            Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing ( Model, Msg (..), (==), view )
                 """
@@ -81,7 +82,7 @@ tests =
                     , effects = AST.NoEffects
                     }
         , test "Docs" <| \_ ->
-            Parser.run PM.parser
+            Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing (..)
 
@@ -108,7 +109,7 @@ tests =
                     , effects = AST.NoEffects
                     }
         , test "imports" <| \_ ->
-            Parser.run PM.parser
+            Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing (..)
 
@@ -142,7 +143,7 @@ tests =
                     , effects = AST.NoEffects
                     }
         , test "imports with alias" <| \_ ->
-            Parser.run PM.parser
+            Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing (..)
 
@@ -176,7 +177,7 @@ tests =
                     , effects = AST.NoEffects
                     }
         , test "imports with alias and exposing" <| \_ ->
-            Parser.run PM.parser
+            Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing (..)
 
@@ -232,7 +233,7 @@ tests =
                 , effects = AST.NoEffects
                 }
         , test "operators" <| \_ ->
-            Parser.run PM.parser
+            Parser.run PM.parser Context.empty
                 """
                 module MyModule exposing (..)
 
@@ -281,7 +282,7 @@ tests =
                      , effects = AST.NoEffects
                      }
          , test "Module with values, type aliases, unions, and ports" <| \_ ->
-             Parser.run PM.parser
+             Parser.run PM.parser Context.empty
                  """
                  module MyValues exposing (..)
 

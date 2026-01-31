@@ -2,8 +2,9 @@ module Test.Parse.Variable exposing ( tests )
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
-import Parser.Advanced as Parser
+import String.Parser.Advanced as Parser
 import Parse.Variable as PV
+import Parse.Context as Context
 import Set
 
 
@@ -12,64 +13,64 @@ tests =
     describe "Parse.Variable"
         [ describe "Lower case"
             [ test "Simple case" <| \_ ->
-                Parser.run PV.lowerCase "myvar"
+                Parser.run PV.lowerCase Context.empty "myvar"
                     |> Expect.equal (Ok "myvar")
             , test "unicode" <| \_ ->
-                Parser.run PV.lowerCase "åberg albert"
+                Parser.run PV.lowerCase Context.empty "åberg albert"
                     |> Expect.equal (Ok "åberg")
             , test "underscore" <| \_ ->
-                Parser.run PV.lowerCase "my_var"
+                Parser.run PV.lowerCase Context.empty "my_var"
                     |> Expect.equal (Ok "my_var")
             , test "with unicode, upper case, digits and underscore" <| \_ ->
-                Parser.run PV.lowerCase "miN_1_Øse"
+                Parser.run PV.lowerCase Context.empty "miN_1_Øse"
                     |> Expect.equal (Ok "miN_1_Øse")
             , test "no emojis" <| \_ ->
-                Parser.run PV.lowerCase "hey🫵"
+                Parser.run PV.lowerCase Context.empty "hey🫵"
                     |> Expect.equal (Ok "hey")
             , test "cannot start with digit" <| \_ ->
-                Parser.run PV.lowerCase "1month"
+                Parser.run PV.lowerCase Context.empty "1month"
                     |> expectErr PV.InvalidCharacter
             , test "cannot start with upper case" <| \_ ->
-                Parser.run PV.lowerCase "Month"
+                Parser.run PV.lowerCase Context.empty "Month"
                     |> expectErr PV.InvalidCharacter
             , test "refuses to parse reserved words" <| \_ ->
                 Set.toArray PV.reservedWords
-                    |> Array.map (Parser.run PV.lowerCase)
+                    |> Array.map (Parser.run PV.lowerCase Context.empty)
                     |> Result.firstOk
                     |> Expect.equal Nothing
             ]
         , describe "Upper case"
             [ test "Simple case" <| \_ ->
-                Parser.run PV.upperCase "Myvar"
+                Parser.run PV.upperCase Context.empty "Myvar"
                     |> Expect.equal (Ok "Myvar")
             , test "unicode" <| \_ ->
-                Parser.run PV.upperCase "Åberg albert"
+                Parser.run PV.upperCase Context.empty "Åberg albert"
                     |> Expect.equal (Ok "Åberg")
             , test "underscore" <| \_ ->
-                Parser.run PV.upperCase "My_var"
+                Parser.run PV.upperCase Context.empty "My_var"
                     |> Expect.equal (Ok "My_var")
             , test "with unicode, upper case, digits and underscore" <| \_ ->
-                Parser.run PV.upperCase "MiN_1_Øse"
+                Parser.run PV.upperCase Context.empty "MiN_1_Øse"
                     |> Expect.equal (Ok "MiN_1_Øse")
             , test "no emojis" <| \_ ->
-                Parser.run PV.upperCase "Hey🫵"
+                Parser.run PV.upperCase Context.empty "Hey🫵"
                     |> Expect.equal (Ok "Hey")
             , test "cannot start with digit" <| \_ ->
-                Parser.run PV.upperCase "1month"
+                Parser.run PV.upperCase Context.empty "1month"
                     |> expectErr PV.InvalidCharacter
             , test "cannot start with lower case" <| \_ ->
-                Parser.run PV.upperCase "month"
+                Parser.run PV.upperCase Context.empty "month"
                     |> expectErr PV.InvalidCharacter
             ]
         , describe "Possibly qualified upper"
             [ test "Unqualified" <| \_ ->
-                Parser.run PV.foreignUpper "Upper"
+                Parser.run PV.foreignUpper Context.empty "Upper"
                     |> Expect.equal (Ok (PV.Unqualified "Upper"))
             , test "Qualified" <| \_ ->
-                Parser.run PV.foreignUpper "My.Upper"
+                Parser.run PV.foreignUpper Context.empty "My.Upper"
                     |> Expect.equal (Ok (PV.Qualified { module_ = "My", name = "Upper" }))
             , test "Qualified (2)" <| \_ ->
-                Parser.run PV.foreignUpper "My.Nested.Upper"
+                Parser.run PV.foreignUpper Context.empty "My.Nested.Upper"
                     |> Expect.equal (Ok (PV.Qualified { module_ = "My.Nested", name = "Upper" }))
             ]
         ]

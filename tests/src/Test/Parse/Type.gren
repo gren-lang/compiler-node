@@ -2,8 +2,9 @@ module Test.Parse.Type exposing ( tests )
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
-import Parser.Advanced as Parser
+import String.Parser.Advanced as Parser
 import Parse.Type as PT
+import Parse.Context as Context
 import AST.Source as AST
 import SourcePosition
 
@@ -12,7 +13,7 @@ tests : Test
 tests =
     describe "Parse.Type"
         [ test "Type" <| \_ ->
-            Parser.run PT.expression "MyType"
+            Parser.run PT.expression Context.empty "MyType"
                 |> expectExpression
                     (AST.TType
                         { name =
@@ -24,7 +25,7 @@ tests =
                         }
                     )
         , test "Type (with args)" <| \_ ->
-            Parser.run PT.expression "MyType a String"
+            Parser.run PT.expression Context.empty "MyType a String"
                 |> expectExpression
                     (AST.TType
                         { name =
@@ -53,7 +54,7 @@ tests =
                         }
                     )
         , test "Qualified Type" <| \_ ->
-            Parser.run PT.expression "Main.Module.MyType"
+            Parser.run PT.expression Context.empty "Main.Module.MyType"
                 |> expectExpression
                     (AST.TTypeQual
                         { varRegion = { start = { row = 1, col = 1 }, end = { row = 1, col = 19 } }
@@ -63,7 +64,7 @@ tests =
                         }
                     )
         , test "Qualified Type (wtih args)" <| \_ ->
-            Parser.run PT.expression "Main.Module.MyType msg"
+            Parser.run PT.expression Context.empty "Main.Module.MyType msg"
                 |> expectExpression
                     (AST.TTypeQual
                         { varRegion = { start = { row = 1, col = 1 }, end = { row = 1, col = 19 } }
@@ -78,11 +79,11 @@ tests =
                         }
                     )
         , test "Type variable" <| \_ ->
-            Parser.run PT.expression "msg"
+            Parser.run PT.expression Context.empty "msg"
                 |> expectExpression
                     (AST.TVar "msg")
         , test "Parenthesized" <| \_ ->
-            Parser.run PT.expression "(a)"
+            Parser.run PT.expression Context.empty "(a)"
                 |> expectExpression
                     (AST.TParens <|
                         SourcePosition.at
@@ -91,7 +92,7 @@ tests =
                             (AST.TVar "a")
                     )
         , test "Empty Record" <| \_ ->
-            Parser.run PT.expression "{ }"
+            Parser.run PT.expression Context.empty "{ }"
                 |> expectExpression
                     (AST.TRecord
                         { fields = []
@@ -99,7 +100,7 @@ tests =
                         }
                     )
         , test "Record with one field" <| \_ ->
-            Parser.run PT.expression "{ hello : String }"
+            Parser.run PT.expression Context.empty "{ hello : String }"
                 |> expectExpression
                     (AST.TRecord
                         { fields =
@@ -127,7 +128,7 @@ tests =
                         }
                     )
         , test "Record with two fields" <| \_ ->
-            Parser.run PT.expression "{ hello : String, person : String }"
+            Parser.run PT.expression Context.empty "{ hello : String, person : String }"
                 |> expectExpression
                     (AST.TRecord
                         { fields =
@@ -174,7 +175,7 @@ tests =
                         }
                     )
         , test "Record update with two fields" <| \_ ->
-            Parser.run PT.expression "{ rec | hello : String, person : String }"
+            Parser.run PT.expression Context.empty "{ rec | hello : String, person : String }"
                 |> expectExpression
                     (AST.TRecord
                         { fields =
@@ -226,7 +227,7 @@ tests =
                         }
                     )
         , test "Lambda" <| \_ ->
-            Parser.run PT.expression "a -> b -> c"
+            Parser.run PT.expression Context.empty "a -> b -> c"
                 |> expectExpression
                     (AST.TLambda
                         { from =
@@ -254,7 +255,7 @@ tests =
                         }
                     )
         , test "Stop when variable appears on a fresh line" <| \_ ->
-            Parser.run PT.expression
+            Parser.run PT.expression Context.empty
                 """
                 Test a
                 b

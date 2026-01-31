@@ -3,26 +3,27 @@ module Test.Parse.Pattern exposing ( tests )
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test, fuzz)
 import Fuzz exposing (Fuzzer)
-import Parser.Advanced as Parser
+import String.Parser.Advanced as Parser
 import Parse.Pattern as PT
 import AST.Source as AST
 import SourcePosition
+import Parse.Context as Context
 
 
 tests : Test
 tests =
     describe "Parse.Pattern"
         [ test "vars" <| \_ ->
-            Parser.run PT.parser "var"
+            Parser.run PT.parser Context.empty "var"
                 |> expectPattern (AST.PVar "var")
         , test "wildcard" <| \_ ->
-            Parser.run PT.parser "_"
+            Parser.run PT.parser Context.empty "_"
                 |> expectPattern (AST.PAnything "")
         , test "wildcard (named)" <| \_ ->
-            Parser.run PT.parser "_test"
+            Parser.run PT.parser Context.empty "_test"
                 |> expectPattern (AST.PAnything "test")
         , test "constructor (unqualified)" <| \_ ->
-            Parser.run PT.parser "Ctor"
+            Parser.run PT.parser Context.empty "Ctor"
                 |> expectPattern
                     (AST.PCtor
                         { arg = Nothing
@@ -34,7 +35,7 @@ tests =
                         }
                     )
         , test "constructor (with args)" <| \_ ->
-            Parser.run PT.parser "Ctor arg"
+            Parser.run PT.parser Context.empty "Ctor arg"
                 |> expectPattern
                     (AST.PCtor
                         { arg =
@@ -51,7 +52,7 @@ tests =
                         }
                     )
         , test "constructor (terminated by ->)" <| \_ ->
-            Parser.run PT.parser "Ctor ->"
+            Parser.run PT.parser Context.empty "Ctor ->"
                 |> expectPattern
                     (AST.PCtor
                         { arg = Nothing
@@ -63,7 +64,7 @@ tests =
                         }
                     )
         , test "constructor (parenthesized with args)" <| \_ ->
-            Parser.run PT.parser "(Ctor arg)"
+            Parser.run PT.parser Context.empty "(Ctor arg)"
                 |> expectPattern
                     (AST.PCtor
                         { arg =
@@ -80,7 +81,7 @@ tests =
                         }
                     )
         , test "constructor (qualified)" <| \_ ->
-            Parser.run PT.parser "My.Ctor"
+            Parser.run PT.parser Context.empty "My.Ctor"
                 |> expectPattern
                     (AST.PCtorQual
                         { varRegion =
@@ -93,31 +94,31 @@ tests =
                         }
                     )
         , test "ints" <| \_ ->
-            Parser.run PT.parser "160"
+            Parser.run PT.parser Context.empty "160"
                 |> expectPattern
                     (AST.PInt { isHex = False, value = 160 })
         , test "neagtive int" <| \_ ->
-            Parser.run PT.parser "-10"
+            Parser.run PT.parser Context.empty "-10"
                 |> expectPattern
                     (AST.PInt { isHex = False, value = -10 })
         , test "ints (hex)" <| \_ ->
-            Parser.run PT.parser "0xAB"
+            Parser.run PT.parser Context.empty "0xAB"
                 |> expectPattern
                     (AST.PInt { isHex = True, value = 171 })
         , test "string" <| \_ ->
-            Parser.run PT.parser "\"some String\""
+            Parser.run PT.parser Context.empty "\"some String\""
                 |> expectPattern
                     (AST.PStr "some String")
         , test "char" <| \_ ->
-            Parser.run PT.parser "'z'"
+            Parser.run PT.parser Context.empty "'z'"
                 |> expectPattern
                     (AST.PChr 'z')
         , test "array (empty)" <| \_ ->
-            Parser.run PT.parser "[]"
+            Parser.run PT.parser Context.empty "[]"
                 |> expectPattern
                     (AST.PArray [])
         , test "array" <| \_ ->
-            Parser.run PT.parser "[ a, 2, b ]"
+            Parser.run PT.parser Context.empty "[ a, 2, b ]"
                 |> expectPattern
                     (AST.PArray
                         [ SourcePosition.at
@@ -135,11 +136,11 @@ tests =
                         ]
                     )
         , test "record (empty)" <| \_ ->
-            Parser.run PT.parser "{}"
+            Parser.run PT.parser Context.empty "{}"
                 |> expectPattern
                     (AST.PRecord [])
         , test "record" <| \_ ->
-            Parser.run PT.parser "{ a = 1, b = _ }"
+            Parser.run PT.parser Context.empty "{ a = 1, b = _ }"
                 |> expectPattern
                     (AST.PRecord
                         [ { field =
@@ -169,7 +170,7 @@ tests =
                         ]
                     )
         , test "record (shorthand)" <| \_ ->
-            Parser.run PT.parser "{ a, b = _ }"
+            Parser.run PT.parser Context.empty "{ a, b = _ }"
                 |> expectPattern
                     (AST.PRecord
                         [ { field =
