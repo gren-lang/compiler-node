@@ -97,7 +97,7 @@ type alias App result =
 type GroupParser result
     = GroupParser 
         { knownCommands : Dict String (Maybe String)
-        , parseFn : String -> String -> Array String -> Dict String String -> CommandParseResult result
+        , parseFn : String -> String -> Array String -> CommandParseResult result
         }
 
 
@@ -108,7 +108,7 @@ defineGroup : GroupParser result
 defineGroup =
     GroupParser
         { knownCommands = Dict.empty 
-        , parseFn = \_appName name _args _flags ->
+        , parseFn = \_appName name _args ->
             UnknownCommand name
         }
 
@@ -122,12 +122,12 @@ withCommand command (GroupParser { knownCommands, parseFn = next }) =
     GroupParser 
         { knownCommands = 
             Dict.set command.word command.commonDescription knownCommands
-        , parseFn = \appName name args flags ->
+        , parseFn = \appName name args ->
             if name /= command.word then
-                next appName name args flags
+                next appName name args
 
             else
-                runCommand appName args flags command
+                runCommand appName args command
         }
 
 
@@ -138,12 +138,12 @@ withPrefix prefix prefixedCommands (GroupParser { knownCommands, parseFn = nextC
     GroupParser
         { knownCommands =
             Dict.set prefix Nothing knownCommands
-        , parseFn = \appName name args flags ->
+        , parseFn = \appName name args ->
             if name /= prefix then
-                nextCommand appName name args flags
+                nextCommand appName name args
 
             else
-                runPrefix appName prefix args flags prefixedCommands
+                runPrefix appName prefix args prefixedCommands
         }
 
 
@@ -156,20 +156,20 @@ run tokens appDef =
         (GroupParser { parseFn = parse }) =
             appDef.commands
         
-        { trues = flags, falses = arguments } =
-            Array.partition (\word -> String.startsWith "--" word) tokens
     in
-    when flags is
-        [ "--version" ] ->
-            HelpText <| PP.text appDef.version
-        
-        _ ->
-            when Array.popFirst arguments is
-                Just { first = command, rest = args } ->
-                    parse appDef.name command args (buildFlagDict flags)
+        when Array.popFirst tokens is
+            Just { first = command, rest = rawTokensAfterCommand } ->
+                when command is
+                    -- If the "command" that was found is actually
+                    -- one of our special flags, handle it here.
+                    -- Otherwise, call the parse function.
+                    "--version" -> HelpText <| PP.text appDef.version
+                    "--help" -> HelpText <| appHelpText appDef
+                    _ -> parse appDef.name command rawTokensAfterCommand
 
-                Nothing ->
-                    HelpText <| appHelpText appDef
+            Nothing ->
+                -- There's no first token, thus, no command, so show the Help.
+                HelpText <| appHelpText appDef
 
 
 appHelpText : App result -> PP.Document
@@ -240,11 +240,11 @@ appHelpText appDef =
         ]
 
 
-runPrefix : String -> String -> Array String -> Dict String String -> GroupParser result -> CommandParseResult result
-runPrefix appName prefixName arguments flags ((GroupParser { parseFn = parse }) as groupParser) =
-    when Array.popFirst arguments is
-        Just { first = command, rest = args } ->
-            parse appName command args flags
+runPrefix : String -> String -> Array String -> GroupParser result -> CommandParseResult result
+runPrefix appName prefixName rawTokensAfterPrefix ((GroupParser { parseFn = parse }) as groupParser) =
+    when Array.popFirst rawTokensAfterPrefix is
+        Just { first = command, rest = rawTokens } ->
+            parse appName command rawTokens
 
         Nothing ->
             HelpText <| prefixHelpText appName prefixName groupParser
@@ -276,30 +276,6 @@ prefixHelpText appName prefixName (GroupParser { knownCommands }) =
         , PP.empty
         ]
 
-buildFlagDict : Array String -> Dict String String
-buildFlagDict flags =
-    Array.foldl
-        (\rawFlag dict ->
-            let
-                flagParts =
-                    rawFlag
-                        |> String.dropFirst 2 -- the --prefix            
-                        |> String.split "="
-                        |> Array.takeFirst 2
-            in
-            when flagParts is
-                [ key ] ->
-                    Dict.set key "" dict
-
-                [ key, value ] ->
-                    Dict.set key value dict
-
-                _ ->
-                    dict
-        )
-        Dict.empty
-        flags
-
 
 -- COMMAND
 
@@ -327,17 +303,150 @@ type CommandParseResult a
     | Success a
 
 
-runCommand : String -> Array String -> Dict String String -> Command args flags result -> CommandParseResult result
-runCommand appName args flags spec =
+parseRawTokens : KnownFlags -> Array String -> { flags : Dict String String, args : Array String }
+parseRawTokens knownFlags tokens =
     let
-        (ArgumentParser { parseFn = parseArgs }) =
-            spec.arguments
-    
-        (FlagParser { knownFlags, parseFn = parseFlags }) =
-            spec.flags
+
+        -- Split a "lhs=rhs" string (left-hand-side, right-hand-side),
+        -- on the first equals sign ("="), but where the rhs can have ='s.
+        -- If there is indeed a "lhs=rhs" pattern, return Just LHS RHS,
+        -- otherwise return Nothing.
+        splitOnFirstEqual : String -> Maybe { lhs: String, rhs: String }
+        splitOnFirstEqual input =
+            let
+                equalIndex = String.firstIndexOf "=" input
+            in
+                when equalIndex is
+                    Nothing -> Nothing
+                    Just i ->
+                        Just
+                            { lhs = String.takeFirst (i) input
+                            , rhs = String.dropFirst (i+1) input
+                            }
+
+        -- Handle a '--flag=value' token, or 'arg'
+        step: String -> Array String -> { flags: Dict String String, args: Array String } -> { flags: Dict String String, args: Array String }
+        step token rest acc =
+            if String.startsWith "--" token then
+                let
+                    withoutPrefix =
+                        String.dropFirst 2 token
+
+                    maybeFlagValue =
+                        splitOnFirstEqual withoutPrefix
+
+                in
+                when maybeFlagValue is
+                    Just { lhs = flagName, rhs = value } ->
+                        stepNext rest { acc | flags = Dict.set flagName value acc.flags }
+
+                    Nothing->
+                        -- Handle a flag without a '='
+                        -- This is impossible, as 'step' is only called when
+                        -- '=' is present. To appease the compiler, we put in the
+                        -- logic which should run, but it was actually handled in
+                        -- handleBareFlag
+                        stepNext rest { acc | flags = Dict.set withoutPrefix "" acc.flags }
+
+            else
+                -- Positional argument
+                stepNext rest { acc | args = Array.pushLast token acc.args }
+
+        -- Special handling for flag tokens that do not have a "=" in them.
+        -- This would be '--flag value', but not '--flag=value'
+        handleBareFlag : String -> Array String -> { flags : Dict String String, args : Array String } -> { flags : Dict String String, args : Array String }
+        handleBareFlag withoutPrefix rest acc =
+            when Dict.get withoutPrefix knownFlags is
+                Just desc ->
+                    -- Here we depend on the FlagParserDescription's title
+                    -- value. If it's an empty string, we consider it a toggle
+                    -- flag which cannot accept a value. If it's not an empty
+                    -- string, it must have a value.
+                    -- Only consume the next token if the flag requires a value (non-empty title)
+                    if desc.title /= "" && not (Array.isEmpty rest) then
+                        let
+                            nextToken =
+                                Array.first rest |> Maybe.withDefault ""
+                        in
+
+                        {- if we wanted to allow '--output --legal-filename',
+                        we would set the withoutPrefix/nextToken as key/value
+                        here, and stepNext into the rest of the tokens.
+                            let
+                                restWithoutValue =
+                                    Array.dropFirst 1 rest
+                            in
+                            stepNext restWithoutValue { acc | flags = Dict.set withoutPrefix nextToken acc.flags }
+                        -}
+
+                        -- Check the next token; does it look like a --flag ?
+                        if not (String.startsWith "--" nextToken) then
+                            -- It does not look like a --flag. Use it as a value
+                            let
+                                restWithoutValue =
+                                    Array.dropFirst 1 rest
+                            in
+                            stepNext restWithoutValue { acc | flags = Dict.set withoutPrefix nextToken acc.flags }
+
+                        else
+                            -- It does look like a --flag. Even though we know
+                            -- that the flag we're currently processing needs
+                            -- a value, don't give it a value. This will later
+                            -- trigger the error handling to report either that
+                            -- the next flags is an unknown flag, or that
+                            -- this flag is missing a value.
+                            stepNext rest { acc | flags = Dict.set withoutPrefix "" acc.flags }
+
+                    else
+                        -- Toggle flag or no next token available
+                        stepNext rest { acc | flags = Dict.set withoutPrefix "" acc.flags }
+
+                Nothing ->
+                    -- Unknown flag. Treat as toggle (validation happens later)
+                    stepNext rest { acc | flags = Dict.set withoutPrefix "" acc.flags }
+
+        -- Step into the next token
+        stepNext : Array String -> { flags: Dict String String, args: Array String } -> { flags: Dict String String, args: Array String }
+        stepNext tokens_ acc =
+            when Array.popFirst tokens_ is
+                Just { first = token, rest = remaining } ->
+                    if String.startsWith "--" token && not (String.contains "=" token) then
+                        -- Bare flag (--flag with no '=') needs special handling
+                        let
+                            withoutPrefix =
+                                String.dropFirst 2 token
+                        in
+                        if withoutPrefix == "" then
+                            -- Special case: "--" stops flag parsing (POSIX convention)
+                            -- Discard "--" and treat the rest as positional args
+                            { acc | args = acc.args ++ remaining }
+                        else
+                            handleBareFlag withoutPrefix remaining acc
+
+                    else
+                        -- The token is either '--flag=value' or 'arg'
+                        step token remaining acc
+
+                Nothing ->
+                    -- There are no more tokens.
+                    acc
+    in
+    stepNext tokens { flags = Dict.empty, args = [] }
+
+
+runCommand : String -> Array String -> Command args flags result -> CommandParseResult result
+runCommand appName rawTokens spec =
+    let
+        (FlagParser { knownFlags, parseFn = parseFlags }) = spec.flags
+
+        { flags, args } = parseRawTokens knownFlags rawTokens
+
+        (ArgumentParser { parseFn = parseArgs }) = spec.arguments
+
     in
     when Dict.get "help" flags is
         Just "" ->
+            -- The user gave a command and a --help flag
             HelpText <| commandHelpText appName spec
 
         _ ->
@@ -692,6 +801,9 @@ type alias KnownFlags =
 
 
 {-| Definition of a single flag.
+The 'title' field  names the type of value it takes.
+The 'title' field is used to determine if the flag accepts a value or not.
+Only toggle flags will have (and, may have) empty titles.
 -}
 type alias FlagParserDescription =
     { title : String

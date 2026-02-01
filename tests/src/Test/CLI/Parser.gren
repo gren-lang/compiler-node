@@ -14,6 +14,9 @@ tests =
         [ test "Parses successfully" <| \{} -> 
             expectParseSuccess testCmd testArgs <| \_ ->
                 Expect.pass
+        , test "Parses successfully (with '--flag value')" <| \{} ->
+            expectParseSuccess testCmd testArgsSplitFlagValue <| \_ ->
+                Expect.pass
         , test "This particular test case even succeeds without args or flags" <| \{} ->
             expectParseSuccess testCmd ["make"] <| \_ ->
                 Expect.pass
@@ -294,6 +297,15 @@ tests =
                     secondTest =
                         [ "make", "out.txt", "src/Main.gren" ]
 
+                    dashDashTest1 =
+                        [ "make", "--", "out.txt", "src/Main.gren" ]
+
+                    dashDashTest2 =
+                        [ "make", "out.txt", "--", "src/Main.gren" ]
+
+                    dashDashTest3 =
+                        [ "make", "out.txt", "src/Main.gren", "--" ]
+
                     validFirstResult =
                         { path = Path.fromPosixString ""
                         , file = Path.fromPosixString ""
@@ -309,6 +321,15 @@ tests =
                         Expect.equal validFirstResult cmd.args
                 , test "Two args is fine" <| \{} ->
                     expectParseSuccess testCmdOneOfArgs secondTest <| \cmd ->
+                        Expect.equal validSecondResult cmd.args
+                , test "Args after -- is fine" <| \{} ->
+                    expectParseSuccess testCmdOneOfArgs dashDashTest1 <| \cmd ->
+                        Expect.equal validSecondResult cmd.args
+                , test "Args around -- is fine" <| \{} ->
+                    expectParseSuccess testCmdOneOfArgs dashDashTest2 <| \cmd ->
+                        Expect.equal validSecondResult cmd.args
+                , test "Args before -- is fine" <| \{} ->
+                    expectParseSuccess testCmdOneOfArgs dashDashTest3 <| \cmd ->
                         Expect.equal validSecondResult cmd.args
                 , test "Everything else still fails, returning first parse error" <| \{} ->
                     runCommand testCmdOneOfArgs [ "make", "src/Dest" ]
@@ -335,6 +356,13 @@ tests =
                         , output = Just <| Path.fromPosixString "out"
                         }
                         cmd.flags
+            , test "Flags in valid example (with '--flag value') are parsed correctly" <| \{} ->
+                expectParseSuccess testCmd testArgsSplitFlagValue <| \cmd ->
+                    Expect.equal
+                        { debug = True
+                        , output = Just <| Path.fromPosixString "out"
+                        }
+                        cmd.flags
             , test "Leaving out a flag means it's Nothing" <| \{} ->
                 expectParseSuccess testCmd [ "make" ] <| \cmd ->
                     Expect.equal Nothing cmd.flags.output
@@ -347,6 +375,18 @@ tests =
             , test "Passing a value flag without a set value fails" <| \{} ->
                 runCommand testCmd [ "make", "--output=" ]
                     |> expectBadFlag (Parser.FlagParserMissingValue { knownFlags = Dict.empty, flagName = "output" })
+            , test "Passing a value flag without an equals sign, and without a value, fails" <| \{} ->
+                runCommand testCmd [ "make", "--output" ]
+                    |> expectBadFlag (Parser.FlagParserMissingValue { knownFlags = Dict.empty, flagName = "output" })
+            , test "Passing a value with a -- prefix fails with MissingValue" <| \{} ->
+                runCommand testCmd [ "make", "--output", "--debug" ]
+                    |> expectBadFlag (Parser.FlagParserMissingValue { knownFlags = Dict.empty, flagName = "output" })
+            , test "Passing a value with a -- prefix fails with UnknownFlag" <| \{} ->
+                runCommand testCmd [ "make", "--output", "--legal-filename" ]
+                    |> expectBadFlag (Parser.FlagParserUnknownFlag { knownFlags = Dict.empty, flagName = "legal-filename" })
+            , test "Passing a value with a -- prefix, using an = sign, succeeds " <| \{} ->
+                expectParseSuccess testCmd [ "make", "--output=--legal-filename" ] <| \cmd ->
+                    Expect.equal (Just (Path.fromPosixString "--legal-filename")) cmd.flags.output
             , test "Passing a value flag where a toggle was expected fails" <| \{} ->
                 runCommand testCmd [ "make", "--debug=true" ]
                     |> expectBadFlag (Parser.FlagParserFoundValueOnToggle { knownFlags = Dict.empty, flagName = "debug" })
@@ -375,7 +415,7 @@ tests =
                     _ ->
                         Expect.fail "Expected help text"
             ]
-        ] 
+        ]
 
 
 expectStringContains : String -> String -> Expectation
@@ -451,6 +491,10 @@ testArgs : Array String
 testArgs =
     [ "make", "--debug", "--output=out", "src/Main.gren" ]
 
+-- The --output flag and its values are in separate CLI arguments
+testArgsSplitFlagValue : Array String
+testArgsSplitFlagValue =
+    [ "make", "--debug", "--output", "out", "src/Main.gren" ]
 
 testCmd =
     cmdBuilder testArgParser testFlags
