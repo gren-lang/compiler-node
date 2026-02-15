@@ -1,0 +1,201 @@
+module Parse.Pattern exposing
+    ( Error (..)
+    , parser
+    )
+
+
+import String.Parser.Advanced as Parser exposing (Parser)
+import AST.Source as AST
+import SourcePosition
+import Parse.Number as Number
+import Parse.String as String
+import Parse.Space as Space
+import Parse.Variable as Variable
+import Parse.Number as Number
+import Parse.Context exposing (Context)
+
+
+type Error
+    = ExpectedChar Char
+    | ExpectedKeyword String
+    | VariableError Variable.Error
+    | NumberError Number.Error
+    | FloatNotSupported
+    | StringError String.Error
+
+
+parser : Parser Context Error AST.Pattern
+parser =
+    Parser.oneOf
+        [ record
+        , array
+        , parenthesized
+        , term
+        ]
+
+
+record : Parser Context Error AST.Pattern
+record =
+    Parser.succeed (\start fields end -> SourcePosition.at start end (AST.PRecord fields))
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.chompChar '{' (ExpectedChar '{'))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] recordInnerLoop)
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+
+
+recordInnerLoop : Array AST.PRecordField -> Parser Context Error (Parser.Step (Array AST.PRecordField) (Array AST.PRecordField))
+recordInnerLoop acc =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done acc)
+            |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+        , Parser.succeed (\start fieldName end -> SourcePosition.at start end fieldName)
+            |> Parser.keep Parser.getPosition
+            |> Parser.keep lowerCaseVariable
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip Space.parser
+            |> Parser.andThen
+                (\field ->
+                    Parser.oneOf
+                        [ Parser.succeed (Parser.Done <| Array.pushLast { field = field, pattern = Nothing } acc)
+                            |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+                        , Parser.succeed (Parser.Loop <| Array.pushLast { field = field, pattern = Nothing } acc)
+                            |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+                            |> Parser.skip Space.parser
+                        , Parser.succeed identity
+                            |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
+                            |> Parser.skip Space.parser
+                            |> Parser.keep parser
+                            |> Parser.andThen
+                                (\pattern ->
+                                    Parser.oneOf
+                                        [ Parser.succeed (Parser.Loop <| Array.pushLast { field = field, pattern = Just pattern } acc)
+                                            |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+                                            |> Parser.skip Space.parser
+                                        , Parser.succeed (Parser.Done <| Array.pushLast { field = field, pattern = Just pattern } acc)
+                                            |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+                                        ]
+                                )
+                        ]
+                )
+        ]
+
+
+array : Parser Context Error AST.Pattern
+array =
+    Parser.succeed (\start arr end -> SourcePosition.at start end (AST.PArray arr))
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.chompChar '[' (ExpectedChar '['))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            ( Parser.oneOf
+                [ Parser.lazy (\_ -> parser)
+                    |> Parser.andThen (\firstArg -> Parser.loop [ firstArg ] arrayInnerLoop)
+                , Parser.succeed []
+                    |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
+                ]
+            )
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+
+
+arrayInnerLoop : Array AST.Pattern -> Parser Context Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
+arrayInnerLoop acc =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done acc)
+            |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr acc))
+            |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep parser
+            |> Parser.skip Space.parser
+        ]
+
+
+parenthesized : Parser Context Error AST.Pattern
+parenthesized =
+    Parser.succeed identity
+        |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+        |> Parser.skip Space.parser
+
+
+term : Parser Context Error AST.Pattern
+term =
+    Parser.succeed (\start expr end -> SourcePosition.at start end expr)
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep
+            ( Parser.oneOf
+                [ Parser.succeed (\name -> AST.PAnything name)
+                    |> Parser.skip (Parser.chompChar '_' (ExpectedChar '_'))
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ lowerCaseVariable
+                            , Parser.succeed ""
+                            ]
+                        )
+                , lowerCaseVariable
+                    |> Parser.map AST.PVar
+                , Parser.succeed (\start var end arg -> { ctor = SourcePosition.at start end var, arg = arg })
+                    |> Parser.keep Parser.getPosition
+                    |> Parser.keep Variable.foreignUpper
+                    |> Parser.mapError VariableError
+                    |> Parser.keep Parser.getPosition
+                    |> Parser.skip Space.parser
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ Parser.lazy (\_ -> parser)
+                                |> Parser.backtrackable
+                                |> Parser.map Just
+                            , Parser.succeed Nothing
+                            ]
+                        )
+                    |> Parser.map
+                        (\{ ctor = { start, end, value }, arg } ->
+                            when value is
+                                Variable.Unqualified ctor ->
+                                    AST.PCtor
+                                        { name = SourcePosition.at start end ctor
+                                        , arg = arg
+                                        }
+
+                                Variable.Qualified { module_, name  } ->
+                                    AST.PCtorQual
+                                        { varRegion = { start = start, end = end }
+                                        , module_ = module_
+                                        , name = name
+                                        , arg = arg
+                                        }
+                        )
+                , Number.parser
+                    |> Parser.mapError NumberError
+                    |> Parser.andThen
+                        (\num ->
+                            when num is
+                                Number.Integer int ->
+                                    Parser.succeed <| AST.PInt { isHex = False, value = int }
+
+                                Number.Hex int ->
+                                    Parser.succeed <| AST.PInt { isHex = True, value = int }
+
+                                Number.FloatingPoint _ ->
+                                    Parser.problem FloatNotSupported
+                        )
+                , String.string
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.PStr
+                , String.char
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.PChr
+                ]
+            )
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+
+
+lowerCaseVariable : Parser Context Error String
+lowerCaseVariable =
+    Variable.lowerCase
+        |> Parser.mapError VariableError

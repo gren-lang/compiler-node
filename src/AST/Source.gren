@@ -1,0 +1,326 @@
+module AST.Source exposing
+    ( Expression
+    , Expression_ (..)
+    , VarType (..)
+    , BinopsSegment
+    , IfBranch
+    , WhenBranch
+    , RecordField
+    , Def (..)
+    , DefineRecord
+    , Pattern
+    , Pattern_ (..)
+    , PRecordField
+    , Type
+    , Type_ (..)
+    , TRecordField
+    , Alias
+    , Union
+    , UnionVariant
+    , Value
+    , Port
+    , Module
+    , ModuleDeclaration
+    , Exposing (..)
+    , Exposed (..)
+    , Privacy (..)
+    , Import
+    , Effects (..)
+    , Manager (..)
+    , Infix
+    , BinopAssociativity (..)
+    )
+
+
+import SourcePosition
+import Parse.Number as Number
+
+
+type alias Expression =
+    SourcePosition.Located Expression_
+
+
+type Expression_
+  = CharLiteral Char
+  | StringLiteral String
+  | NumberLiteral Number.Outcome
+  | Var
+    { varType : VarType
+    , name : String
+    }
+  | VarQual
+    { varType : VarType
+    , qualifier : String
+    , name : String
+    }
+  | ArrayLiteral (Array Expression)
+  | Record (Array RecordField)
+  | Update
+    { record : Expression
+    , newValues : Array RecordField
+    }
+  | Operator String
+  | Negate Expression
+  | Binops
+    { segments : Array BinopsSegment
+    , finalExpression : Expression
+    }
+  | Lambda
+    { patterns : Array Pattern
+    , body : Expression
+    }
+  | Call
+    { fn : Expression
+    , args : Array Expression
+    }
+  | Let
+    { defs : Array (SourcePosition.Located Def)
+    , body : Expression
+    }
+  | If
+    { branches : Array IfBranch
+    , elseBranch : Expression
+    }
+  | When
+    { expression : Expression
+    , branches : Array WhenBranch
+    }
+  | Accessor String
+  | Access
+    { expression : Expression
+    , accessor : String
+    }
+  | Parens Expression
+
+
+type VarType
+    = LowVar
+    | CapVar
+
+
+type alias BinopsSegment =
+    { leadingExpression : Expression
+    , operatorName : SourcePosition.Located String
+    }
+
+
+type alias IfBranch =
+    { test : Expression
+    , body : Expression
+    }
+
+
+type alias WhenBranch =
+    { pattern : Pattern
+    , body : Expression
+    }
+
+
+type alias RecordField =
+    { field : SourcePosition.Located String
+    , value : Expression
+    }
+
+
+-- DEFINITIONS
+
+
+type Def
+  = Define DefineRecord
+  | Destruct
+    { pattern : Pattern
+    , body : Expression
+    }
+
+
+type alias DefineRecord =
+    { name : SourcePosition.Located String
+    , args : Array Pattern
+    , body : Expression
+    , typeSignature : Maybe Type
+    }
+
+
+-- PATTERN
+
+
+type alias Pattern
+    = SourcePosition.Located Pattern_
+
+
+type Pattern_
+  = PAnything String
+  | PVar String
+  | PRecord (Array PRecordField)
+  | PAlias
+    { pattern : Pattern
+    , name : SourcePosition.Located String
+    }
+  | PCtor
+    { name : SourcePosition.Located String
+    , arg : Maybe Pattern
+    }
+  | PCtorQual
+    { varRegion : SourcePosition.Region
+    , module_ : String
+    , name : String
+    , arg : Maybe Pattern
+    }
+  | PArray (Array Pattern)
+  | PChr Char
+  | PStr String
+  | PInt
+    { value : Int
+    , isHex : Bool
+    }
+
+
+type alias PRecordField =
+    { field : SourcePosition.Located String
+    , pattern : Maybe Pattern
+    }
+
+
+-- TYPE
+
+
+type alias Type =
+    SourcePosition.Located Type_
+
+
+type Type_
+  = TLambda
+    { from : Type
+    , to : Type
+    }
+  | TVar String
+  | TType
+    { name : SourcePosition.Located String
+    , args : Array Type
+    }
+  | TTypeQual
+    { varRegion : SourcePosition.Region
+    , qualifier : String
+    , name : String
+    , args : Array Type
+    }
+  | TRecord
+    { fields : Array TRecordField
+    , extending : Maybe (SourcePosition.Located String)
+    }
+  | TParens Type
+
+
+type alias TRecordField =
+    { field : SourcePosition.Located String
+    , signature : Type
+    }
+
+
+-- Declarations
+
+
+type alias Alias =
+  { name : SourcePosition.Located String
+  , vars : Array (SourcePosition.Located String)
+  , type_ : Type
+  }
+
+
+type alias Union =
+  { name : SourcePosition.Located String
+  , vars : Array (SourcePosition.Located String)
+  , variants : Array (SourcePosition.Located UnionVariant)
+  }
+
+
+type alias UnionVariant =
+  { name : SourcePosition.Located String
+  , payload : Maybe Type
+  }
+
+
+type alias Value =
+  { name : SourcePosition.Located String
+  , signature : Maybe Type
+  , args : Array Pattern
+  , body : Expression
+  }
+
+
+type alias Port =
+  { name : SourcePosition.Located String
+  , signature : Type
+  }
+
+
+-- Module
+
+
+type alias Module =
+  { name : SourcePosition.Located String
+  , exports : Exposing
+  , docs : Maybe (SourcePosition.Located String)
+  , imports : Array (SourcePosition.Located Import)
+  , values : Array (ModuleDeclaration Value)
+  , unions : Array (ModuleDeclaration Union)
+  , aliases : Array (ModuleDeclaration Alias)
+  , binops : Array (SourcePosition.Located Infix)
+  , effects : Effects
+  }
+
+
+type alias ModuleDeclaration v =
+  SourcePosition.Located
+    { docs : Maybe (SourcePosition.Located String)
+    , value : v
+    }
+
+
+type Exposing
+  = Open
+  | Explicit (Array Exposed)
+
+
+type Exposed
+  = ExposedLower (SourcePosition.Located String)
+  | ExposedUpper { name : SourcePosition.Located String, privacy : Privacy }
+  | ExposedOperator (SourcePosition.Located String)
+
+
+type Privacy
+  = Public
+  | Private
+
+
+type alias Import =
+  { module_ : SourcePosition.Located String
+  , alias : Maybe String
+  , expose : Exposing
+  }
+
+
+type Effects
+  = NoEffects
+  | Ports (Array (ModuleDeclaration Port))
+  | Manager Manager
+
+
+type Manager
+  = Cmd (SourcePosition.Located String)
+  | Sub (SourcePosition.Located String)
+  | Fx { cmd : SourcePosition.Located String, sub : SourcePosition.Located String }
+  
+
+type alias Infix =
+  { fn : String
+  , symbol : String
+  , associativity : BinopAssociativity
+  , precedence : Int
+  }
+
+
+type BinopAssociativity
+  = OpALeft
+  | OpANone
+  | OpARight

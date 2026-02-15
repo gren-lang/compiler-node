@@ -2,29 +2,44 @@ module Main exposing (main)
 
 import Test
 import Test.Runner.Node as TestRunner
-import Test.CLI.Parser as CLIParser
-import Test.CLI.PrettyPrinter as PrettyPrinter
-import Test.SemanticVersion as SemanticVersion
-import Test.SemanticVersionRange as SemanticVersionRange
-import Test.Compiler.Dependencies as Dependencies
-import Test.Compiler.PackageName as PackageName
-import Test.Compiler.ModuleName as ModuleName
-import Test.Compiler.Platform as Platform
-import Test.String.EditDistance as EditDistance
-import Node exposing (Program)
+import Test.CLI.Parser
+import Test.CLI.PrettyPrinter
+import Test.SemanticVersion
+import Test.SemanticVersionRange
+import Test.Compiler.Dependencies
+import Test.Compiler.PackageName
+import Test.Compiler.ModuleName
+import Test.Compiler.Platform
+import Test.String.EditDistance
+import Test.Parse.Number
+import Test.Parse.String
+import Test.Parse.Variable
+import Test.Parse.Pattern
+import Test.Parse.Expression
+import Test.Parse.Type
+import Test.Parse.Declaration
+import Test.Parse.Module
 
 
 main : TestRunner.Program
 main =
     TestRunner.run <|
         Test.describe "Gren Compiler Node tests"
-            [ CLIParser.tests
-            , Dependencies.tests
-            , PrettyPrinter.tests
-            , SemanticVersion.tests
-            , SemanticVersionRange.tests
-            , PackageName.tests
-            , ModuleName.tests
-            , Platform.tests
-            , EditDistance.tests
+            [ Test.CLI.Parser.tests
+            , Test.CLI.PrettyPrinter.tests
+            , Test.SemanticVersion.tests
+            , Test.SemanticVersionRange.tests
+            , Test.Compiler.Dependencies.tests
+            , Test.Compiler.PackageName.tests
+            , Test.Compiler.ModuleName.tests
+            , Test.Compiler.Platform.tests
+            , Test.String.EditDistance.tests
+            , Test.Parse.Expression.tests
+            , Test.Parse.Number.tests
+            , Test.Parse.String.tests
+            , Test.Parse.Pattern.tests
+            , Test.Parse.Variable.tests
+            , Test.Parse.Type.tests
+            , Test.Parse.Declaration.tests
+            , Test.Parse.Module.tests
             ]

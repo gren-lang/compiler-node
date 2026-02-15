@@ -1,0 +1,157 @@
+module Parse.Variable exposing
+    ( Error (..)
+    , lowerCase
+    , upperCase
+    , ForeignVar (..)
+    , foreignVarToString
+    , foreignUpper
+    , reservedWords
+    )
+
+
+import String.Parser.Advanced as Parser exposing (Parser)
+import String.Regex as Regex exposing (Regex)
+import Set exposing (Set)
+import Parse.Context exposing (Context)
+
+
+type Error
+    = InvalidCharacter
+    | ExpectedDot
+    | ReservedWord String
+
+
+lowerCase : Parser Context Error String
+lowerCase =
+    -- TODO: simply stops parsing at invalid character, in lack of better alternatives
+    -- Revisit this once gren-lang/parser has gotten more flexible
+    Parser.succeed {}
+        |> Parser.skip (Parser.chompIf isLowerCaseLetter InvalidCharacter)
+        |> Parser.skip (Parser.chompWhile isInner)
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\word ->
+                if Set.member word reservedWords then
+                    Parser.problem (ReservedWord word)
+
+                else
+                    Parser.succeed word
+            )
+        -- TODO: uncertain if this `backtrackable` work the way I intend
+        -- ideally, we'd only backtrack on reserved words
+        |> Parser.backtrackable
+
+
+reservedWords : Set String
+reservedWords =
+    Set.fromArray
+        [ "if"
+        , "then"
+        , "else"
+        , "when"
+        , "is"
+        , "let"
+        , "in"
+        , "type"
+        , "module"
+        , "where"
+        , "import"
+        , "exposing"
+        , "as"
+        , "port"
+        ]
+
+
+upperCase : Parser Context Error String
+upperCase =
+    Parser.succeed {}
+        |> Parser.skip (Parser.chompIf isUpperCaseLetter InvalidCharacter)
+        |> Parser.skip (Parser.chompWhile isInner)
+        |> Parser.getChompedString
+
+
+type ForeignVar
+    = Unqualified String
+    | Qualified { module_ : String, name : String }
+
+
+foreignVarToString : ForeignVar -> String
+foreignVarToString fv =
+    when fv is
+        Unqualified str ->
+            str
+
+        Qualified { module_, name } ->
+            module_ ++ "." ++ name
+
+
+foreignUpper : Parser Context Error ForeignVar
+foreignUpper =
+    upperCase
+        |> Parser.andThen
+            (\first ->
+                Parser.loop { module_ = [], name = first } foreignUpperLoop
+                    |> Parser.map
+                        (\{ module_, name } ->
+                            when module_ is
+                                [] ->
+                                    Unqualified name
+
+                                _ ->
+                                    Qualified
+                                        { module_ = String.join "." module_
+                                        , name = name
+                                        }
+                        )
+            )
+
+
+type alias ForeignUpperStep =
+    { module_ : Array String
+    , name : String
+    }
+
+
+foreignUpperLoop : ForeignUpperStep -> Parser Context Error (Parser.Step ForeignUpperStep ForeignUpperStep)
+foreignUpperLoop acc =
+    Parser.oneOf
+        [ Parser.succeed
+            (\next ->
+                Parser.Loop { module_ = Array.pushLast acc.name acc.module_, name = next }
+            )
+            |> Parser.skip (Parser.chompChar '.' ExpectedDot)
+            |> Parser.keep upperCase
+        , Parser.succeed (Parser.Done acc)
+        ]
+
+
+lowerCaseLetterRegex : Regex
+lowerCaseLetterRegex =
+    Regex.fromString "\\p{Ll}"
+        |> Maybe.withDefault Regex.never
+
+
+isLowerCaseLetter : Char -> Bool
+isLowerCaseLetter char =
+    String.fromChar char
+        |> Regex.contains lowerCaseLetterRegex
+
+
+upperCaseLetterRegex : Regex
+upperCaseLetterRegex =
+    Regex.fromString "\\p{Lu}"
+        |> Maybe.withDefault Regex.never
+
+
+isUpperCaseLetter : Char -> Bool
+isUpperCaseLetter char =
+    String.fromChar char
+        |> Regex.contains upperCaseLetterRegex
+
+
+isInner : Char -> Bool
+isInner char =
+    Char.isAlphaNum char
+        || char == '_'
+        || isLowerCaseLetter char
+        || isUpperCaseLetter char

@@ -1,0 +1,137 @@
+module Parse.Number exposing
+    ( Outcome (..)
+    , Error (..)
+    , parser
+    , hexParser
+    )
+
+
+import String.Parser.Advanced as Parser exposing (Parser)
+import Parse.Context exposing (Context)
+
+
+type Outcome
+    = Integer Int
+    | FloatingPoint Float
+    | Hex Int
+
+
+type Error
+    = NotANumber
+    | LeadingZero
+    | ExpectedInt
+    | ExpectedHex
+
+
+parser : Parser Context Error Outcome
+parser =
+    Parser.oneOf
+        [ Parser.succeed
+            (\outcome ->
+                when outcome is
+                    Integer int ->
+                        Integer (negate int)
+
+                    FloatingPoint float ->
+                        FloatingPoint (negate float)
+
+                    Hex hex ->
+                        Hex (negate hex)
+            )
+            |> Parser.skip (Parser.token "-" NotANumber)
+            |> Parser.keep numParser
+        , numParser
+        ]
+        |> Parser.andThen
+            (\successCase ->
+                Parser.oneOf
+                    [ Parser.chompIf Char.isAlpha NotANumber
+                        |> Parser.andThen (\_ -> Parser.problem NotANumber)
+                    , Parser.succeed successCase
+                    ]
+            )
+
+
+numParser : Parser Context Error Outcome
+numParser =
+    Parser.oneOf
+        [ Parser.chompChar '0' NotANumber
+            |> Parser.andThen
+                (\_ ->
+                    Parser.oneOf
+                        [ Parser.chompChar 'x' NotANumber
+                            |> Parser.andThen (\_ -> hexParser ExpectedHex)
+                            |> Parser.map Hex
+                        , Parser.chompChar '.' NotANumber
+                            |> Parser.andThen (\_ -> fractalParser "0")
+                        , Parser.chompIf Char.isDigit NotANumber
+                            |> Parser.andThen (\_ -> Parser.problem LeadingZero)
+                        , Parser.succeed (Integer 0)
+                        ]
+                )
+        , Parser.chompIf Char.isDigit NotANumber
+            |> Parser.skip (Parser.chompWhile Char.isDigit)
+            |> Parser.getChompedString
+            |> Parser.andThen
+                (\str ->
+                    when String.toInt str is
+                        Nothing ->
+                            Parser.problem NotANumber
+
+                        Just num ->
+                            Parser.oneOf
+                                [ Parser.chompChar '.' NotANumber
+                                    |> Parser.andThen (\_ -> fractalParser str)
+                                , Parser.succeed (Integer num)
+                                ]
+                )
+        ]
+
+
+fractalParser : String -> Parser Context Error Outcome
+fractalParser str =
+    Parser.chompIf Char.isDigit ExpectedInt
+        |> Parser.skip (Parser.chompWhile Char.isDigit)
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\postDot ->
+                when String.toFloat (str ++ "." ++ postDot) is
+                    Nothing ->
+                        Parser.problem NotANumber
+
+                    Just float ->
+                        Parser.succeed (FloatingPoint float)
+            )
+
+hexParser : error -> Parser Context error Int
+hexParser err =
+    Parser.chompIf Char.isHexDigit err
+        |> Parser.skip (Parser.chompWhile Char.isHexDigit)
+        |> Parser.getChompedString
+        |> Parser.andThen
+            (\hexString ->
+                String.foldl hexFolder 0 hexString
+                    |> Parser.succeed
+            )
+
+
+hexFolder : Char -> Int -> Int
+hexFolder char acc =
+    let
+        charCode =
+            Char.toCode char
+    in
+    if charCode >= 48 && charCode <= 57 then
+        -- 0-9
+        16 * acc + charCode - 48
+
+    else if charCode >= 65 && charCode <= 70 then
+        -- A-F
+        16 * acc + 10 + charCode - 65
+
+    else if charCode >= 97 && charCode <= 102 then
+        -- a-f
+        16 * acc + 10 + charCode - 97
+
+    else
+        acc

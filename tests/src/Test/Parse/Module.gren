@@ -1,0 +1,511 @@
+module Test.Parse.Module exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import String.Parser.Advanced as Parser
+import Parse.Module as PM
+import Parse.Number as Number
+import SourcePosition
+import AST.Source as AST
+import Parse.Context as Context
+
+
+tests : Test
+tests =
+    describe "Parse.Module"
+        [ test "Empty module" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        , test "Empty module with exposings (valid when parsing)" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing ( Model, Msg (..), (==), view )
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports =
+                        AST.Explicit
+                            [ AST.ExposedUpper
+                                { name =
+                                    SourcePosition.at
+                                        { row = 1, col = 28 }
+                                        { row = 1, col = 33 }
+                                        "Model"
+                                , privacy = AST.Private
+                                }
+                            , AST.ExposedUpper
+                                { name =
+                                    SourcePosition.at
+                                        { row = 1, col = 35 }
+                                        { row = 1, col = 38 }
+                                        "Msg"
+                                , privacy = AST.Public
+                                }
+                            , AST.ExposedOperator <|
+                                SourcePosition.at
+                                    { row = 1, col = 46 }
+                                    { row = 1, col = 48 }
+                                    "=="
+                            , AST.ExposedLower <|
+                                SourcePosition.at
+                                    { row = 1, col = 51 }
+                                    { row = 1, col = 55 }
+                                    "view"
+                            ]
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        , test "Docs" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                {-| The documentation for MyModule
+                -}
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Just <|
+                        SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 4, col = 3 }
+                            "The documentation for MyModule"
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        , test "imports" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 13 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 3, col = 8 }
+                                    { row = 3, col = 13 }
+                                    "Array"
+                            , alias = Nothing
+                            , expose = AST.Explicit []
+                            }
+                        ]
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        , test "imports with alias" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array as A
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 18 }
+                            { module_ =
+                                SourcePosition.at
+                                    { row = 3, col = 8 }
+                                    { row = 3, col = 13 }
+                                    "Array"
+                            , alias = Just "A"
+                            , expose = AST.Explicit []
+                            }
+                        ]
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
+        , test "imports with alias and exposing" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array exposing (..)
+                import Nested.Module as N.M exposing (T)
+                """
+            |> expect
+                { name =
+                    SourcePosition.at
+                        { row = 1, col = 8 }
+                        { row = 1, col = 16 }
+                        "MyModule"
+                , exports = AST.Open
+                , docs = Nothing
+                , imports =
+                    [ SourcePosition.at
+                        { row = 3, col = 1 }
+                        { row = 3, col = 27 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 3, col = 8 }
+                                { row = 3, col = 13 }
+                                "Array"
+                        , alias = Nothing
+                        , expose = AST.Open
+                        }
+                    , SourcePosition.at
+                        { row = 4, col = 1 }
+                        { row = 4, col = 41 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 4, col = 8 }
+                                { row = 4, col = 21 }
+                                "Nested.Module"
+                        , alias = Just "N.M"
+                        , expose =
+                            AST.Explicit
+                                [ AST.ExposedUpper
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 4, col = 39 }
+                                            { row = 4, col = 40 }
+                                            "T"
+                                    , privacy = AST.Private
+                                    }
+                                ]
+                            }
+                        ]
+                , values = []
+                , unions = []
+                , aliases = []
+                , binops = []
+                , effects = AST.NoEffects
+                }
+        , test "operators" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                infix left  0 (|>) = apR
+                infix right 3 (&&) = and
+                infix non   4 (==) = eq
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 16 }
+                            "MyModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops =
+                        [ SourcePosition.at
+                            { row = 3, col = 1 }
+                            { row = 3, col = 25 }
+                            { fn = "apR"
+                            , symbol = "|>"
+                            , associativity = AST.OpALeft
+                            , precedence = 0
+                            }
+                        , SourcePosition.at
+                            { row = 4, col = 1 }
+                            { row = 4, col = 25 }
+                            { fn = "and"
+                            , symbol = "&&"
+                            , associativity = AST.OpARight
+                            , precedence = 3
+                            }
+                        , SourcePosition.at
+                            { row = 5, col = 1 }
+                            { row = 5, col = 24 }
+                            { fn = "eq"
+                            , symbol = "=="
+                            , associativity = AST.OpANone
+                            , precedence = 4
+                            }
+                        ]
+                     , effects = AST.NoEffects
+                     }
+         , test "Module with values, type aliases, unions, and ports" <| \_ ->
+             Parser.run PM.parser Context.empty
+                 """
+                 module MyValues exposing (..)
+
+                 num : Int
+                 num = 25
+
+                 type alias Person =
+                   { name : String
+                   , age : Int
+                   }
+
+                 type Choice
+                   = Left
+                   | Right
+
+                 port somePort : String -> Cmd msg
+                 """
+                 |> expect
+                     { name =
+                         SourcePosition.at
+                             { row = 1, col = 8 }
+                             { row = 1, col = 16 }
+                             "MyValues"
+                     , exports = AST.Open
+                     , docs = Nothing
+                     , imports = []
+                      , values =
+                          [ SourcePosition.at
+                              { row = 3, col = 1 }
+                              { row = 4, col = 9 }
+                              { docs = Nothing
+                              , value =
+                                  { name =
+                                      SourcePosition.at
+                                          { row = 3, col = 1 }
+                                          { row = 3, col = 4 }
+                                          "num"
+                                  , signature =
+                                      Just <|
+                                          SourcePosition.at
+                                              { row = 3, col = 7 }
+                                              { row = 3, col = 10 }
+                                              (AST.TType
+                                                  { name =
+                                                      SourcePosition.at
+                                                          { row = 3, col = 7 }
+                                                          { row = 3, col = 10 }
+                                                          "Int"
+                                                  , args = []
+                                                  }
+                                              )
+                                  , args = []
+                                  , body =
+                                      SourcePosition.at
+                                          { row = 4, col = 7 }
+                                          { row = 4, col = 9 }
+                                          (AST.NumberLiteral (Number.Integer 25))
+                                  }
+                             }
+                          ]
+                      , unions =
+                          [ SourcePosition.at
+                              { row = 11, col = 1 }
+                              { row = 13, col = 10 }
+                              { docs = Nothing
+                              , value =
+                                 { name =
+                                      SourcePosition.at
+                                          { row = 11, col = 6 }
+                                          { row = 11, col = 12 }
+                                          "Choice"
+                                  , vars = []
+                                  , variants =
+                                      [ SourcePosition.at
+                                          { row = 12, col = 5 }
+                                          { row = 12, col = 9 }
+                                          { name =
+                                              SourcePosition.at
+                                                  { row = 12, col = 5 }
+                                                  { row = 12, col = 9 }
+                                                  "Left"
+                                          , payload = Nothing
+                                          }
+                                      , SourcePosition.at
+                                          { row = 13, col = 5 }
+                                          { row = 13, col = 10 }
+                                          { name =
+                                              SourcePosition.at
+                                                  { row = 13, col = 5 }
+                                                  { row = 13, col = 10 }
+                                                  "Right"
+                                          , payload = Nothing
+                                          }
+                                      ]
+                                  }
+                              }
+                          ]
+                     , aliases =
+                         [ SourcePosition.at
+                             { row = 6, col = 1 }
+                             { row = 9, col = 4 }
+                             { docs = Nothing
+                             , value =
+                                { name =
+                                     SourcePosition.at
+                                         { row = 6, col = 12 }
+                                         { row = 6, col = 18 }
+                                         "Person"
+                                 , vars = []
+                                 , type_ =
+                                     SourcePosition.at
+                                         { row = 7, col = 3 }
+                                         { row = 9, col = 4 }
+                                         (AST.TRecord
+                                             { fields =
+                                                 [ { field =
+                                                         SourcePosition.at
+                                                             { row = 7, col = 5 }
+                                                             { row = 7, col = 9 }
+                                                             "name"
+                                                     , signature =
+                                                         SourcePosition.at
+                                                             { row = 7, col = 12 }
+                                                             { row = 7, col = 18 }
+                                                             (AST.TType
+                                                                 { name =
+                                                                     SourcePosition.at
+                                                                         { row = 7, col = 12 }
+                                                                         { row = 7, col = 18 }
+                                                                         "String"
+                                                                 , args = []
+                                                                 }
+                                                             )
+                                                     }
+                                                 , { field =
+                                                         SourcePosition.at
+                                                             { row = 8, col = 5 }
+                                                             { row = 8, col = 8 }
+                                                             "age"
+                                                     , signature =
+                                                         SourcePosition.at
+                                                             { row = 8, col = 11 }
+                                                             { row = 8, col = 14 }
+                                                             (AST.TType
+                                                                 { name =
+                                                                     SourcePosition.at
+                                                                         { row = 8, col = 11 }
+                                                                         { row = 8, col = 14 }
+                                                                         "Int"
+                                                                 , args = []
+                                                                 }
+                                                             )
+                                                     }
+                                                 ]
+                                             , extending = Nothing
+                                             }
+                                         )
+                                 }
+                            }
+                         ]
+                    , binops = []
+                    , effects =
+                        AST.Ports
+                            [ SourcePosition.at
+                                { row = 15, col = 1 }
+                                { row = 15, col = 34}
+                                { docs = Nothing
+                                , value =
+                                    { name =
+                                          SourcePosition.at
+                                              { row = 15, col = 6 }
+                                              { row = 15, col = 14 }
+                                              "somePort"
+                                    , signature =
+                                        SourcePosition.at
+                                            { row = 15, col = 17 }
+                                            { row = 15, col = 34 }
+                                            (AST.TLambda
+                                                { from =
+                                                    SourcePosition.at
+                                                        { row = 15, col = 17 }
+                                                        { row = 15, col = 23 }
+                                                        (AST.TType
+                                                            { name =
+                                                                SourcePosition.at
+                                                                    { row = 15, col = 17 }
+                                                                    { row = 15, col = 23 }
+                                                                    "String"
+                                                            , args = []
+                                                            }
+                                                        )
+                                                , to =
+                                                    SourcePosition.at
+                                                        { row = 15, col = 27 }
+                                                        { row = 15, col = 34 }
+                                                        (AST.TType
+                                                            { name =
+                                                                SourcePosition.at
+                                                                    { row = 15, col = 27 }
+                                                                    { row = 15, col = 30 }
+                                                                    "Cmd"
+                                                            , args =
+                                                                [ SourcePosition.at
+                                                                    { row = 15, col = 31 }
+                                                                    { row = 15, col = 34 }
+                                                                    (AST.TVar "msg")
+                                                                ]
+                                                            }
+                                                        )
+                                                }
+                                            )
+                                        }
+                                }
+                            ]
+                    }
+         ]
+
+
+expect : AST.Module -> Result (Array (Parser.DeadEnd c e)) AST.Module -> Expectation
+expect expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok res ->
+            Expect.equal expected res

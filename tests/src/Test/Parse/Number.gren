@@ -1,0 +1,82 @@
+module Test.Parse.Number exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Fuzz exposing (Fuzzer)
+import String.Parser.Advanced as Parser
+import Parse.Number as PN
+import Parse.Context as Context exposing (Context)
+
+
+tests : Test
+tests =
+    describe "Parse.Number"
+        [ describe "Integers"
+            [ fuzz Fuzz.int "Can parse regular integers" <| \int ->
+                run (String.fromInt int)
+                    |> Expect.equal (Ok (PN.Integer int))
+            , test "empty string fails" <| \{} ->
+                run ""
+                    |> expectErr PN.NotANumber
+            , test "leading 0 fails" <| \{} ->
+                run "012"
+                    |> expectErr PN.LeadingZero
+            , test "leading negative 0 fails" <| \{} ->
+                run "-012"
+                    |> expectErr PN.LeadingZero
+            , test "when followed by letter, it fails" <| \{} ->
+                run "123a"
+                    |> expectErr PN.NotANumber
+            ]
+        , describe "Floats"
+            [ fuzz (Fuzz.floatRange 0 32000) "Can parse regular floats" <| \float ->
+                run (String.fromFloat float)
+                    |> Result.map
+                        (\outcome ->
+                            when outcome is
+                                PN.Integer value -> 
+                                    PN.FloatingPoint (toFloat value)
+
+                                _ ->
+                                    outcome
+                        )
+                    |> Expect.equal (Ok (PN.FloatingPoint float))
+            , test "Requires a number after ." <| \{} ->
+                run "0."
+                    |> expectErr PN.ExpectedInt
+            , test "when followed by letter, it fails" <| \{} ->
+                run "0.15a"
+                    |> expectErr PN.NotANumber
+            ]
+        , describe "Hex"
+            [ test "Can parse hex" <| \{} ->
+                run "0xAFFE"
+                    |> Expect.equal (Ok (PN.Hex 45054))
+            , test "Requires a hex digit after 0x" <| \{} ->
+                run "0x"
+                    |> expectErr PN.ExpectedHex
+            , test "When followed by illegal character, it fails" <| \{} ->
+                run "0xABZ"
+                    |> expectErr PN.NotANumber
+            ]
+        ]
+
+
+run : String -> Result (Array (Parser.DeadEnd Context PN.Error)) PN.Outcome
+run str =
+    Parser.run PN.parser Context.empty str
+
+
+expectErr : PN.Error -> Result (Array (Parser.DeadEnd Context PN.Error)) PN.Outcome -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."

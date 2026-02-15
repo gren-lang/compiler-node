@@ -1,0 +1,223 @@
+module Test.Parse.Pattern exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Fuzz exposing (Fuzzer)
+import String.Parser.Advanced as Parser
+import Parse.Pattern as PT
+import AST.Source as AST
+import SourcePosition
+import Parse.Context as Context
+
+
+tests : Test
+tests =
+    describe "Parse.Pattern"
+        [ test "vars" <| \_ ->
+            Parser.run PT.parser Context.empty "var"
+                |> expectPattern (AST.PVar "var")
+        , test "wildcard" <| \_ ->
+            Parser.run PT.parser Context.empty "_"
+                |> expectPattern (AST.PAnything "")
+        , test "wildcard (named)" <| \_ ->
+            Parser.run PT.parser Context.empty "_test"
+                |> expectPattern (AST.PAnything "test")
+        , test "constructor (unqualified)" <| \_ ->
+            Parser.run PT.parser Context.empty "Ctor"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg = Nothing
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 5 }
+                                "Ctor"
+                        }
+                    )
+        , test "constructor (with args)" <| \_ ->
+            Parser.run PT.parser Context.empty "Ctor arg"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 9 }
+                                    (AST.PVar "arg")
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 5 }
+                                "Ctor"
+                        }
+                    )
+        , test "constructor (terminated by ->)" <| \_ ->
+            Parser.run PT.parser Context.empty "Ctor ->"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg = Nothing
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 5 }
+                                "Ctor"
+                        }
+                    )
+        , test "constructor (parenthesized with args)" <| \_ ->
+            Parser.run PT.parser Context.empty "(Ctor arg)"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 7 }
+                                    { row = 1, col = 10 }
+                                    (AST.PVar "arg")
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 2 }
+                                { row = 1, col = 6 }
+                                "Ctor"
+                        }
+                    )
+        , test "constructor (qualified)" <| \_ ->
+            Parser.run PT.parser Context.empty "My.Ctor"
+                |> expectPattern
+                    (AST.PCtorQual
+                        { varRegion =
+                            { start = { row = 1, col = 1 }
+                            , end = { row = 1, col = 8 }
+                            }
+                        , arg = Nothing
+                        , module_ = "My"
+                        , name = "Ctor"
+                        }
+                    )
+        , test "ints" <| \_ ->
+            Parser.run PT.parser Context.empty "160"
+                |> expectPattern
+                    (AST.PInt { isHex = False, value = 160 })
+        , test "neagtive int" <| \_ ->
+            Parser.run PT.parser Context.empty "-10"
+                |> expectPattern
+                    (AST.PInt { isHex = False, value = -10 })
+        , test "ints (hex)" <| \_ ->
+            Parser.run PT.parser Context.empty "0xAB"
+                |> expectPattern
+                    (AST.PInt { isHex = True, value = 171 })
+        , test "string" <| \_ ->
+            Parser.run PT.parser Context.empty "\"some String\""
+                |> expectPattern
+                    (AST.PStr "some String")
+        , test "char" <| \_ ->
+            Parser.run PT.parser Context.empty "'z'"
+                |> expectPattern
+                    (AST.PChr 'z')
+        , test "array (empty)" <| \_ ->
+            Parser.run PT.parser Context.empty "[]"
+                |> expectPattern
+                    (AST.PArray [])
+        , test "array" <| \_ ->
+            Parser.run PT.parser Context.empty "[ a, 2, b ]"
+                |> expectPattern
+                    (AST.PArray
+                        [ SourcePosition.at
+                            { row = 1, col = 3 }
+                            { row = 1, col = 4 }
+                            (AST.PVar "a")
+                        , SourcePosition.at
+                            { row = 1, col = 6 }
+                            { row = 1, col = 7 }
+                            (AST.PInt { isHex = False, value = 2 })
+                        , SourcePosition.at
+                            { row = 1, col = 9 }
+                            { row = 1, col = 10 }
+                            (AST.PVar "b")
+                        ]
+                    )
+        , test "record (empty)" <| \_ ->
+            Parser.run PT.parser Context.empty "{}"
+                |> expectPattern
+                    (AST.PRecord [])
+        , test "record" <| \_ ->
+            Parser.run PT.parser Context.empty "{ a = 1, b = _ }"
+                |> expectPattern
+                    (AST.PRecord
+                        [ { field =
+                               SourcePosition.at
+                                   { row = 1, col = 3 }
+                                   { row = 1, col = 4 }
+                                   "a"
+                           , pattern =
+                               Just <|
+                                   SourcePosition.at
+                                       { row = 1, col = 7 }
+                                       { row = 1, col = 8 }
+                                       (AST.PInt { isHex = False, value = 1 })
+                           }
+                        , { field =
+                               SourcePosition.at
+                                   { row = 1, col = 10 }
+                                   { row = 1, col = 11 }
+                                   "b"
+                           , pattern =
+                               Just <|
+                                   SourcePosition.at
+                                       { row = 1, col = 14 }
+                                       { row = 1, col = 15 }
+                                       (AST.PAnything "")
+                           }
+                        ]
+                    )
+        , test "record (shorthand)" <| \_ ->
+            Parser.run PT.parser Context.empty "{ a, b = _ }"
+                |> expectPattern
+                    (AST.PRecord
+                        [ { field =
+                               SourcePosition.at
+                                   { row = 1, col = 3 }
+                                   { row = 1, col = 4 }
+                                   "a"
+                           , pattern =
+                                Nothing
+                           }
+                        , { field =
+                               SourcePosition.at
+                                   { row = 1, col = 6 }
+                                   { row = 1, col = 7 }
+                                   "b"
+                           , pattern =
+                               Just <|
+                                   SourcePosition.at
+                                       { row = 1, col = 10 }
+                                       { row = 1, col = 11 }
+                                       (AST.PAnything "")
+                           }
+                        ]
+                    )
+        ]
+
+
+expectPattern : a -> Result (Array (Parser.DeadEnd c e)) (SourcePosition.Located a) -> Expectation
+expectPattern expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok { value } ->
+            Expect.equal expected value
+
+
+expectErr : PT.Error -> Result (Array (Parser.DeadEnd c PT.Error)) a -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."

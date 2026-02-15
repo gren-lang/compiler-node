@@ -1,0 +1,703 @@
+module Parse.Expression exposing
+    ( Error (..)
+    , parser
+    , letDefNamedParser
+    )
+
+
+import String.Parser.Advanced as Parser exposing (Parser)
+import AST.Source as AST
+import SourcePosition
+import Parse.Number as Number
+import Parse.String as String
+import Parse.Space as Space
+import Parse.Variable as Variable
+import Parse.Pattern as Pattern
+import Parse.Type as Type
+import Set exposing (Set)
+import Parse.Context exposing (Context)
+
+
+type Error
+    = ExpectedChar Char
+    | ExpectedKeyword String
+    | VariableError Variable.Error
+    | NumberError Number.Error
+    | StringError String.Error
+    | PatternError Pattern.Error
+    | TypeError Type.Error
+    | WildcardAttempt
+    | ExpectedLowerVariable AST.Expression
+    | NameMismatch { first : String, second : String }
+    | IndentError
+    | BadOperator String
+    | InvalidOperatorChar
+
+
+parser : Parser Context Error AST.Expression
+parser =
+    Parser.oneOf
+        [ ifParser
+        , whenParser
+        , letParser
+        , function
+        , possiblyNegativeTerm
+            |> Parser.andThen
+                (\firstTerm ->
+                    Parser.succeed identity
+                        |> Parser.skip Space.parser
+                        |> Parser.keep
+                            (Parser.scopedUpdatePayload
+                                firstTerm.start.col
+                                .indent
+                                (\newIndent payload -> { payload | indent = newIndent })
+                                (Parser.loop
+                                    { currentTerm = firstTerm, currentArgs = [], binopSegments = [] }
+                                    argOrOperatorLoop
+                                )
+                            )
+                        |> Parser.map
+                            (\state ->
+                                let
+                                    finalExpression =
+                                        toCall state.currentTerm state.currentArgs
+                                in
+                                if Array.isEmpty state.binopSegments then
+                                    finalExpression
+
+                                else
+                                    let
+                                        expressionStart =
+                                            Array.first state.binopSegments
+                                                |> Maybe.map (\segment -> segment.leadingExpression.start)
+                                                |> Maybe.withDefault finalExpression.start
+                                    in
+                                    SourcePosition.at
+                                        expressionStart
+                                        finalExpression.end
+                                        (AST.Binops
+                                            { segments = state.binopSegments
+                                            , finalExpression = finalExpression
+                                            }
+                                        )
+                            )
+                )
+        ]
+
+
+type alias ArgOrOperatorState =
+    { currentTerm : AST.Expression
+    , currentArgs : Array AST.Expression
+    , binopSegments : Array AST.BinopsSegment
+    }
+
+
+argOrOperatorLoop : ArgOrOperatorState -> Parser Context Error (Parser.Step ArgOrOperatorState ArgOrOperatorState)
+argOrOperatorLoop state =
+    Parser.oneOf
+        [ Parser.succeed (\start value end -> SourcePosition.at start end value)
+            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
+            |> Parser.keep Parser.getPosition
+            |> Parser.keep operatorParser
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip Space.parser
+            |> Parser.andThen
+                (\operator ->
+                    if operator.value == "-" then
+                        Parser.getPosition
+                            |> Parser.andThen
+                                (\pos ->
+                                    if operator.end.col == pos.col then
+                                        -- negated term (no space between operator)
+                                        Parser.succeed (\term_ -> Parser.Loop <| pushStateArg (SourcePosition.at operator.start term_.end (AST.Negate term_)) state)
+                                            |> Parser.keep term
+
+                                    else
+                                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
+                                            |> Parser.keep possiblyNegativeTerm
+                                )
+
+                    else
+                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
+                            |> Parser.skip Space.parser
+                            |> Parser.keep possiblyNegativeTerm
+                )
+                |> Parser.skip Space.parser
+        , Parser.succeed (\arg -> Parser.Loop <| pushStateArg arg state)
+            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
+            |> Parser.keep term
+            |> Parser.skip Space.parser
+        , Parser.succeed (Parser.Done state)
+        ]
+
+
+pushStateArg : AST.Expression -> ArgOrOperatorState -> ArgOrOperatorState 
+pushStateArg arg state =
+    { state | currentArgs = Array.pushLast arg state.currentArgs }
+
+
+pushStateSegment : AST.Expression -> SourcePosition.Located String -> ArgOrOperatorState -> ArgOrOperatorState 
+pushStateSegment expr operator state =
+    { currentTerm = expr
+    , currentArgs = []
+    , binopSegments =
+        Array.pushLast
+            { leadingExpression = toCall state.currentTerm state.currentArgs
+            , operatorName = operator
+            }
+            state.binopSegments
+    }
+
+
+toCall : AST.Expression -> Array AST.Expression -> AST.Expression
+toCall fn args =
+    if Array.isEmpty args then
+        fn
+
+    else
+        let
+            argsEnd =
+                Array.last args
+                    |> Maybe.map .end
+                    |> Maybe.withDefault fn.end
+        in
+        SourcePosition.at
+            fn.start
+            argsEnd
+            (AST.Call { fn = fn, args = args })
+
+
+operatorChars : Set Char
+operatorChars =
+    Set.fromArray
+        [ '+'
+        , '-'
+        , '/'
+        , '*'
+        , '='
+        , '.'
+        , '<'
+        , '>'
+        , ':'
+        , '&'
+        , '|'
+        , '^'
+        , '?'
+        , '%'
+        , '!'
+        ]
+
+
+operatorParser : Parser Context Error String
+operatorParser =
+    Parser.oneOf
+        [ Parser.token "." (BadOperator ".")
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "."))
+        , Parser.token "|" (BadOperator "|")
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "|"))
+        , Parser.token "->" (BadOperator "->")
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "->"))
+        , Parser.token "=" (BadOperator "=")
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator "="))
+        , Parser.token ":" (BadOperator ":")
+            |> Parser.andThen (\_ -> Parser.problem (BadOperator ":"))
+        , Parser.succeed identity
+            |> Parser.skip (Parser.chompIf (\c -> Set.member c operatorChars) InvalidOperatorChar)
+            |> Parser.skip (Parser.chompWhile (\c -> Set.member c operatorChars))
+            |> Parser.getChompedString
+        ]
+        |> Parser.backtrackable
+
+
+-- LET
+
+
+letParser : Parser Context Error AST.Expression
+letParser =
+    Parser.succeed
+        (\start firstDef defs body end ->
+            SourcePosition.at
+                start
+                end
+                (AST.Let
+                    { defs = Array.pushFirst firstDef defs
+                    , body = body
+                    }
+                )
+        )
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.keyword "let" (ExpectedKeyword "let"))
+        |> Parser.skip Space.parser
+        |> Parser.keep letDefParser
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] letDefLoopParser)
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.keep Parser.getPosition
+
+
+letDefParser : Parser Context Error (SourcePosition.Located AST.Def)
+letDefParser =
+    Parser.oneOf
+        [ letDefNamedParser
+            |> Parser.map (\{ start, value, end } -> SourcePosition.at start end (AST.Define value))
+        , letDefDestructParser
+        ]
+
+
+letDefNamedParser : Parser Context Error (SourcePosition.Located AST.DefineRecord)
+letDefNamedParser =
+    Parser.succeed (\nameStart name nameEnd -> SourcePosition.at nameStart nameEnd name )
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep lowerCaseVariable
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.andThen
+            (\var ->
+                Parser.succeed
+                    (\signature args body ->
+                        let
+                            bodyEnd =
+                                body.end
+                        in
+                        SourcePosition.at
+                            var.start
+                            bodyEnd
+                            { name = var
+                            , args = args
+                            , body = body
+                            , typeSignature = signature
+                            }
+                    )
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ Parser.succeed Just
+                                |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
+                                |> Parser.skip Space.parser
+                                |> Parser.keep
+                                    (Type.expression
+                                        |> Parser.scopedUpdatePayload
+                                            var.start.col
+                                            .indent
+                                            (\nextValue payload -> { payload | indent = nextValue })
+                                        |> Parser.mapError TypeError
+                                    )
+                                |> Parser.skip
+                                    ( lowerCaseVariable
+                                        |> Parser.andThen
+                                            (\var2 ->
+                                                if var.value /= var2 then
+                                                    Parser.problem <|
+                                                        NameMismatch
+                                                            { first = var.value
+                                                            , second = var2
+                                                            }
+
+                                                else
+                                                    Parser.succeed {}
+                                            )
+                                
+                                    )
+                                |> Parser.skip Space.parser
+                            , Parser.succeed Nothing
+                            ]
+                        )
+                    |> Parser.keep (Parser.loop [] (functionArgsParser "="))
+                    |> Parser.skip Space.parser
+                    |> Parser.keep (Parser.lazy (\_ -> parser))
+            )
+
+
+letDefDestructParser : Parser Context Error (SourcePosition.Located AST.Def)
+letDefDestructParser =
+    Parser.succeed
+        (\pattern body ->
+            SourcePosition.at
+                pattern.start
+                body.end
+                (AST.Destruct
+                    { pattern = pattern
+                    , body = body
+                    }
+                )
+        )
+        |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+
+
+letDefLoopParser : Array (SourcePosition.Located AST.Def) -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.Def)) (Array (SourcePosition.Located AST.Def)))
+letDefLoopParser defs =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done defs)
+            |> Parser.skip (Parser.keyword "in" (ExpectedKeyword "in"))
+        , Parser.succeed (\def -> Parser.Loop <| Array.pushLast def defs)
+            |> Parser.keep letDefParser
+            |> Parser.skip Space.parser
+        ]
+
+
+-- IF
+
+
+ifParser : Parser Context Error AST.Expression
+ifParser =
+    Parser.succeed (\startPos firstBranch -> { startPos = startPos, firstBranch = firstBranch })
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep ifBranchParser
+        |> Parser.andThen
+            (\{ startPos, firstBranch } ->
+                Parser.loop [ firstBranch ] (ifElseLoop startPos)
+            )
+
+
+ifBranchParser : Parser Context Error AST.IfBranch
+ifBranchParser =
+    Parser.succeed (\test body -> { test = test, body = body })
+        |> Parser.skip (Parser.keyword "if" (ExpectedKeyword "if"))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword "then" (ExpectedKeyword "then"))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword "else" (ExpectedKeyword "else"))
+        |> Parser.skip Space.parser
+
+
+ifElseLoop : { row : Int, col : Int } -> Array AST.IfBranch -> Parser Context Error (Parser.Step (Array AST.IfBranch) AST.Expression)
+ifElseLoop startPos branches =
+    Parser.oneOf
+        [ Parser.succeed (\branch -> Parser.Loop (Array.pushLast branch branches))
+            |> Parser.keep ifBranchParser
+        , Parser.succeed
+            (\expr ->
+                Parser.Done <|
+                    SourcePosition.at
+                        startPos
+                        expr.end
+                        (AST.If
+                            { branches = branches
+                            , elseBranch = expr
+                            }
+                        )
+            )
+            |> Parser.keep parser
+            |> Parser.skip Space.parser
+        ]
+
+
+-- WHEN IS
+
+
+whenParser : Parser Context Error AST.Expression
+whenParser =
+    Parser.succeed (\start expr firstBranch -> { start = start, expr = expr, firstBranch = firstBranch })
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.keyword "when" (ExpectedKeyword "when"))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword "is" (ExpectedKeyword "is"))
+        |> Parser.skip Space.parser
+        |> Parser.keep whenBranchParser
+        |> Parser.andThen
+            (\{ start, expr, firstBranch } ->
+                Parser.loop [ firstBranch ] whenBranchLoopParser
+                    |> Parser.map
+                        (\branches ->
+                            let
+                                endLocation =
+                                    Array.last branches
+                                        |> Maybe.map .body
+                                        |> Maybe.map .end
+                                        |> Maybe.withDefault { row = 1, col = 1 }
+                            in
+                            SourcePosition.at
+                                start
+                                endLocation
+                                (AST.When { expression = expr, branches = branches })
+                        )
+            )
+
+whenBranchParser : Parser Context Error AST.WhenBranch
+whenBranchParser =
+    Parser.succeed (\pattern body -> { pattern = pattern, body = body })
+        |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.skip Space.parser
+
+
+whenBranchLoopParser : Array AST.WhenBranch -> Parser Context Error (Parser.Step (Array AST.WhenBranch) (Array AST.WhenBranch))
+whenBranchLoopParser branches =
+    Parser.oneOf
+        [ Parser.succeed (\branch -> Parser.Loop (Array.pushLast branch branches))
+            |> Parser.keep whenBranchParser
+        , Parser.succeed (Parser.Done branches)
+        ]
+
+
+-- FUNCTION
+
+
+function : Parser Context Error AST.Expression
+function =
+    Parser.succeed (\startPos firstArg -> { startPos = startPos, firstArg = firstArg })
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.chompChar '\\' (ExpectedChar '\\'))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+        |> Parser.skip Space.parser
+        |> Parser.andThen
+            (\{ startPos, firstArg } ->
+                Parser.succeed
+                    (\args body ->
+                        SourcePosition.at
+                            startPos
+                            body.end
+                            (AST.Lambda
+                                { patterns = args
+                                , body = body
+                                }
+                            )
+                    )
+                    |> Parser.keep (Parser.loop [ firstArg ] (functionArgsParser "->"))
+                    |> Parser.skip Space.parser
+                    |> Parser.keep parser
+                    |> Parser.skip Space.parser
+            )
+
+
+functionArgsParser : String -> Array AST.Pattern -> Parser Context Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
+functionArgsParser terminator array =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done array)
+            |> Parser.skip (Parser.token terminator (ExpectedKeyword terminator))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.keep (Parser.mapError PatternError Pattern.parser)
+            |> Parser.skip Space.parser
+        ]
+
+
+-- TERM
+
+possiblyNegativeTerm : Parser Context Error AST.Expression
+possiblyNegativeTerm =
+    Parser.oneOf
+        [ Parser.succeed (\start expr end -> SourcePosition.at start end (AST.Negate expr))
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip (Parser.chompChar '-' (ExpectedChar '-'))
+            |> Parser.keep term
+            |> Parser.keep Parser.getPosition
+        , term
+        ]
+
+
+term : Parser Context Error AST.Expression
+term =
+    Parser.succeed (\start expr end -> SourcePosition.at start end expr)
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep
+            ( Parser.oneOf
+                [ lowerCaseVariable
+                    |> Parser.map (\name -> AST.Var { name = name, varType = AST.LowVar })
+                , Variable.upperCase
+                    |> Parser.mapError VariableError
+                    |> Parser.map (\name -> AST.Var { name = name, varType = AST.CapVar })
+                , Number.parser
+                    |> Parser.mapError NumberError
+                    |> Parser.map AST.NumberLiteral
+                , String.char
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.CharLiteral
+                , String.string
+                    |> Parser.mapError StringError
+                    |> Parser.map AST.StringLiteral
+                , arrayParser
+                    |> Parser.map AST.ArrayLiteral
+                , recordParser
+                , Parser.succeed AST.Accessor
+                    |> Parser.skip (Parser.chompChar '.' (ExpectedChar '.'))
+                    |> Parser.keep lowerCaseVariable
+                , Parser.succeed identity
+                    |> Parser.skip (Parser.chompChar '_' (ExpectedChar '_'))
+                    |> Parser.keep lowerCaseVariable
+                    |> Parser.andThen
+                        (\_ -> Parser.problem WildcardAttempt)
+                ]
+            )
+        |> Parser.keep Parser.getPosition
+        |> Parser.andThen
+            (\expr ->
+                when expr.value is
+                    AST.Var { varType = AST.LowVar } ->
+                        accessible expr
+
+                    _ ->
+                        Parser.succeed expr
+            )
+
+
+lowerCaseVariable : Parser Context Error String
+lowerCaseVariable =
+    Variable.lowerCase
+        |> Parser.mapError VariableError
+
+
+accessible : AST.Expression -> Parser Context Error AST.Expression
+accessible currentExpression =
+    Parser.oneOf
+        [ Parser.succeed
+            (\start name end ->
+                SourcePosition.at
+                    start
+                    end
+                    (AST.Access
+                        { accessor = name
+                        , expression = currentExpression
+                        }
+                    )
+            )
+            |> Parser.skip (Parser.chompChar '.' (ExpectedChar '.'))
+            |> Parser.keep Parser.getPosition
+            |> Parser.keep lowerCaseVariable
+            |> Parser.keep Parser.getPosition
+            |> Parser.andThen accessible
+        , Parser.succeed currentExpression
+        ]
+
+
+-- ARRAY
+
+
+arrayParser : Parser Context Error (Array AST.Expression)
+arrayParser =
+    Parser.succeed identity
+        |> Parser.skip (Parser.chompChar '[' (ExpectedChar '['))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed []
+                    |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
+                , Parser.lazy (\_ -> parser)
+                    |> Parser.andThen
+                        (\firstElement ->
+                            Parser.succeed identity
+                                |> Parser.skip Space.parser
+                                |> Parser.keep (Parser.loop [ firstElement ] innerArrayParser)
+                        )
+                ]
+            )
+
+
+innerArrayParser : Array AST.Expression -> Parser Context Error (Parser.Step (Array AST.Expression) (Array AST.Expression))
+innerArrayParser array =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done array)
+            |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep (Parser.lazy (\_ -> parser))
+            |> Parser.skip Space.parser
+        ]
+
+
+-- RECORD
+
+
+recordParser : Parser Context Error AST.Expression_
+recordParser =
+    Parser.succeed identity
+        |> Parser.skip (Parser.chompChar '{' (ExpectedChar '{'))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed (AST.Record [])
+                    |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+                , Parser.succeed identity
+                    |> Parser.keep (Parser.lazy (\_ -> parser))
+                    |> Parser.skip Space.parser
+                    |> Parser.andThen
+                        (\firstVarName ->
+                            Parser.oneOf
+                                [ Parser.succeed identity
+                                    |> Parser.skip (Parser.chompChar '|' (ExpectedChar '|'))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.keep recordFieldParser
+                                    |> Parser.andThen
+                                        (\firstPair ->
+                                            Parser.succeed
+                                                (\fields ->
+                                                    AST.Update
+                                                        { record = firstVarName
+                                                        , newValues = fields
+                                                        }
+                                                )
+                                                |> Parser.skip Space.parser
+                                                |> Parser.keep (Parser.loop [ firstPair ] innerRecordParser)
+                                        )
+                                , Parser.succeed identity
+                                    |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.keep (Parser.lazy (\_ -> parser))
+                                    |> Parser.skip Space.parser
+                                    |> Parser.andThen
+                                        (\value ->
+                                            when firstVarName.value is
+                                                AST.Var { name, varType = AST.LowVar } ->
+                                                    let
+                                                        locatedField =
+                                                            SourcePosition.at firstVarName.start firstVarName.end name
+                                                    in
+                                                    Parser.succeed AST.Record
+                                                        |> Parser.skip Space.parser
+                                                        |> Parser.keep
+                                                            (Parser.loop
+                                                                [ { field = locatedField, value = value } ]
+                                                                innerRecordParser
+                                                            )
+
+                                                _ ->
+                                                    Parser.problem (ExpectedLowerVariable firstVarName)
+                                        )
+                                ]
+                        )
+                ]
+            )
+
+
+recordFieldParser : Parser Context Error AST.RecordField
+recordFieldParser =
+    Parser.succeed
+        (\fieldStart field fieldEnd value ->
+            { field = SourcePosition.at fieldStart fieldEnd field
+            , value = value
+            }
+        )
+        |> Parser.keep Parser.getPosition
+        |> Parser.keep lowerCaseVariable
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.lazy (\_ -> parser))
+
+
+innerRecordParser : Array AST.RecordField -> Parser Context Error (Parser.Step (Array AST.RecordField) (Array AST.RecordField))
+innerRecordParser array =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done array)
+            |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+        , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
+            |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep recordFieldParser
+            |> Parser.skip Space.parser
+        ]

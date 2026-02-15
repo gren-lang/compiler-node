@@ -1,0 +1,500 @@
+module Test.Parse.Declaration exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import String.Parser.Advanced as Parser
+import Parse.Declaration as PD
+import SourcePosition
+import AST.Source as AST
+import Parse.Context as Context
+
+
+tests : Test
+tests =
+    describe "Parse.Declaration"
+        [ describe "type alias"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type alias Name = String
+                    """
+                    |> expect
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 12 }
+                                    { row = 1, col = 16 }
+                                    "Name"
+                            , vars = []
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 1, col = 19 }
+                                    { row = 1, col = 25 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 19 }
+                                                { row = 1, col = 25 }
+                                                "String"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
+            , test "With doc comment" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| Docs for Name
+                    -}
+                    type alias Name = String
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            "Docs for Name"
+                        )
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 12 }
+                                    { row = 3, col = 16 }
+                                    "Name"
+                            , vars = []
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 3, col = 19 }
+                                    { row = 3, col = 25 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 3, col = 19 }
+                                                { row = 3, col = 25 }
+                                                "String"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
+            , test "Args" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type alias MyDict k v = Dict k v
+                    """
+                    |> expect
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 12 }
+                                    { row = 1, col = 18 }
+                                    "MyDict"
+                            , vars =
+                                [ SourcePosition.at
+                                    { row = 1, col = 19 }
+                                    { row = 1, col = 20 }
+                                    "k"
+                                , SourcePosition.at
+                                    { row = 1, col = 21 }
+                                    { row = 1, col = 22 }
+                                    "v"
+                                ]
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 1, col = 25 }
+                                    { row = 1, col = 33 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 25 }
+                                                { row = 1, col = 29 }
+                                                "Dict"
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 30 }
+                                                { row = 1, col = 31 }
+                                                (AST.TVar "k")
+                                            , SourcePosition.at
+                                                { row = 1, col = 32 }
+                                                { row = 1, col = 33 }
+                                                (AST.TVar "v")
+                                            ]
+                                        }
+                                    )
+                            }
+                        )
+            ]
+        , describe "type union"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type Direction
+                        = Left
+                        | Right
+                    """
+                    |> expect
+                        (PD.Union
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 15 }
+                                    "Direction"
+                            , vars = []
+                            , variants =
+                                [ SourcePosition.at
+                                    { row = 2, col = 7 }
+                                    { row = 2, col = 11 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 2, col = 7 }
+                                            { row = 2, col = 11 }
+                                            "Left"
+                                    , payload = Nothing
+                                    }
+                                , SourcePosition.at
+                                    { row = 3, col = 7 }
+                                    { row = 3, col = 12 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 3, col = 7 }
+                                            { row = 3, col = 12 }
+                                            "Right"
+                                    , payload = Nothing
+                                    }
+                                ]
+                            }
+                        )
+            , test "Simple case with docs" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| Docs for union
+                    -}
+                    type Direction
+                        = Left
+                        | Right
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            "Docs for union"
+                        )
+                        (PD.Union
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 6 }
+                                    { row = 3, col = 15 }
+                                    "Direction"
+                            , vars = []
+                            , variants =
+                                [ SourcePosition.at
+                                    { row = 4, col = 7 }
+                                    { row = 4, col = 11 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 4, col = 7 }
+                                            { row = 4, col = 11 }
+                                            "Left"
+                                    , payload = Nothing
+                                    }
+                                , SourcePosition.at
+                                    { row = 5, col = 7 }
+                                    { row = 5, col = 12 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 5, col = 7 }
+                                            { row = 5, col = 12 }
+                                            "Right"
+                                    , payload = Nothing
+                                    }
+                                ]
+                            }
+                        )
+            , test "With var and payload" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type Maybe a
+                        = Just a
+                        | Nothing
+                    """
+                    |> expect
+                        (PD.Union
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 11 }
+                                    "Maybe"
+                            , vars =
+                                [ SourcePosition.at
+                                    { row = 1, col = 12 }
+                                    { row = 1, col = 13 }
+                                    "a"
+                                ]
+                            , variants =
+                                [ SourcePosition.at
+                                    { row = 2, col = 7 }
+                                    { row = 2, col = 13 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 2, col = 7 }
+                                            { row = 2, col = 11 }
+                                            "Just"
+                                    , payload =
+                                        Just <|
+                                            SourcePosition.at
+                                                { row = 2, col = 12 }
+                                                { row = 2, col = 13 }
+                                                (AST.TVar "a")
+                                    }
+                                , SourcePosition.at
+                                    { row = 3, col = 7 }
+                                    { row = 3, col = 14 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 3, col = 7 }
+                                            { row = 3, col = 14 }
+                                            "Nothing"
+                                    , payload = Nothing
+                                    }
+                                ]
+                            }
+                        )
+            ]
+        , describe "Values"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    foo = "bar"
+                    """
+                    |> expect
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 4 }
+                                    "foo"
+                            , signature = Nothing
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 1, col = 7 }
+                                    { row = 1, col = 12 }
+                                    (AST.StringLiteral "bar")
+                            }
+                        )
+            , test "Simple case with docs" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| value test
+                    -}
+                    foo = "bar"
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            "value test"
+                        )
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 1 }
+                                    { row = 3, col = 4 }
+                                    "foo"
+                            , signature = Nothing
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 3, col = 7 }
+                                    { row = 3, col = 12 }
+                                    (AST.StringLiteral "bar")
+                            }
+                        )
+            , test "Simple case with type" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    foo : String
+                    foo = "bar"
+                    """
+                    |> expect
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 4 }
+                                    "foo"
+                            , signature =
+                                Just <|
+                                    SourcePosition.at
+                                        { row = 1, col = 7 }
+                                        { row = 1, col = 13 }
+                                        (AST.TType
+                                            { name =
+                                                SourcePosition.at
+                                                    { row = 1, col = 7 }
+                                                    { row = 1, col = 13 }
+                                                    "String"
+                                            , args = []
+                                            }
+                                        )
+                            , args = []
+                            , body =
+                                SourcePosition.at
+                                    { row = 2, col = 7 }
+                                    { row = 2, col = 12 }
+                                    (AST.StringLiteral "bar")
+                            }
+                        )
+            , test "Complex case" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    {-| Function docs
+                    -}
+                    foo : Int -> String
+                    foo n =
+                        String.repeat n "bar"
+                    """
+                    |> expectDoc
+                        (SourcePosition.at
+                            { row = 1, col = 1 }
+                            { row = 2, col = 3 }
+                            "Function docs"
+                        )
+                        (PD.Value
+                            { name =
+                                SourcePosition.at
+                                    { row = 3, col = 1 }
+                                    { row = 3, col = 4 }
+                                    "foo"
+                            , signature =
+                                Just <|
+                                    SourcePosition.at
+                                        { row = 3, col = 7 }
+                                        { row = 3, col = 20 }
+                                        (AST.TLambda
+                                            { from =
+                                                SourcePosition.at
+                                                    { row = 3, col = 7 }
+                                                    { row = 3, col = 10 }
+                                                    (AST.TType
+                                                        { name =
+                                                            SourcePosition.at
+                                                                { row = 3, col = 7 }
+                                                                { row = 3, col = 10 }
+                                                                "Int"
+                                                        , args = []
+                                                        }
+                                                    )
+                                            , to =
+                                                SourcePosition.at
+                                                    { row = 3, col = 14 }
+                                                    { row = 3, col = 20 }
+                                                    (AST.TType
+                                                        { name =
+                                                            SourcePosition.at
+                                                                { row = 3, col = 14 }
+                                                                { row = 3, col = 20 }
+                                                                "String"
+                                                        , args = []
+                                                        }
+                                                    )
+                                            }
+                                        )
+                            , args =
+                                [ SourcePosition.at
+                                    { row = 4, col = 5 }
+                                    { row = 4, col = 6 }
+                                    (AST.PVar "n")
+                                ]
+                            , body =
+                                SourcePosition.at
+                                    { row = 5, col = 5 }
+                                    { row = 5, col = 26 }
+                                    (AST.Call
+                                        { args =
+                                            [ SourcePosition.at
+                                                { row = 5, col = 11 }
+                                                { row = 5, col = 18 }
+                                                (AST.Accessor "repeat")
+                                            , SourcePosition.at
+                                                { row = 5, col = 19 }
+                                                { row = 5, col = 20 }
+                                                (AST.Var
+                                                    { name = "n"
+                                                    , varType = AST.LowVar
+                                                    }
+                                                )
+                                            , SourcePosition.at
+                                                { row = 5, col = 21 }
+                                                { row = 5, col = 26 }
+                                                (AST.StringLiteral "bar")
+                                            ]
+                                        , fn =
+                                            -- TODO: This is wrong, isn't it?
+                                            SourcePosition.at
+                                                { row = 5, col = 5 }
+                                                { row = 5, col = 11 }
+                                                (AST.Var
+                                                    { name = "String"
+                                                    , varType = AST.CapVar
+                                                    }
+                                                )
+                                        }
+                                    )
+                            }
+                        )
+            ]
+        , describe "Ports"
+            [ test "Simple case" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    port myOutput : String
+                    """
+                    |> expect
+                        (PD.Port
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 14 }
+                                    "myOutput"
+                            , signature =
+                                SourcePosition.at
+                                    { row = 1, col = 17 }
+                                    { row = 1, col = 23 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 17 }
+                                                { row = 1, col = 23 }
+                                                "String"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
+            ]
+        ]
+
+
+expect : PD.DeclarationValue -> Result (Array (Parser.DeadEnd c e)) PD.Declaration -> Expectation
+expect expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok decl ->
+            Expect.equal expected decl.value
+
+
+expectDoc : SourcePosition.Located String -> PD.DeclarationValue -> Result (Array (Parser.DeadEnd c e)) PD.Declaration -> Expectation
+expectDoc expectedDocs expectedValue result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok decl ->
+            Expect.equal
+                { docs = Just expectedDocs
+                , value = expectedValue
+                }
+                decl
+

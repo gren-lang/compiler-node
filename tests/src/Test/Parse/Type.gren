@@ -1,0 +1,288 @@
+module Test.Parse.Type exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import String.Parser.Advanced as Parser
+import Parse.Type as PT
+import Parse.Context as Context
+import AST.Source as AST
+import SourcePosition
+
+
+tests : Test
+tests =
+    describe "Parse.Type"
+        [ test "Type" <| \_ ->
+            Parser.run PT.expression Context.empty "MyType"
+                |> expectExpression
+                    (AST.TType
+                        { name =
+                            SourcePosition.at
+                                { row = 1 , col = 1 }
+                                { row = 1 , col = 7 }
+                                "MyType"
+                        , args = []
+                        }
+                    )
+        , test "Type (with args)" <| \_ ->
+            Parser.run PT.expression Context.empty "MyType a String"
+                |> expectExpression
+                    (AST.TType
+                        { name =
+                            SourcePosition.at
+                                { row = 1 , col = 1 }
+                                { row = 1 , col = 7 }
+                                "MyType"
+                        , args =
+                            [ SourcePosition.at
+                                { row = 1, col = 8 }
+                                { row = 1, col = 9 }
+                                (AST.TVar "a")
+                            , SourcePosition.at
+                                { row = 1, col = 10 }
+                                { row = 1, col = 16 }
+                                (AST.TType
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 1, col = 10 }
+                                            { row = 1, col = 16 }
+                                            "String"
+                                    , args = []
+                                    }
+                                )
+                            ]
+                        }
+                    )
+        , test "Qualified Type" <| \_ ->
+            Parser.run PT.expression Context.empty "Main.Module.MyType"
+                |> expectExpression
+                    (AST.TTypeQual
+                        { varRegion = { start = { row = 1, col = 1 }, end = { row = 1, col = 19 } }
+                        , name = "MyType"
+                        , qualifier = "Main.Module"
+                        , args = []
+                        }
+                    )
+        , test "Qualified Type (wtih args)" <| \_ ->
+            Parser.run PT.expression Context.empty "Main.Module.MyType msg"
+                |> expectExpression
+                    (AST.TTypeQual
+                        { varRegion = { start = { row = 1, col = 1 }, end = { row = 1, col = 19 } }
+                        , name = "MyType"
+                        , qualifier = "Main.Module"
+                        , args =
+                            [ SourcePosition.at
+                                { row = 1, col = 20 }
+                                { row = 1, col = 23 }
+                                (AST.TVar "msg")
+                            ]
+                        }
+                    )
+        , test "Type variable" <| \_ ->
+            Parser.run PT.expression Context.empty "msg"
+                |> expectExpression
+                    (AST.TVar "msg")
+        , test "Parenthesized" <| \_ ->
+            Parser.run PT.expression Context.empty "(a)"
+                |> expectExpression
+                    (AST.TParens <|
+                        SourcePosition.at
+                            { row = 1, col = 2 }
+                            { row = 1, col = 3 }
+                            (AST.TVar "a")
+                    )
+        , test "Empty Record" <| \_ ->
+            Parser.run PT.expression Context.empty "{ }"
+                |> expectExpression
+                    (AST.TRecord
+                        { fields = []
+                        , extending = Nothing
+                        }
+                    )
+        , test "Record with one field" <| \_ ->
+            Parser.run PT.expression Context.empty "{ hello : String }"
+                |> expectExpression
+                    (AST.TRecord
+                        { fields =
+                            [ { field =
+                                  SourcePosition.at
+                                      { row = 1, col = 3 }
+                                      { row = 1, col = 8 }
+                                      "hello"
+                              , signature =
+                                  SourcePosition.at
+                                    { row = 1, col = 11 }
+                                    { row = 1, col = 17 }
+                                    (AST.TType
+                                        { args = []
+                                        , name =
+                                            SourcePosition.at
+                                                { row = 1, col = 11 }
+                                                { row = 1, col = 17 }
+                                                "String"
+                                        }
+                                    )
+                              }
+                            ]
+                        , extending = Nothing
+                        }
+                    )
+        , test "Record with two fields" <| \_ ->
+            Parser.run PT.expression Context.empty "{ hello : String, person : String }"
+                |> expectExpression
+                    (AST.TRecord
+                        { fields =
+                            [ { field =
+                                  SourcePosition.at
+                                      { row = 1, col = 3 }
+                                      { row = 1, col = 8 }
+                                      "hello"
+                              , signature =
+                                  SourcePosition.at
+                                    { row = 1, col = 11 }
+                                    { row = 1, col = 17 }
+                                    (AST.TType
+                                        { args = []
+                                        , name =
+                                            SourcePosition.at
+                                                { row = 1, col = 11 }
+                                                { row = 1, col = 17 }
+                                                "String"
+                                        }
+                                    )
+                              }
+                            , { field =
+                                  SourcePosition.at
+                                      { row = 1, col = 19 }
+                                      { row = 1, col = 25 }
+                                      "person"
+                              , signature =
+                                  SourcePosition.at
+                                    { row = 1, col = 28 }
+                                    { row = 1, col = 34 }
+                                    (AST.TType
+                                        { args = []
+                                        , name =
+                                            SourcePosition.at
+                                                { row = 1, col = 28 }
+                                                { row = 1, col = 34 }
+                                                "String"
+                                        }
+                                    )
+                              }
+                            ]
+                        , extending = Nothing
+                        }
+                    )
+        , test "Record update with two fields" <| \_ ->
+            Parser.run PT.expression Context.empty "{ rec | hello : String, person : String }"
+                |> expectExpression
+                    (AST.TRecord
+                        { fields =
+                            [ { field =
+                                  SourcePosition.at
+                                      { row = 1, col = 9 }
+                                      { row = 1, col = 14 }
+                                      "hello"
+                              , signature =
+                                  SourcePosition.at
+                                    { row = 1, col = 17 }
+                                    { row = 1, col = 23 }
+                                    (AST.TType
+                                        { args = []
+                                        , name =
+                                            SourcePosition.at
+                                                { row = 1, col = 17 }
+                                                { row = 1, col = 23 }
+                                                "String"
+                                        }
+                                    )
+                              }
+                            , { field =
+                                  SourcePosition.at
+                                      { row = 1, col = 25 }
+                                      { row = 1, col = 31 }
+                                      "person"
+                              , signature =
+                                  SourcePosition.at
+                                    { row = 1, col = 34 }
+                                    { row = 1, col = 40 }
+                                    (AST.TType
+                                        { args = []
+                                        , name =
+                                            SourcePosition.at
+                                                { row = 1, col = 34 }
+                                                { row = 1, col = 40 }
+                                                "String"
+                                        }
+                                    )
+                              }
+                            ]
+                        , extending =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 3 }
+                                    { row = 1, col = 6 }
+                                    "rec"
+                        }
+                    )
+        , test "Lambda" <| \_ ->
+            Parser.run PT.expression Context.empty "a -> b -> c"
+                |> expectExpression
+                    (AST.TLambda
+                        { from =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 2 }
+                                (AST.TVar "a")
+                        , to =
+                            SourcePosition.at
+                                { row = 1, col = 6 }
+                                { row = 1, col = 12 }
+                                (AST.TLambda
+                                    { from =
+                                        SourcePosition.at
+                                            { row = 1, col = 6 }
+                                            { row = 1, col = 7 }
+                                            (AST.TVar "b")
+                                    , to =
+                                        SourcePosition.at
+                                            { row = 1, col = 11 }
+                                            { row = 1, col = 12 }
+                                            (AST.TVar "c")
+                                    }
+                                )
+                        }
+                    )
+        , test "Stop when variable appears on a fresh line" <| \_ ->
+            Parser.run PT.expression Context.empty
+                """
+                Test a
+                b
+                """
+                |> expectExpression
+                    (AST.TType
+                        { name =
+                            SourcePosition.at
+                                { row = 1 , col = 1 }
+                                { row = 1 , col = 5 }
+                                "Test"
+                        , args =
+                            [ SourcePosition.at
+                                { row = 1, col = 6 }
+                                { row = 1, col = 7 }
+                                (AST.TVar "a")
+                            ]
+                        }
+                    )
+        ]
+
+
+expectExpression : a -> Result (Array (Parser.DeadEnd c e)) (SourcePosition.Located a) -> Expectation
+expectExpression expected result =
+    when result is
+        Err err ->
+            Expect.fail (Debug.toString err)
+
+        Ok { value } ->
+            Expect.equal expected value

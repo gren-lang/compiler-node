@@ -1,0 +1,28 @@
+module Parse.Space exposing
+    ( parser
+    , checkIndent
+    )
+
+
+import Parse.Context exposing (Context)
+import String.Parser.Advanced as Parser exposing (Parser)
+
+
+parser : Parser Context err {}
+parser =
+    Parser.chompWhile (\c -> c == ' ' || c == '\n' || c == '\r')
+
+
+checkIndent : Parser Context {} {}
+checkIndent =
+    Parser.succeed (\indent col -> { indent = indent, col = col })
+        |> Parser.keep (Parser.map .indent Parser.getPayload)
+        |> Parser.keep Parser.getCol
+        |> Parser.andThen
+            (\{ indent, col } ->
+                if col > indent && col > 1 then
+                    Parser.succeed {}
+
+                else
+                    Parser.problem {}
+            )

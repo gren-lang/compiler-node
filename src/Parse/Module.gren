@@ -1,0 +1,381 @@
+module Parse.Module exposing
+    ( Error (..)
+    , parser
+    )
+
+
+import String.Parser.Advanced as Parser exposing (Parser)
+import AST.Source as AST
+import SourcePosition
+import Parse.Space as Space
+import Parse.Variable as Variable
+import Parse.Operator as Operator
+import Parse.Declaration as Declaration
+import Parse.Number as Number
+import Parse.Declaration as Declaration exposing (Declaration)
+import Parse.Context exposing (Context)
+
+
+type Error
+    = ExpectedKeyword String
+    | ExpectedChar Char
+    | VariableError Variable.Error
+    | OperatorError Operator.Error
+    | ExpectedIntPrecedence
+    | DeclarationError Declaration.Error
+
+
+parser : Parser Context Error AST.Module
+parser =
+    Parser.succeed
+        (\name exports docs imports binops decls ->
+            let
+                values =
+                    Array.mapAndKeepJust declarationToModuleValue decls
+
+                unions =
+                    Array.mapAndKeepJust declarationToModuleUnion decls
+
+                aliases =
+                    Array.mapAndKeepJust declarationToModuleAlias decls
+
+                ports =
+                    Array.mapAndKeepJust declarationToModulePort decls
+            in
+            { name = name
+            , exports = exports
+            , docs = docs
+            , imports = imports
+            , values = values
+            , unions = unions
+            , aliases = aliases
+            , binops = binops
+            , effects =
+                when ports is
+                    [] ->
+                        AST.NoEffects
+
+                    _ ->
+                        AST.Ports ports
+            }
+        )
+        |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
+        |> Parser.skip Space.parser
+        |> Parser.keep moduleNameParser
+        |> Parser.skip Space.parser
+        |> Parser.keep parseExposingStatement
+        |> Parser.skip Space.parser
+        |> Parser.keep (Declaration.docParser ExpectedKeyword)
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] importLoopParser)
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] operatorLoopParser)
+        |> Parser.skip Space.parser
+        |> Parser.keep (Parser.loop [] declarationLoopParser)
+
+
+moduleNameParser : Parser Context Error (SourcePosition.Located String)
+moduleNameParser =
+    SourcePosition.parser
+        ( Variable.foreignUpper
+            |> Parser.mapError VariableError
+            |> Parser.map Variable.foreignVarToString
+        )
+
+
+parseExposingStatement : Parser Context Error AST.Exposing
+parseExposingStatement =
+    Parser.succeed identity
+        |> Parser.skip (Parser.token "exposing" (ExpectedKeyword "exposing"))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+        |> Parser.skip Space.parser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed AST.Open
+                    |> Parser.skip (Parser.token ".." (ExpectedKeyword ".."))
+                    |> Parser.skip Space.parser
+                    |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+                , Parser.succeed AST.Explicit
+                    |> Parser.keep
+                        (parseExposingValue
+                            |> Parser.skip Space.parser
+                            |> Parser.andThen
+                                (\firstExposing ->
+                                    Parser.loop [ firstExposing ] parseExposingArray
+                                )
+                        )
+                ]
+            )
+
+    
+parseExposingArray : Array AST.Exposed -> Parser Context Error (Parser.Step (Array AST.Exposed) (Array AST.Exposed))
+parseExposingArray exps =
+    Parser.oneOf
+        [ Parser.succeed (Parser.Done exps)
+            |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+        , Parser.succeed (\next -> Parser.Loop <| Array.pushLast next exps)
+            |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+            |> Parser.skip Space.parser
+            |> Parser.keep parseExposingValue
+            |> Parser.skip Space.parser
+        ]
+
+
+parseExposingValue : Parser Context Error AST.Exposed
+parseExposingValue =
+    Parser.oneOf
+        [ Parser.succeed AST.ExposedLower
+            |> Parser.keep
+                (SourcePosition.parser Variable.lowerCase
+                    |> Parser.mapError VariableError
+                )
+        , Parser.succeed (\name privacy -> AST.ExposedUpper { name = name, privacy = privacy })
+            |> Parser.keep
+                (SourcePosition.parser Variable.upperCase
+                    |> Parser.mapError VariableError
+                )
+            |> Parser.skip Space.parser
+            |> Parser.keep
+                (Parser.oneOf
+                    [ Parser.succeed AST.Public
+                        |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+                        |> Parser.skip Space.parser
+                        |> Parser.skip (Parser.token ".." (ExpectedKeyword ".."))
+                        |> Parser.skip Space.parser
+                        |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+                    , Parser.succeed AST.Private
+                    ]
+                )
+        , Parser.succeed AST.ExposedOperator
+            |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+            |> Parser.keep
+                (SourcePosition.parser Operator.parser
+                    |> Parser.mapError OperatorError
+                )
+            |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+        ]
+
+
+parseAssociativity : Parser Context Error AST.BinopAssociativity
+parseAssociativity =
+    Parser.oneOf
+        [ Parser.succeed AST.OpALeft
+            |> Parser.skip (Parser.token "left" (ExpectedKeyword "left"))
+        , Parser.succeed AST.OpARight
+            |> Parser.skip (Parser.token "right" (ExpectedKeyword "right"))
+        , Parser.succeed AST.OpANone
+            |> Parser.skip (Parser.token "non" (ExpectedKeyword "non"))
+        ]
+
+
+parsePrecedence : Parser Context Error Int
+parsePrecedence =
+    Number.parser
+        |> Parser.mapError (\_ -> ExpectedIntPrecedence)
+        |> Parser.andThen
+            (\outcome ->
+                when outcome is
+                    Number.Integer int ->
+                        Parser.succeed int
+                    _ ->
+                        Parser.problem ExpectedIntPrecedence
+            )
+
+
+parseOperatorDeclaration : Parser Context Error (SourcePosition.Located AST.Infix)
+parseOperatorDeclaration =
+    Parser.succeed (\start assoc prec op func end ->
+        SourcePosition.at start end
+            { fn = func.value
+            , symbol = op.value
+            , associativity = assoc
+            , precedence = prec
+            }
+    )
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.token "infix" (ExpectedKeyword "infix"))
+        |> Parser.skip Space.parser
+        |> Parser.keep parseAssociativity
+        |> Parser.skip Space.parser
+        |> Parser.keep parsePrecedence
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+        |> Parser.keep (SourcePosition.parser Operator.parser |> Parser.mapError OperatorError)
+        |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+        |> Parser.skip Space.parser
+        |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
+        |> Parser.skip Space.parser
+        |> Parser.keep (SourcePosition.parser Variable.lowerCase |> Parser.mapError VariableError)
+        |> Parser.keep Parser.getPosition
+
+
+importLoopParser
+    : Array (SourcePosition.Located AST.Import)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located  AST.Import)) (Array (SourcePosition.Located  AST.Import)))
+importLoopParser imps =
+    Parser.oneOf
+        [ Parser.succeed
+            (\moduleName ->
+                SourcePosition.at
+                    { moduleName.start | col = 1 }
+                    moduleName.end
+                    { module_ = moduleName
+                    , alias = Nothing
+                    , expose = AST.Explicit []
+                    }
+            )
+            |> Parser.skip (Parser.token "import" (ExpectedKeyword "import"))
+            |> Parser.skip Space.parser
+            |> Parser.keep moduleNameParser
+            |> Parser.skip Space.parser
+            |> Parser.andThen
+                (\baseImport ->
+                    Parser.oneOf
+                        [ Parser.succeed
+                            (\alias ->
+                                { baseImport
+                                    | end = alias.end
+                                    , value =
+                                        { baseImport.value
+                                            | alias = Just alias.value
+                                        }
+                                }
+                            )
+                            |> Parser.skip (Parser.token "as" (ExpectedKeyword "as"))
+                            |> Parser.skip Space.parser
+                            |> Parser.keep moduleNameParser
+                            |> Parser.skip Space.parser
+                        , Parser.succeed baseImport
+                        ]
+                )
+            |> Parser.andThen
+                (\importWithAlias ->
+                    Parser.succeed
+                        (\expose endPos ->
+                            { importWithAlias
+                                | end = endPos
+                                , value =
+                                    { importWithAlias.value
+                                        | expose = expose
+                                    }
+                            }
+                        )
+                        |> Parser.keep
+                            (Parser.oneOf
+                                [ parseExposingStatement
+                                , Parser.succeed (AST.Explicit [])
+                                ]
+                            )
+                        |> Parser.keep Parser.getPosition
+                        |> Parser.skip Space.parser
+                )
+            |> Parser.map
+                (\finalImport ->
+                    Parser.Loop <|
+                        Array.pushLast finalImport imps
+                )
+        , Parser.succeed (Parser.Done imps)
+        ]
+
+
+operatorLoopParser
+    : Array (SourcePosition.Located AST.Infix)
+    -> Parser Context Error (Parser.Step (Array (SourcePosition.Located AST.Infix)) (Array (SourcePosition.Located AST.Infix)))
+operatorLoopParser ops =
+    Parser.oneOf
+        [ Parser.succeed
+            (\op ->
+                Parser.Loop <|
+                    Array.pushLast op ops
+            )
+            |> Parser.keep parseOperatorDeclaration
+            |> Parser.skip Space.parser
+        , Parser.succeed (Parser.Done ops)
+        ]
+
+
+declarationLoopParser
+    : Array Declaration.Declaration
+    -> Parser Context Error (Parser.Step (Array Declaration.Declaration) (Array Declaration.Declaration))
+declarationLoopParser decls =
+    Parser.oneOf
+        [ Parser.succeed
+            (\decl ->
+                Parser.Loop <|
+                    Array.pushLast decl decls
+            )
+            |> Parser.keep (Parser.mapError DeclarationError Declaration.parser)
+            |> Parser.skip Space.parser
+        , Parser.succeed (Parser.Done decls)
+        ]
+
+
+declarationToModuleValue : Declaration -> Maybe (AST.ModuleDeclaration AST.Value)
+declarationToModuleValue decl =
+    when decl.value is
+        Declaration.Value v ->
+            Just <|
+                SourcePosition.at
+                    v.name.start
+                    v.body.end
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+declarationToModuleAlias : Declaration -> Maybe (AST.ModuleDeclaration AST.Alias)
+declarationToModuleAlias decl =
+    when decl.value is
+        Declaration.Alias v ->
+            Just <|
+                SourcePosition.at
+                    { row = v.name.start.row, col = 1 }
+                    v.type_.end
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+declarationToModuleUnion : Declaration -> Maybe (AST.ModuleDeclaration AST.Union)
+declarationToModuleUnion decl =
+    when decl.value is
+        Declaration.Union v ->
+            let
+                endPos =
+                    Array.last v.variants
+                        |> Maybe.map .end
+                        |> Maybe.withDefault v.name.end
+            in
+            Just <|
+                SourcePosition.at
+                    { row = v.name.start.row, col = 1 }
+                    endPos
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing
+
+
+declarationToModulePort : Declaration -> Maybe (AST.ModuleDeclaration AST.Port)
+declarationToModulePort decl =
+    when decl.value is
+        Declaration.Port v ->
+            Just <|
+                SourcePosition.at
+                    { row = v.name.start.row, col = 1 }
+                    v.signature.end
+                    { docs = decl.docs
+                    , value = v
+                    }
+
+        _ ->
+            Nothing

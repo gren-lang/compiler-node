@@ -1,0 +1,12 @@
+module Parse.Context exposing (Context, empty)
+
+
+type alias Context =
+    { indent : Int
+    }
+
+
+empty : Context
+empty =
+    { indent = 0
+    }

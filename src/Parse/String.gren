@@ -1,0 +1,182 @@
+module Parse.String exposing
+    ( Error (..)
+    , char
+    , string
+    )
+
+
+import String.Parser.Advanced as Parser exposing (Parser)
+import Parse.Number as Number
+import Parse.Context exposing (Context)
+
+
+type Error
+    = ExpectedQuote
+    | ExpectedChar
+    | ExpectedEscapeChar String
+    | ExpectedUnicodeOpening
+    | ExpectedValidUnicode
+    | ExpectedUnicodeClosing
+    | ExpectedNewline
+    | MisalignedMultiQuotes
+
+
+char : Parser Context Error Char
+char =
+    Parser.succeed identity
+        |> Parser.skip charQuote
+        |> Parser.keep coreParser
+        |> Parser.skip charQuote
+
+
+coreParser : Parser Context Error Char
+coreParser =
+    Parser.oneOf
+        [ Parser.chompChar '\\' ExpectedChar
+            |> Parser.andThen
+                (\_ ->
+                    Parser.oneOf
+                        [ Parser.chompChar 'n' ExpectedChar
+                            |> Parser.map (\_ -> '\n')
+                        , Parser.chompChar 'r' ExpectedChar
+                            |> Parser.map (\_ -> '\r')
+                        , Parser.chompChar 't' ExpectedChar
+                            |> Parser.map (\_ -> '\t')
+                        , Parser.chompChar '\\' ExpectedChar
+                            |> Parser.map (\_ -> '\\')
+                        , Parser.chompChar '\'' ExpectedChar
+                            |> Parser.map (\_ -> '\'')
+                        , Parser.chompChar '\"' ExpectedChar
+                            |> Parser.map (\_ -> '\"')
+                        , Parser.succeed identity
+                            |> Parser.skip unicodeOpening
+                            |> Parser.keep (Number.hexParser ExpectedValidUnicode)
+                            |> Parser.skip (Parser.chompChar '}' ExpectedUnicodeClosing)
+                            |> Parser.andThen
+                                (\num ->
+                                    let
+                                        character =
+                                            Char.fromCode num
+                                    in
+                                    -- Check if char is valid (replacement character)
+                                    if character == '\u{FFFD}' then
+                                        Parser.problem ExpectedValidUnicode
+
+                                    else
+                                        Parser.succeed character
+                                )
+                        , Parser.chompIf (\_ -> True)  ExpectedChar
+                            |> Parser.getChompedString
+                            |> Parser.andThen (Parser.problem << ExpectedEscapeChar)
+                        ]
+                )
+        , Parser.chompIf (\_ -> True) ExpectedChar
+            |> Parser.getChompedString
+            |> Parser.andThen
+                (\str ->
+                    when String.popFirst str is
+                        Nothing ->
+                            Parser.problem ExpectedChar
+
+                        Just { first = c } ->
+                            Parser.succeed c
+                )
+        ]
+
+
+charQuote : Parser Context Error {}
+charQuote =
+    Parser.token "\'" ExpectedQuote
+
+
+singleLineStrQuote : Parser Context Error {}
+singleLineStrQuote =
+    Parser.token "\"" ExpectedQuote
+
+
+multiLineStrQuote : Parser Context Error {}
+multiLineStrQuote =
+    Parser.token "\"\"\"" ExpectedQuote
+
+
+unicodeOpening : Parser Context Error {}
+unicodeOpening =
+    Parser.token "u{" ExpectedUnicodeOpening
+
+
+crlf : Parser Context Error {}
+crlf =
+    Parser.token "\r\n" ExpectedNewline
+
+
+string : Parser Context Error String
+string =
+    Parser.oneOf
+        [ Parser.succeed
+            (\startPos str endPos ->
+                { start = startPos
+                , str = String.trimRight str
+                , end = endPos
+                }
+            )
+            |> Parser.keep Parser.getPosition
+            |> Parser.skip multiLineStrQuote
+            |> Parser.skip
+                (Parser.oneOf
+                    [ Parser.chompChar '\n' ExpectedNewline
+                    , crlf
+                    ]
+                )
+            |> Parser.keep (Parser.loop "" (innerSingleLineString multiLineStrQuote))
+            |> Parser.keep Parser.getPosition
+            |> Parser.andThen
+                (\{ start, str, end } ->
+                    if end.col - 3 /= start.col then
+                        Parser.problem MisalignedMultiQuotes
+
+                    else
+                        let
+                            requiredIndent =
+                                start.col - 1
+
+                            lines =
+                                String.split "\n" str
+
+                            linesSufficientlyIndented =
+                                lines
+                                    |> Array.all
+                                        (\line ->
+                                            let
+                                                whiteSpacePortion =
+                                                    String.takeFirst requiredIndent line
+                                            in
+                                            String.count whiteSpacePortion == requiredIndent
+                                                && String.all (\c -> c == ' ') whiteSpacePortion
+                                        )
+                        in
+                        if linesSufficientlyIndented then
+                            lines
+                                |> Array.map (String.dropFirst requiredIndent) 
+                                |> String.join "\n"
+                                |> Parser.succeed
+
+                        else
+                            Parser.problem MisalignedMultiQuotes
+                )
+        , Parser.succeed identity
+            |> Parser.skip singleLineStrQuote
+            |> Parser.keep (Parser.loop "" (innerSingleLineString singleLineStrQuote))
+        ]
+
+
+innerSingleLineString : Parser Context Error {} -> String -> Parser Context Error (Parser.Step String String)
+innerSingleLineString endToken str =
+    Parser.oneOf
+        [ Parser.succeed {}
+            |> Parser.skip endToken
+            |> Parser.map (\_ -> Parser.Done str)
+        , Parser.succeed (\_ -> Parser.Loop (String.pushLast '\n' str))
+            |> Parser.keep crlf
+        , Parser.succeed (\chr -> Parser.Loop (String.pushLast chr str))
+            |> Parser.keep coreParser
+        ]

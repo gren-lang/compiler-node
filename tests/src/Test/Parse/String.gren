@@ -1,0 +1,118 @@
+module Test.Parse.String exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test, fuzz)
+import Fuzz exposing (Fuzzer)
+import String.Parser.Advanced as Parser
+import Parse.String as PS
+import Parse.Context as Context
+
+
+tests : Test
+tests =
+    describe "Parse.String"
+        [ describe "Characters"
+            [ fuzz Fuzz.char "Can parse unicode chars" <| \char ->
+                let
+                    charString =
+                        if char == '\\' then
+                            "\\\\"
+
+                        else
+                            String.fromChar char
+                in
+                Parser.run PS.char Context.empty ("\'" ++ charString ++ "\'")
+                    |> Expect.equal (Ok char)
+            , test "There is no such thing as an empty char" <| \_ ->
+                Parser.run PS.char Context.empty "\'\'"
+                    |> expectErr PS.ExpectedQuote
+            , test "Unicode character requiring surrogate pairs" <| \_ ->
+                let
+                    char = '𐐷'
+                in
+                Parser.run PS.char Context.empty ("\'" ++ String.fromChar char ++ "\'")
+                    |> Expect.equal (Ok char)
+            , test "Unicode character requiring surrogate pairs, using escape sequence" <| \_ ->
+                Parser.run PS.char Context.empty ("\'\\u{10437}\'")
+                    |> Expect.equal (Ok '𐐷')
+            , test "Escape newline" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\n\'"
+                    |> Expect.equal (Ok '\n')
+            , test "Escape return" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\r\'"
+                    |> Expect.equal (Ok '\r')
+            , test "Escape tab" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\t\'"
+                    |> Expect.equal (Ok '\t')
+            , test "Escape slash" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\\\'"
+                    |> Expect.equal (Ok '\\')
+            , test "Escape single quote" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\\'\'"
+                    |> Expect.equal (Ok '\'')
+            , test "Escape double quote" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\\"\'"
+                    |> Expect.equal (Ok '\"')
+            , test "Bad escape" <| \_ ->
+                Parser.run PS.char Context.empty "\'\\a\'"
+                    |> expectErr (PS.ExpectedEscapeChar "a")
+            ]
+        , describe "Strings"
+            [ test "Example" <| \_ ->
+                Parser.run PS.string Context.empty "\"this is a \\\" Test -String_\""
+                    |> Expect.equal (Ok "this is a \" Test -String_")
+            , test "Example with surrogate pair" <| \_ ->
+                Parser.run PS.string Context.empty "\"this is a \\\" Test 𤭢 -String_\""
+                    |> Expect.equal (Ok "this is a \" Test 𤭢 -String_")
+            , test "crlf is normalized to lf" <| \_ ->
+                Parser.run PS.string Context.empty "\"\r\n\""
+                    |> Expect.equal (Ok "\n")
+            ]
+        , describe "Multi-line Strings"
+            [ test "Simple case" <| \_ ->
+                Parser.run PS.string Context.empty "\"\"\"\nnormal string\n\"\"\""
+                    |> Expect.equal (Ok "normal string")
+            , test "Simple case with crlf" <| \_ ->
+                Parser.run PS.string Context.empty "\"\"\"\r\nnormal string\r\n\"\"\""
+                    |> Expect.equal (Ok "normal string")
+            , test "crlf works in general" <| \_ ->
+                Parser.run PS.string Context.empty "\"\"\"\r\nstring \r\n with crlf\r\n\"\"\""
+                    |> Expect.equal (Ok "string \n with crlf")
+            , test "quotes must be aligned" <| \_ ->
+                Parser.run (skipLeadingWhitespace PS.string) Context.empty "   \"\"\"\nnormal string\n\"\"\""
+                    |> expectErr PS.MisalignedMultiQuotes
+            , test "must end in newline (due to alignment)" <| \_ ->
+                Parser.run (skipLeadingWhitespace PS.string) Context.empty "\"\"\"\nnormal string\"\"\""
+                    |> expectErr PS.MisalignedMultiQuotes
+            , test "content must be aligned with opening quote" <| \_ ->
+                Parser.run (skipLeadingWhitespace PS.string) Context.empty "  \"\"\"\nnormal string\n  \"\"\""
+                    |> expectErr PS.MisalignedMultiQuotes
+            , test "leading whitespace is dropped" <| \_ ->
+                Parser.run (skipLeadingWhitespace PS.string) Context.empty "  \"\"\"\n  normal string\n   second line\n  \"\"\""
+                    |> Expect.equal (Ok "normal string\n second line")
+            , test "leading whitespace is determined by quote placement" <| \_ ->
+                Parser.run (skipLeadingWhitespace PS.string) Context.empty "\"\"\"\n  normal string\n   second line\n\"\"\""
+                    |> Expect.equal (Ok "  normal string\n   second line")
+            ]
+        ]
+
+
+skipLeadingWhitespace : Parser.Parser c PS.Error a -> Parser.Parser c PS.Error a
+skipLeadingWhitespace p =
+    Parser.chompWhile (\c -> c == ' ')
+        |> Parser.andThen (\_ -> p)
+
+
+expectErr : PS.Error -> Result (Array (Parser.DeadEnd c PS.Error)) a -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."
