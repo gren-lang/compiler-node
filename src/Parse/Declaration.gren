@@ -81,8 +81,9 @@ docParser toErr =
             |> Parser.keep
                 (Parser.chompUntil "-}" (toErr "-}")
                     |> Parser.getChompedString
-                    |> Parser.map (String.dropLast 2 >> String.trimRight)
+                    |> Parser.map String.trim
                 )
+            |> Parser.skip (Parser.token "-}" (toErr "-}"))
             |> Parser.keep Parser.getPosition
             |> Parser.skip Space.parser
         , Parser.succeed Nothing

@@ -36,11 +36,11 @@ coreParser =
             |> Parser.andThen
                 (\_ ->
                     Parser.oneOf
-                        [ Parser.chompChar '\n' ExpectedChar
+                        [ Parser.chompChar 'n' ExpectedChar
                             |> Parser.map (\_ -> '\n')
-                        , Parser.chompChar '\r' ExpectedChar
+                        , Parser.chompChar 'r' ExpectedChar
                             |> Parser.map (\_ -> '\r')
-                        , Parser.chompChar '\t' ExpectedChar
+                        , Parser.chompChar 't' ExpectedChar
                             |> Parser.map (\_ -> '\t')
                         , Parser.chompChar '\\' ExpectedChar
                             |> Parser.map (\_ -> '\\')
