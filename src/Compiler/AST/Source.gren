@@ -1,4 +1,4 @@
-module AST.Source exposing
+module Compiler.AST.Source exposing
     ( Expression
     , Expression_ (..)
     , VarType (..)
@@ -33,7 +33,7 @@ module AST.Source exposing
 
 
 import SourcePosition
-import Parse.Number as Number
+import Compiler.Parse.Number as Number
 
 
 type alias Expression =

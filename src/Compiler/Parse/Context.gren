@@ -1,4 +1,4 @@
-module Parse.Context exposing (Context, empty)
+module Compiler.Parse.Context exposing (Context, empty)
 
 
 type alias Context =

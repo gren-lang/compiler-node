@@ -1,4 +1,4 @@
-module Parse.Number exposing
+module Compiler.Parse.Number exposing
     ( Outcome (..)
     , Error (..)
     , parser
@@ -7,7 +7,7 @@ module Parse.Number exposing
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
-import Parse.Context exposing (Context)
+import Compiler.Parse.Context exposing (Context)
 
 
 type Outcome

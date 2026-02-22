@@ -1,4 +1,4 @@
-module Parse.Module exposing
+module Compiler.Parse.Module exposing
     ( Error (..)
     , parser
     , errorsToString
@@ -6,15 +6,15 @@ module Parse.Module exposing
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
-import AST.Source as AST
+import Compiler.AST.Source as AST
 import SourcePosition
-import Parse.Space as Space
-import Parse.Variable as Variable
-import Parse.Operator as Operator
-import Parse.Declaration as Declaration
-import Parse.Number as Number
-import Parse.Declaration as Declaration exposing (Declaration)
-import Parse.Context exposing (Context)
+import Compiler.Parse.Space as Space
+import Compiler.Parse.Variable as Variable
+import Compiler.Parse.Operator as Operator
+import Compiler.Parse.Declaration as Declaration
+import Compiler.Parse.Number as Number
+import Compiler.Parse.Declaration as Declaration exposing (Declaration)
+import Compiler.Parse.Context exposing (Context)
 
 
 type Error

@@ -1,13 +1,13 @@
-module Test.Parse.Pattern exposing ( tests )
+module Test.Compiler.Parse.Pattern exposing ( tests )
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test, fuzz)
 import Fuzz exposing (Fuzzer)
 import String.Parser.Advanced as Parser
-import Parse.Pattern as PT
-import AST.Source as AST
+import Compiler.Parse.Pattern as PT
+import Compiler.AST.Source as AST
 import SourcePosition
-import Parse.Context as Context
+import Compiler.Parse.Context as Context
 
 
 tests : Test

@@ -1,15 +1,15 @@
-module Parse.Type exposing
+module Compiler.Parse.Type exposing
     ( Error (..)
     , expression
     )
 
 
-import Parse.Context exposing (Context)
+import Compiler.Parse.Context exposing (Context)
 import String.Parser.Advanced as Parser exposing (Parser)
 import SourcePosition
-import AST.Source as AST
-import Parse.Variable as Variable
-import Parse.Space as Space
+import Compiler.AST.Source as AST
+import Compiler.Parse.Variable as Variable
+import Compiler.Parse.Space as Space
 
 
 type Error

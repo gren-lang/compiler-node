@@ -1,10 +1,10 @@
-module Parse.Space exposing
+module Compiler.Parse.Space exposing
     ( parser
     , checkIndent
     )
 
 
-import Parse.Context exposing (Context)
+import Compiler.Parse.Context exposing (Context)
 import String.Parser.Advanced as Parser exposing (Parser)
 
 

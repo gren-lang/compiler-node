@@ -1,4 +1,4 @@
-module Parse.Operator exposing
+module Compiler.Parse.Operator exposing
   ( parser
   , Error (..)
   )
@@ -6,7 +6,7 @@ module Parse.Operator exposing
 
 import Set exposing (Set)
 import String.Parser.Advanced as Parser exposing (Parser)
-import Parse.Context exposing (Context)
+import Compiler.Parse.Context exposing (Context)
 
 
 type Error

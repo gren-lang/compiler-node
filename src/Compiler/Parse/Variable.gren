@@ -1,4 +1,4 @@
-module Parse.Variable exposing
+module Compiler.Parse.Variable exposing
     ( Error (..)
     , lowerCase
     , upperCase
@@ -12,7 +12,7 @@ module Parse.Variable exposing
 import String.Parser.Advanced as Parser exposing (Parser)
 import String.Regex as Regex exposing (Regex)
 import Set exposing (Set)
-import Parse.Context exposing (Context)
+import Compiler.Parse.Context exposing (Context)
 
 
 type Error

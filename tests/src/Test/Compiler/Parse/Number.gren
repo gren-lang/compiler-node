@@ -1,11 +1,11 @@
-module Test.Parse.Number exposing ( tests )
+module Test.Compiler.Parse.Number exposing ( tests )
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test, fuzz)
 import Fuzz exposing (Fuzzer)
 import String.Parser.Advanced as Parser
-import Parse.Number as PN
-import Parse.Context as Context exposing (Context)
+import Compiler.Parse.Number as PN
+import Compiler.Parse.Context as Context exposing (Context)
 
 
 tests : Test

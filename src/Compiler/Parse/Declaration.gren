@@ -1,4 +1,4 @@
-module Parse.Declaration exposing
+module Compiler.Parse.Declaration exposing
     ( Declaration
     , DeclarationValue (..)
     , Error (..)
@@ -8,14 +8,14 @@ module Parse.Declaration exposing
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
-import AST.Source as AST
+import Compiler.AST.Source as AST
 import SourcePosition
-import Parse.Space as Space
-import Parse.Variable as Variable
-import Parse.Pattern as Pattern
-import Parse.Type as Type
-import Parse.Expression as Expr
-import Parse.Context exposing (Context)
+import Compiler.Parse.Space as Space
+import Compiler.Parse.Variable as Variable
+import Compiler.Parse.Pattern as Pattern
+import Compiler.Parse.Type as Type
+import Compiler.Parse.Expression as Expr
+import Compiler.Parse.Context exposing (Context)
 
 
 type alias Declaration =
