@@ -6,9 +6,9 @@
     "license": "BSD-3-Clause",
     "version": "3.0.7",
     "exposed-modules": [
-        "Compiler.AST.Source",
-        "CLI.Parser",
-        "CLI.PrettyPrinter",
+        "Compiler.Ast.Source",
+        "Cli.Parser",
+        "Cli.PrettyPrinter",
         "Compiler.Backend",
         "Compiler.Dependencies",
         "Compiler.ModuleName",

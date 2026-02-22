@@ -1,4 +1,4 @@
-module Compiler.AST.Source exposing
+module Compiler.Ast.Source exposing
     ( Expression
     , Expression_ (..)
     , VarType (..)

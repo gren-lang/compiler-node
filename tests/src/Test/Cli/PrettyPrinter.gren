@@ -1,8 +1,8 @@
-module Test.CLI.PrettyPrinter exposing (tests)
+module Test.Cli.PrettyPrinter exposing (tests)
 
 import Expect exposing (Expectation)
 import Test exposing (Test, describe, test)
-import CLI.PrettyPrinter as PP
+import Cli.PrettyPrinter as PP
 import Math
 
 

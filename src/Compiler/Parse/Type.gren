@@ -7,7 +7,7 @@ module Compiler.Parse.Type exposing
 import Compiler.Parse.Context exposing (Context)
 import String.Parser.Advanced as Parser exposing (Parser)
 import SourcePosition
-import Compiler.AST.Source as AST
+import Compiler.Ast.Source as AST
 import Compiler.Parse.Variable as Variable
 import Compiler.Parse.Space as Space
 

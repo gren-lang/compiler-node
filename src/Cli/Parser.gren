@@ -1,4 +1,4 @@
-module CLI.Parser exposing 
+module Cli.Parser exposing 
     ( App
     , CommandParseResult(..)
     , run
@@ -71,7 +71,7 @@ Into a data structure.
 
 import Dict exposing (Dict)
 import FileSystem.Path as Path exposing (Path)
-import CLI.PrettyPrinter as PP
+import Cli.PrettyPrinter as PP
 
 
 {-| Defines a command line application.

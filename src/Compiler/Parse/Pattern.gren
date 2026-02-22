@@ -5,7 +5,7 @@ module Compiler.Parse.Pattern exposing
 
 
 import String.Parser.Advanced as Parser exposing (Parser)
-import Compiler.AST.Source as AST
+import Compiler.Ast.Source as AST
 import SourcePosition
 import Compiler.Parse.Number as Number
 import Compiler.Parse.String as String

@@ -2,8 +2,8 @@ module Main exposing (main)
 
 import Test
 import Test.Runner.Node as TestRunner
-import Test.CLI.Parser
-import Test.CLI.PrettyPrinter
+import Test.Cli.Parser
+import Test.Cli.PrettyPrinter
 import Test.SemanticVersion
 import Test.SemanticVersionRange
 import Test.Compiler.Dependencies
@@ -25,8 +25,8 @@ main : TestRunner.Program
 main =
     TestRunner.run <|
         Test.describe "Gren Compiler Node tests"
-            [ Test.CLI.Parser.tests
-            , Test.CLI.PrettyPrinter.tests
+            [ Test.Cli.Parser.tests
+            , Test.Cli.PrettyPrinter.tests
             , Test.SemanticVersion.tests
             , Test.SemanticVersionRange.tests
             , Test.Compiler.Dependencies.tests

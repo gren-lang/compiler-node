@@ -29,7 +29,7 @@ rules.
 -}
 
 
-import CLI.Parser
+import Cli.Parser
 import Json.Encode as Json
 import Json.Decode as Decode exposing (Decoder)
 
@@ -88,9 +88,9 @@ fromString str =
             Nothing
 
 
-{-| A parser for use with [CLI.Parser](#CLI.Parser).
+{-| A parser for use with [Cli.Parser](#Cli.Parser).
 -}
-cliParser : CLI.Parser.ValueParser SemanticVersion
+cliParser : Cli.Parser.ValueParser SemanticVersion
 cliParser =
     { singular = "version"
     , plural = "versions"
