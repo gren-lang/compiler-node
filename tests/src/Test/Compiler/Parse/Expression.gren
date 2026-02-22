@@ -92,6 +92,45 @@ tests =
                                 ]
                             }
                         )
+            , test "function calls (with parens)" <| \_ ->
+                Parser.run PE.parser Context.empty "foo a (bar b)"
+                    |> expectExpression
+                        (AST.Call
+                            { fn =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 4 }
+                                    (AST.Var { name = "foo", varType = AST.LowVar })
+                            , args =
+                                [ SourcePosition.at
+                                    { row = 1, col = 5 }
+                                    { row = 1, col = 6 }
+                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                , SourcePosition.at
+                                    { row = 1, col = 7 }
+                                    { row = 1, col = 14 }
+                                    (AST.Parens <|
+                                        SourcePosition.at
+                                            { row = 1, col = 8 }
+                                            { row = 1, col = 13 }
+                                            (AST.Call
+                                                { fn =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 8 }
+                                                        { row = 1, col = 11 }
+                                                        (AST.Var { name = "bar", varType = AST.LowVar })
+                                                , args =
+                                                    [ SourcePosition.at
+                                                        { row = 1, col = 12 }
+                                                        { row = 1, col = 13 }
+                                                        (AST.Var { name = "b", varType = AST.LowVar })
+                                                    ]
+                                                }
+                                            )
+                                    )
+                                ]
+                            }
+                        )
             , test "operators" <| \_ ->
                 Parser.run PE.parser Context.empty "func a + b - c"
                     |> expectExpression

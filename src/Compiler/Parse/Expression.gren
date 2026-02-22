@@ -505,7 +505,13 @@ term =
         |> Parser.keep Parser.getPosition
         |> Parser.keep
             ( Parser.oneOf
-                [ lowerCaseVariable
+                [ Parser.succeed AST.Parens
+                    |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+                    |> Parser.skip Space.parser
+                    |> Parser.keep (Parser.lazy (\_ -> parser))
+                    |> Parser.skip Space.parser
+                    |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+                , lowerCaseVariable
                     |> Parser.map (\name -> AST.Var { name = name, varType = AST.LowVar })
                 , Variable.upperCase
                     |> Parser.mapError VariableError
