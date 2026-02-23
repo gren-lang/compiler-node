@@ -23,6 +23,7 @@
         "Compiler.Parse.Expression",
         "Compiler.Parse.Module",
         "Compiler.Parse.Number",
+        "Compiler.Parse.Operator",
         "Compiler.Parse.String",
         "Compiler.Parse.Space",
         "Compiler.Parse.Pattern",

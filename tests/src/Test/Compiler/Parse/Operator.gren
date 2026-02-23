@@ -1,0 +1,77 @@
+module Test.Compiler.Parse.Operator exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import String.Parser.Advanced as Parser
+import Compiler.Parse.Operator as PO
+import Compiler.Parse.Context as Context exposing (Context)
+
+
+tests : Test
+tests =
+    describe "Parse.Operator"
+        [ describe "Valid operators"
+            [ test "Basic arithmetic operators" <| \_ ->
+                run "+" |> Expect.equal (Ok "+")
+            , test "Compound operators" <| \_ ->
+                run "+=" |> Expect.equal (Ok "+=")
+            , test "Comparison operators" <| \_ ->
+                run "<=" |> Expect.equal (Ok "<=")
+            , test "Equality operators" <| \_ ->
+                run "!=" |> Expect.equal (Ok "!=")
+            , test "Logical operators" <| \_ ->
+                run "&&" |> Expect.equal (Ok "&&")
+            , test "Bitwise operators" <| \_ ->
+                run "<<" |> Expect.equal (Ok "<<")
+            , test "Miscellaneous operators" <| \_ ->
+                run "?" |> Expect.equal (Ok "?")
+            , test "Complex operator" <| \_ ->
+                run "<=>" |> Expect.equal (Ok "<=>")
+            , test "Pipe forward operator" <| \_ ->
+                run "|>" |> Expect.equal (Ok "|>")
+            , test "Pipe backward operator" <| \_ ->
+                run "<|" |> Expect.equal (Ok "<|")
+            ]
+        , describe "Reserved operators (should fail)"
+            [ test "Dot operator" <| \_ ->
+                run "." |> expectErr PO.BadDot
+            , test "Pipe operator" <| \_ ->
+                run "|" |> expectErr PO.BadPipe
+            , test "Arrow operator" <| \_ ->
+                run "->" |> expectErr PO.BadArrow
+            , test "Equals operator" <| \_ ->
+                run "=" |> expectErr PO.BadEquals
+            , test "HasType operator" <| \_ ->
+                run ":" |> expectErr PO.BadHasType
+            ]
+        , describe "Edge cases"
+            [ test "Empty string" <| \_ ->
+                run "" |> expectErr PO.BadOperatorCharacter
+            , test "Invalid character" <| \_ ->
+                run "@" |> expectErr PO.BadOperatorCharacter
+            , test "Mixed valid and invalid" <| \_ ->
+                run "@+" |> expectErr PO.BadOperatorCharacter
+            , test "Single valid character" <| \_ ->
+                run "*" |> Expect.equal (Ok "*")
+            ]
+        ]
+
+
+run : String -> Result (Array (Parser.DeadEnd Context PO.Error)) String
+run str =
+    Parser.run PO.parser Context.empty str
+
+
+expectErr : PO.Error -> Result (Array (Parser.DeadEnd Context PO.Error)) String -> Expectation
+expectErr expected result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected error"
+
+        Err problems ->
+            when Array.first problems is
+                Just firstProblem ->
+                    Expect.equal expected firstProblem.problem
+
+                Nothing ->
+                    Expect.fail "Failed, but with no problems..."

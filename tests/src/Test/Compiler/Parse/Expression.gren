@@ -268,6 +268,97 @@ tests =
                               }
                             ]
                         )
+            , test "Array with if-expression" <| \_ ->
+                Parser.run PE.parser Context.empty "[ 0, if True then 1 else 2 ]"
+                    |> expectExpression
+                        (AST.ArrayLiteral
+                            [ { start = { row = 1, col = 3 }
+                              , end = { row = 1, col = 4 }
+                              , value = AST.NumberLiteral (Number.Integer 0)
+                              }
+                            , { start = { row = 1, col = 6 }
+                              , end = { row = 1, col = 27 }
+                              , value =
+                                    (AST.If
+                                        { branches =
+                                            [ { test =
+                                                SourcePosition.at
+                                                    { row = 1, col = 9 }
+                                                    { row = 1, col = 13 }
+                                                    (AST.Var { name = "True", varType = AST.CapVar })
+                                              , body =
+                                                SourcePosition.at
+                                                    { row = 1, col = 19 }
+                                                    { row = 1, col = 20 }
+                                                    (AST.NumberLiteral (Number.Integer 1))
+                                              }
+                                            ]
+                                        , elseBranch =
+                                            SourcePosition.at
+                                                { row = 1, col = 26 }
+                                                { row = 1, col = 27 }
+                                                (AST.NumberLiteral (Number.Integer 2))
+                                        }
+                                    )
+                              }
+                            ]
+                        )
+            , test "Array with operator expression" <| \_ ->
+                Parser.run PE.parser Context.empty "[ 1 + 2, 3 |> inc ]"
+                    |> expectExpression
+                        (AST.ArrayLiteral
+                            [ { start = { row = 1, col = 3 }
+                              , end = { row = 1, col = 8 }
+                              , value =
+                                    (AST.Binops
+                                        { segments =
+                                            [ { leadingExpression =
+                                                SourcePosition.at
+                                                    { row = 1, col = 3 }
+                                                    { row = 1, col = 4 }
+                                                    (AST.NumberLiteral (Number.Integer 1))
+                                              , operatorName =
+                                                SourcePosition.at
+                                                    { row = 1, col = 5 }
+                                                    { row = 1, col = 6 }
+                                                    "+"
+                                              }
+                                            ]
+                                        , finalExpression =
+                                            SourcePosition.at
+                                                { row = 1, col = 7 }
+                                                { row = 1, col = 8 }
+                                                (AST.NumberLiteral (Number.Integer 2))
+                                        }
+                                    )
+                              }
+                            , { start = { row = 1, col = 10 }
+                              , end = { row = 1, col = 18 }
+                              , value =
+                                    (AST.Binops
+                                        { segments =
+                                            [ { leadingExpression =
+                                                SourcePosition.at
+                                                    { row = 1, col = 10 }
+                                                    { row = 1, col = 11 }
+                                                    (AST.NumberLiteral (Number.Integer 3))
+                                              , operatorName =
+                                                SourcePosition.at
+                                                    { row = 1, col = 12 }
+                                                    { row = 1, col = 14 }
+                                                    "|>"
+                                              }
+                                            ]
+                                        , finalExpression =
+                                            SourcePosition.at
+                                                { row = 1, col = 15 }
+                                                { row = 1, col = 18 }
+                                                (AST.Var { name = "inc", varType = AST.LowVar })
+                                        }
+                                    )
+                              }
+                            ]
+                        )
             ]
         , describe "Record"
             [ test "Empty record" <| \_ ->
@@ -321,6 +412,111 @@ tests =
                               }
                             ]
                         )
+                , test "Record with if-expression" <| \_ ->
+                    Parser.run PE.parser Context.empty "{ field1 = if True then 1 else 2 }"
+                        |> expectExpression
+                            (AST.Record
+                                [ { field =
+                                        SourcePosition.at
+                                            { row = 1, col = 3 }
+                                            { row = 1, col = 9 }
+                                            "field1"
+                                  , value =
+                                        SourcePosition.at
+                                            { row = 1, col = 12 }
+                                            { row = 1, col = 33 }
+                                            (AST.If
+                                                { branches =
+                                                    [ { test =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 15 }
+                                                            { row = 1, col = 19 }
+                                                            (AST.Var { name = "True", varType = AST.CapVar })
+                                                      , body =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 25 }
+                                                            { row = 1, col = 26 }
+                                                            (AST.NumberLiteral (Number.Integer 1))
+                                                      }
+                                                    ]
+                                                , elseBranch =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 32 }
+                                                        { row = 1, col = 33 }
+                                                        (AST.NumberLiteral (Number.Integer 2))
+                                                }
+                                            )
+                                  }
+                                ]
+                            )
+                , test "Record with operator expression" <| \_ ->
+                    Parser.run PE.parser Context.empty "{ field1 = 1 + 2, field2 = 3 |> inc }"
+                        |> expectExpression
+                            (AST.Record
+                                [ { field =
+                                        SourcePosition.at
+                                            { row = 1, col = 3 }
+                                            { row = 1, col = 9 }
+                                            "field1"
+                                  , value =
+                                        SourcePosition.at
+                                            { row = 1, col = 12 }
+                                            { row = 1, col = 17 }
+                                            (AST.Binops
+                                                { segments =
+                                                    [ { leadingExpression =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 12 }
+                                                            { row = 1, col = 13 }
+                                                            (AST.NumberLiteral (Number.Integer 1))
+                                                      , operatorName =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 14 }
+                                                            { row = 1, col = 15 }
+                                                            "+"
+                                                      }
+                                                    ]
+                                                , finalExpression =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 16 }
+                                                        { row = 1, col = 17 }
+                                                        (AST.NumberLiteral (Number.Integer 2))
+                                                }
+                                            )
+                                  }
+                                , { field =
+                                        SourcePosition.at
+                                            { row = 1, col = 19 }
+                                            { row = 1, col = 25 }
+                                            "field2"
+                                  , value =
+                                        SourcePosition.at
+                                            { row = 1, col = 28 }
+                                            { row = 1, col = 36 }
+                                            (AST.Binops
+                                                { segments =
+                                                    [ { leadingExpression =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 28 }
+                                                            { row = 1, col = 29 }
+                                                            (AST.NumberLiteral (Number.Integer 3))
+                                                      , operatorName =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 30 }
+                                                            { row = 1, col = 32 }
+                                                            "|>"
+                                                      }
+                                                    ]
+                                                , finalExpression =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 33 }
+                                                        { row = 1, col = 36 }
+                                                        (AST.Var { name = "inc", varType = AST.LowVar })
+                                                }
+                                            )
+                                  }
+                                ]
+                            )
             , test "Update" <| \_ ->
                 Parser.run PE.parser Context.empty "{ old | field1 = 1, field2 = 10 }"
                     |> expectExpression

@@ -9,6 +9,7 @@ import String.Parser.Advanced as Parser exposing (Parser)
 import Compiler.Ast.Source as AST
 import SourcePosition
 import Compiler.Parse.Number as Number
+import Compiler.Parse.Operator as Operator
 import Compiler.Parse.String as String
 import Compiler.Parse.Space as Space
 import Compiler.Parse.Variable as Variable
@@ -32,6 +33,7 @@ type Error
     | IndentError
     | BadOperator String
     | InvalidOperatorChar
+    | OperatorError Operator.Error
 
 
 parser : Parser Context Error AST.Expression
@@ -167,45 +169,9 @@ toCall fn args =
             (AST.Call { fn = fn, args = args })
 
 
-operatorChars : Set Char
-operatorChars =
-    Set.fromArray
-        [ '+'
-        , '-'
-        , '/'
-        , '*'
-        , '='
-        , '.'
-        , '<'
-        , '>'
-        , ':'
-        , '&'
-        , '|'
-        , '^'
-        , '?'
-        , '%'
-        , '!'
-        ]
-
-
 operatorParser : Parser Context Error String
 operatorParser =
-    Parser.oneOf
-        [ Parser.token "." (BadOperator ".")
-            |> Parser.andThen (\_ -> Parser.problem (BadOperator "."))
-        , Parser.token "|" (BadOperator "|")
-            |> Parser.andThen (\_ -> Parser.problem (BadOperator "|"))
-        , Parser.token "->" (BadOperator "->")
-            |> Parser.andThen (\_ -> Parser.problem (BadOperator "->"))
-        , Parser.token "=" (BadOperator "=")
-            |> Parser.andThen (\_ -> Parser.problem (BadOperator "="))
-        , Parser.token ":" (BadOperator ":")
-            |> Parser.andThen (\_ -> Parser.problem (BadOperator ":"))
-        , Parser.succeed identity
-            |> Parser.skip (Parser.chompIf (\c -> Set.member c operatorChars) InvalidOperatorChar)
-            |> Parser.skip (Parser.chompWhile (\c -> Set.member c operatorChars))
-            |> Parser.getChompedString
-        ]
+    Parser.mapError OperatorError Operator.parser
         |> Parser.backtrackable
 
 
