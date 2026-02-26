@@ -404,6 +404,7 @@ whenBranchLoopParser : Array AST.WhenBranch -> Parser Context Error (Parser.Step
 whenBranchLoopParser branches =
     Parser.oneOf
         [ Parser.succeed (\branch -> Parser.Loop (Array.pushLast branch branches))
+            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
             |> Parser.keep whenBranchParser
         , Parser.succeed (Parser.Done branches)
         ]

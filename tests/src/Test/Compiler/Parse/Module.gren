@@ -309,7 +309,7 @@ tests =
                      , exports = AST.Open
                      , docs = Nothing
                      , imports = []
-                      , values =
+                     , values =
                           [ SourcePosition.at
                               { row = 3, col = 1 }
                               { row = 4, col = 9 }
@@ -498,8 +498,214 @@ tests =
                                 }
                             ]
                     }
-         ]
+         , test "Declaration after when expression" <| \_ ->
+             Parser.run PM.parser Context.empty
+                 """
+                 module Test exposing (..)
 
+                 foo : Int -> String
+                 foo n =
+                     when n is
+                         0 -> "Zero"
+                         1 -> "One"
+                         _ -> "Other"
+
+                 bar : Int -> String
+                 bar n =
+                     String.fromInt n
+                 """
+                 |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 8 }
+                            { row = 1, col = 12 }
+                            "Test"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , aliases = []
+                    , binops = []
+                    , unions = []
+                    , effects = AST.NoEffects
+                    , values =
+                        [ SourcePosition.at
+                                { row = 3, col = 1 }
+                                { row = 8, col = 21 }
+                                { docs = Nothing
+                                , value =
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 3, col = 1 }
+                                            { row = 3, col = 4 }
+                                            "foo"
+                                    , signature =
+                                        Just
+                                            (SourcePosition.at
+                                                { row = 3, col = 7 }
+                                                { row = 3, col = 20 }
+                                                (AST.TLambda
+                                                    { from =
+                                                        SourcePosition.at
+                                                            { row = 3, col = 7 }
+                                                            { row = 3, col = 10 }
+                                                            (AST.TType
+                                                                { name =
+                                                                    SourcePosition.at
+                                                                        { row = 3, col = 7 }
+                                                                        { row = 3, col = 10 }
+                                                                        "Int"
+                                                                , args = []
+                                                                }
+                                                            )
+                                                    , to =
+                                                        SourcePosition.at
+                                                            { row = 3, col = 14 }
+                                                            { row = 3, col = 20 }
+                                                            (AST.TType
+                                                                { name =
+                                                                    SourcePosition.at
+                                                                        { row = 3, col = 14 }
+                                                                        { row = 3, col = 20 }
+                                                                        "String"
+                                                                , args = []
+                                                                }
+                                                            )
+                                                    }
+                                                )
+                                            )
+                                    , args =
+                                        [ SourcePosition.at
+                                            { row = 4, col = 5 }
+                                            { row = 4, col = 6 }
+                                            (AST.PVar "n")
+                                        ]
+                                    , body =
+                                        SourcePosition.at
+                                            { row = 5, col = 5 }
+                                            { row = 8, col = 21 }
+                                            (AST.When
+                                                { expression =
+                                                    SourcePosition.at
+                                                        { row = 5, col = 10 }
+                                                        { row = 5, col = 11 }
+                                                        (AST.Var { name = "n", varType = AST.LowVar })
+                                                , branches =
+                                                    [ { pattern =
+                                                            SourcePosition.at
+                                                                { row = 6, col = 9 }
+                                                                { row = 6, col = 10 }
+                                                                (AST.PInt { value = 0, isHex = False })
+                                                        , body =
+                                                            SourcePosition.at
+                                                                { row = 6, col = 14 }
+                                                                { row = 6, col = 20 }
+                                                                (AST.StringLiteral "Zero")
+                                                        }
+                                                    , { pattern =
+                                                            SourcePosition.at
+                                                                { row = 7, col = 9 }
+                                                                { row = 7, col = 10 }
+                                                                (AST.PInt { value = 1, isHex = False })
+                                                        , body =
+                                                            SourcePosition.at
+                                                                { row = 7, col = 14 }
+                                                                { row = 7, col = 19 }
+                                                                (AST.StringLiteral "One")
+                                                        }
+                                                    , { pattern =
+                                                            SourcePosition.at
+                                                                { row = 8, col = 9 }
+                                                                { row = 8, col = 10 }
+                                                                (AST.PAnything "")
+                                                        , body =
+                                                            SourcePosition.at
+                                                                { row = 8, col = 14 }
+                                                                { row = 8, col = 21 }
+                                                                (AST.StringLiteral "Other")
+                                                        }
+                                                    ]
+                                                }
+                                            )
+                                    }
+                                }
+                            , SourcePosition.at
+                                { row = 10, col = 1 }
+                                { row = 12, col = 21 }
+                                { docs = Nothing
+                                , value =
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 10, col = 1 }
+                                            { row = 10, col = 4 }
+                                            "bar"
+                                    , signature =
+                                        Just
+                                            (SourcePosition.at
+                                                { row = 10, col = 7 }
+                                                { row = 10, col = 20 }
+                                                (AST.TLambda
+                                                    { from =
+                                                        SourcePosition.at
+                                                            { row = 10, col = 7 }
+                                                            { row = 10, col = 10 }
+                                                            (AST.TType
+                                                                { name =
+                                                                    SourcePosition.at
+                                                                        { row = 10, col = 7 }
+                                                                        { row = 10, col = 10 }
+                                                                        "Int"
+                                                                , args = []
+                                                                }
+                                                            )
+                                                    , to =
+                                                        SourcePosition.at
+                                                            { row = 10, col = 14 }
+                                                            { row = 10, col = 20 }
+                                                            (AST.TType
+                                                                { name =
+                                                                    SourcePosition.at
+                                                                        { row = 10, col = 14 }
+                                                                        { row = 10, col = 20 }
+                                                                        "String"
+                                                                , args = []
+                                                                }
+                                                            )
+                                                    }
+                                                )
+                                            )
+                                    , args =
+                                        [ SourcePosition.at
+                                            { row = 11, col = 5 }
+                                            { row = 11, col = 6 }
+                                            (AST.PVar "n")
+                                        ]
+                                    , body =
+                                        SourcePosition.at
+                                            { row = 12, col = 5 }
+                                            { row = 12, col = 21 }
+                                            (AST.Call
+                                                { fn =
+                                                    SourcePosition.at
+                                                        { row = 12, col = 5 }
+                                                        { row = 12, col = 11 }
+                                                        (AST.Var { name = "String", varType = AST.CapVar })
+                                                , args =
+                                                    [ SourcePosition.at
+                                                        { row = 12, col = 11 }
+                                                        { row = 12, col = 19 }
+                                                        (AST.Accessor "fromInt")
+                                                    , SourcePosition.at
+                                                        { row = 12, col = 20 }
+                                                        { row = 12, col = 21 }
+                                                        (AST.Var { name = "n", varType = AST.LowVar })
+                                                    ]
+                                                }
+                                            )
+                                    }
+                                }
+                        ]
+                    }
+        ]
 
 expect : AST.Module -> Result (Array (Parser.DeadEnd c e)) AST.Module -> Expectation
 expect expected result =
