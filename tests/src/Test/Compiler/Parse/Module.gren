@@ -687,14 +687,15 @@ tests =
                                                 { fn =
                                                     SourcePosition.at
                                                         { row = 12, col = 5 }
-                                                        { row = 12, col = 11 }
-                                                        (AST.Var { name = "String", varType = AST.CapVar })
+                                                        { row = 12, col = 19 }
+                                                        (AST.VarQual
+                                                            { name = "fromInt"
+                                                            , qualifier = "String"
+                                                            , varType = AST.LowVar
+                                                            }
+                                                        )
                                                 , args =
                                                     [ SourcePosition.at
-                                                        { row = 12, col = 11 }
-                                                        { row = 12, col = 19 }
-                                                        (AST.Accessor "fromInt")
-                                                    , SourcePosition.at
                                                         { row = 12, col = 20 }
                                                         { row = 12, col = 21 }
                                                         (AST.Var { name = "n", varType = AST.LowVar })

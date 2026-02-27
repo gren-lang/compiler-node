@@ -34,6 +34,7 @@ type Error
     | BadOperator String
     | InvalidOperatorChar
     | OperatorError Operator.Error
+    | InternalError
 
 
 parser : Parser Context Error AST.Expression
@@ -480,9 +481,35 @@ term =
                     |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
                 , lowerCaseVariable
                     |> Parser.map (\name -> AST.Var { name = name, varType = AST.LowVar })
-                , Variable.upperCase
+                , Variable.foreignVar
                     |> Parser.mapError VariableError
-                    |> Parser.map (\name -> AST.Var { name = name, varType = AST.CapVar })
+                    |> Parser.andThen
+                        (\foreign ->
+                            when foreign is
+                                Variable.Unqualified name ->
+                                    Parser.succeed (AST.Var { name = name, varType = AST.CapVar })
+
+                                Variable.Qualified { module_, name } ->
+                                    when String.popFirst name is
+                                        Just { first } ->
+                                            Parser.succeed <|
+                                                if Char.isUpper first then
+                                                    AST.VarQual
+                                                        { name = name
+                                                        , qualifier = module_
+                                                        , varType = AST.CapVar
+                                                        }
+
+                                                else
+                                                    AST.VarQual
+                                                        { name = name
+                                                        , qualifier = module_
+                                                        , varType = AST.LowVar
+                                                        }
+
+                                        Nothing ->
+                                            Parser.problem InternalError
+                        )
                 , Number.parser
                     |> Parser.mapError NumberError
                     |> Parser.map AST.NumberLiteral

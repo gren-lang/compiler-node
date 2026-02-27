@@ -45,6 +45,15 @@ tests =
             , test "var name" <| \_ ->
                 Parser.run PE.parser Context.empty "myvar"
                     |> expectExpression (AST.Var { name = "myvar", varType = AST.LowVar })
+            , test "qualified var" <| \_ ->
+                Parser.run PE.parser Context.empty "My.var"
+                    |> expectExpression (AST.VarQual { name = "var", qualifier = "My", varType = AST.LowVar })
+            , test "more qualified var" <| \_ ->
+                Parser.run PE.parser Context.empty "My.Nested.var"
+                    |> expectExpression (AST.VarQual { name = "var", qualifier = "My.Nested", varType = AST.LowVar })
+            , test "qualified type" <| \_ ->
+                Parser.run PE.parser Context.empty "My.Custom.Type"
+                    |> expectExpression (AST.VarQual { name = "Type", qualifier = "My.Custom", varType = AST.CapVar })
             , test "accessor" <| \_ ->
                 Parser.run PE.parser Context.empty ".field"
                     |> expectExpression (AST.Accessor "field")

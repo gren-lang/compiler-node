@@ -412,10 +412,6 @@ tests =
                                     (AST.Call
                                         { args =
                                             [ SourcePosition.at
-                                                { row = 5, col = 11 }
-                                                { row = 5, col = 18 }
-                                                (AST.Accessor "repeat")
-                                            , SourcePosition.at
                                                 { row = 5, col = 19 }
                                                 { row = 5, col = 20 }
                                                 (AST.Var
@@ -429,13 +425,13 @@ tests =
                                                 (AST.StringLiteral "bar")
                                             ]
                                         , fn =
-                                            -- TODO: This is wrong, isn't it?
                                             SourcePosition.at
                                                 { row = 5, col = 5 }
-                                                { row = 5, col = 11 }
-                                                (AST.Var
-                                                    { name = "String"
-                                                    , varType = AST.CapVar
+                                                { row = 5, col = 18 }
+                                                (AST.VarQual
+                                                    { name = "repeat"
+                                                    , qualifier = "String"
+                                                    , varType = AST.LowVar
                                                     }
                                                 )
                                         }

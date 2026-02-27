@@ -5,6 +5,7 @@ module Compiler.Parse.Variable exposing
     , ForeignVar (..)
     , foreignVarToString
     , foreignUpper
+    , foreignVar
     , reservedWords
     )
 
@@ -106,13 +107,13 @@ foreignUpper =
             )
 
 
-type alias ForeignUpperStep =
+type alias ForeignVarStep =
     { module_ : Array String
     , name : String
     }
 
 
-foreignUpperLoop : ForeignUpperStep -> Parser Context Error (Parser.Step ForeignUpperStep ForeignUpperStep)
+foreignUpperLoop : ForeignVarStep -> Parser Context Error (Parser.Step ForeignVarStep ForeignVarStep)
 foreignUpperLoop acc =
     Parser.oneOf
         [ Parser.succeed
@@ -121,6 +122,50 @@ foreignUpperLoop acc =
             )
             |> Parser.skip (Parser.chompChar '.' ExpectedDot)
             |> Parser.keep upperCase
+        , Parser.succeed (Parser.Done acc)
+        ]
+
+
+foreignVar : Parser Context Error ForeignVar
+foreignVar =
+    upperCase
+        |> Parser.andThen
+            (\first ->
+                Parser.loop { module_ = [], name = first } foreignVarLoop
+                    |> Parser.map
+                        (\{ module_, name } ->
+                            when module_ is
+                                [] ->
+                                    Unqualified name
+
+                                _ ->
+                                    Qualified
+                                        { module_ = String.join "." module_
+                                        , name = name
+                                        }
+                        )
+            )
+
+
+foreignVarLoop : ForeignVarStep -> Parser Context Error (Parser.Step ForeignVarStep ForeignVarStep)
+foreignVarLoop acc =
+    Parser.oneOf
+        [ Parser.succeed identity
+            |> Parser.skip (Parser.chompChar '.' ExpectedDot)
+            |> Parser.keep
+                (Parser.oneOf
+                    [ Parser.succeed
+                        (\next ->
+                            Parser.Loop { module_ = Array.pushLast acc.name acc.module_, name = next }
+                        )
+                        |> Parser.keep upperCase
+                    , Parser.succeed
+                        (\varName ->
+                            Parser.Done { module_ = Array.pushLast acc.name acc.module_, name = varName }
+                        )
+                        |> Parser.keep lowerCase
+                    ]
+                )
         , Parser.succeed (Parser.Done acc)
         ]
 
