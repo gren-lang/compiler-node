@@ -1,12 +1,34 @@
-module Compiler.Parse.Context exposing (Context, empty)
+module Compiler.Parse.Context exposing
+    ( Context
+    , empty
+    , Comment
+    , CommentValue (..)
+    )
+
+
+import Dict exposing (Dict)
 
 
 type alias Context =
     { indent : Int
+    , comments : Dict Int (Array Comment)
     }
 
 
 empty : Context
 empty =
     { indent = 0
+    , comments = Dict.empty
     }
+
+
+type alias Comment =
+    { row : Int
+    , col : Int
+    , value : CommentValue
+    }
+
+
+type CommentValue
+    = Line String
+    | MultiLine String

@@ -22,6 +22,12 @@ type Error
     | NumberError Number.Error
     | FloatNotSupported
     | StringError String.Error
+    | SpaceError Space.Error
+
+
+spaceParser : Parser Context Error {}
+spaceParser =
+    Parser.mapError SpaceError Space.parser
 
 
 parser : Parser Context Error AST.Pattern
@@ -39,10 +45,10 @@ record =
     Parser.succeed (\start fields end -> SourcePosition.at start end (AST.PRecord fields))
         |> Parser.keep Parser.getPosition
         |> Parser.skip (Parser.chompChar '{' (ExpectedChar '{'))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] recordInnerLoop)
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
 
 
 recordInnerLoop : Array AST.PRecordField -> Parser Context Error (Parser.Step (Array AST.PRecordField) (Array AST.PRecordField))
@@ -54,7 +60,7 @@ recordInnerLoop acc =
             |> Parser.keep Parser.getPosition
             |> Parser.keep lowerCaseVariable
             |> Parser.keep Parser.getPosition
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.andThen
                 (\field ->
                     Parser.oneOf
@@ -62,17 +68,17 @@ recordInnerLoop acc =
                             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
                         , Parser.succeed (Parser.Loop <| Array.pushLast { field = field, pattern = Nothing } acc)
                             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
-                            |> Parser.skip Space.parser
+                            |> Parser.skip spaceParser
                         , Parser.succeed identity
                             |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
-                            |> Parser.skip Space.parser
+                            |> Parser.skip spaceParser
                             |> Parser.keep parser
                             |> Parser.andThen
                                 (\pattern ->
                                     Parser.oneOf
                                         [ Parser.succeed (Parser.Loop <| Array.pushLast { field = field, pattern = Just pattern } acc)
                                             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
-                                            |> Parser.skip Space.parser
+                                            |> Parser.skip spaceParser
                                         , Parser.succeed (Parser.Done <| Array.pushLast { field = field, pattern = Just pattern } acc)
                                             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
                                         ]
@@ -87,7 +93,7 @@ array =
     Parser.succeed (\start arr end -> SourcePosition.at start end (AST.PArray arr))
         |> Parser.keep Parser.getPosition
         |> Parser.skip (Parser.chompChar '[' (ExpectedChar '['))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep
             ( Parser.oneOf
                 [ Parser.lazy (\_ -> parser)
@@ -97,7 +103,7 @@ array =
                 ]
             )
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
 
 
 arrayInnerLoop : Array AST.Pattern -> Parser Context Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
@@ -107,9 +113,9 @@ arrayInnerLoop acc =
             |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
         , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr acc))
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.keep parser
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]
 
 
@@ -119,7 +125,7 @@ parenthesized =
         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
         |> Parser.keep (Parser.lazy (\_ -> parser))
         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
 
 
 term : Parser Context Error AST.Pattern
@@ -143,7 +149,7 @@ term =
                     |> Parser.keep Variable.foreignUpper
                     |> Parser.mapError VariableError
                     |> Parser.keep Parser.getPosition
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
                     |> Parser.keep
                         (Parser.oneOf
                             [ Parser.lazy (\_ -> parser)
@@ -192,7 +198,7 @@ term =
                 ]
             )
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
 
 
 lowerCaseVariable : Parser Context Error String

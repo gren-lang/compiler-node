@@ -37,6 +37,12 @@ type Error
     | VariableError Variable.Error
     | TypeError Type.Error
     | ExprError Expr.Error
+    | SpaceError Space.Error
+
+
+spaceParser : Parser Context Error {}
+spaceParser =
+    Parser.mapError SpaceError Space.parser
 
 
 parser : Parser Context Error Declaration
@@ -69,6 +75,16 @@ parser =
 
 docParser : (String -> err) -> Parser Context err (Maybe (SourcePosition.Located String))
 docParser toErr =
+    let
+        spaceErr : Space.Error -> err
+        spaceErr spaceError =
+            when spaceError is
+                Space.ExpectedLineComment ->
+                    toErr "expected line comment"
+
+                Space.InvalidWhiteSpace ->
+                    toErr "expected white space character"
+    in
     Parser.oneOf
         [ Parser.succeed
             (\docStart doc docEnd ->
@@ -77,7 +93,7 @@ docParser toErr =
             )
             |> Parser.keep Parser.getPosition
             |> Parser.skip (Parser.token "{-|" (toErr "{-|"))
-            |> Parser.skip Space.parser
+            |> Parser.skip (Parser.mapError spaceErr Space.parser)
             |> Parser.keep
                 (Parser.chompUntil "-}" (toErr "-}")
                     |> Parser.getChompedString
@@ -85,7 +101,7 @@ docParser toErr =
                 )
             |> Parser.skip (Parser.token "-}" (toErr "-}"))
             |> Parser.keep Parser.getPosition
-            |> Parser.skip Space.parser
+            |> Parser.skip (Parser.mapError spaceErr Space.parser)
         , Parser.succeed Nothing
         ]
 
@@ -94,7 +110,7 @@ typeParser : Parser Context Error DeclarationValue
 typeParser =
     Parser.succeed identity
         |> Parser.skip (Parser.token "type" (ExpectedKeyword "type"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.oneOf [ aliasParser, unionParser ])
 
 
@@ -109,13 +125,13 @@ aliasParser =
                 }
         )
         |> Parser.skip (Parser.token "alias" (ExpectedKeyword "alias"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep Parser.getPosition
         |> Parser.keep (Parser.mapError VariableError Variable.upperCase)
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] typeArgLoopParser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.mapError TypeError Type.expression)
 
 
@@ -132,7 +148,7 @@ typeArgLoopParser vars =
             |> Parser.keep Parser.getPosition
             |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
             |> Parser.keep Parser.getPosition
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]
 
 
@@ -149,9 +165,9 @@ unionParser =
         |> Parser.keep Parser.getPosition
         |> Parser.keep (Parser.mapError VariableError Variable.upperCase)
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] typeArgLoopParser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep
             (variantParser
                 |> Parser.andThen
@@ -181,7 +197,7 @@ variantParser =
         |> Parser.keep Parser.getPosition
         |> Parser.keep (Parser.mapError VariableError Variable.upperCase)
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep
             (Parser.oneOf
                 [ Parser.succeed Just
@@ -200,7 +216,7 @@ variantLoopParser variants =
                     Array.pushLast variant variants
             )
             |> Parser.skip (Parser.chompChar '|' (ExpectedChar '|'))
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.keep variantParser
         , Parser.succeed (Parser.Done variants)
         ]
@@ -216,11 +232,11 @@ portParser =
                 }
         )
         |> Parser.skip (Parser.token "port" (ExpectedKeyword "port"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep Parser.getPosition
         |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.mapError TypeError Type.expression)

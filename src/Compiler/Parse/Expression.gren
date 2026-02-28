@@ -33,8 +33,14 @@ type Error
     | IndentError
     | BadOperator String
     | InvalidOperatorChar
+    | SpaceError Space.Error
     | OperatorError Operator.Error
     | InternalError
+
+
+spaceParser : Parser Context Error {}
+spaceParser =
+    Parser.mapError SpaceError Space.parser
 
 
 parser : Parser Context Error AST.Expression
@@ -48,7 +54,7 @@ parser =
             |> Parser.andThen
                 (\firstTerm ->
                     Parser.succeed identity
-                        |> Parser.skip Space.parser
+                        |> Parser.skip spaceParser
                         |> Parser.keep
                             (Parser.scopedUpdatePayload
                                 firstTerm.start.col
@@ -103,7 +109,7 @@ argOrOperatorLoop state =
             |> Parser.keep Parser.getPosition
             |> Parser.keep operatorParser
             |> Parser.keep Parser.getPosition
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.andThen
                 (\operator ->
                     if operator.value == "-" then
@@ -122,14 +128,14 @@ argOrOperatorLoop state =
 
                     else
                         Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
-                            |> Parser.skip Space.parser
+                            |> Parser.skip spaceParser
                             |> Parser.keep possiblyNegativeTerm
                 )
-                |> Parser.skip Space.parser
+                |> Parser.skip spaceParser
         , Parser.succeed (\arg -> Parser.Loop <| pushStateArg arg state)
             |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
             |> Parser.keep term
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         , Parser.succeed (Parser.Done state)
         ]
 
@@ -194,11 +200,11 @@ letParser =
         )
         |> Parser.keep Parser.getPosition
         |> Parser.skip (Parser.keyword "let" (ExpectedKeyword "let"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep letDefParser
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] letDefLoopParser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
         |> Parser.keep Parser.getPosition
 
@@ -218,7 +224,7 @@ letDefNamedParser =
         |> Parser.keep Parser.getPosition
         |> Parser.keep lowerCaseVariable
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.andThen
             (\var ->
                 Parser.succeed
@@ -240,7 +246,7 @@ letDefNamedParser =
                         (Parser.oneOf
                             [ Parser.succeed Just
                                 |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
-                                |> Parser.skip Space.parser
+                                |> Parser.skip spaceParser
                                 |> Parser.keep
                                     (Type.expression
                                         |> Parser.scopedUpdatePayload
@@ -265,12 +271,12 @@ letDefNamedParser =
                                             )
                                 
                                     )
-                                |> Parser.skip Space.parser
+                                |> Parser.skip spaceParser
                             , Parser.succeed Nothing
                             ]
                         )
                     |> Parser.keep (Parser.loop [] (functionArgsParser "="))
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
                     |> Parser.keep (Parser.lazy (\_ -> parser))
             )
 
@@ -289,9 +295,9 @@ letDefDestructParser =
                 )
         )
         |> Parser.keep (Parser.mapError PatternError Pattern.parser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
 
 
@@ -302,7 +308,7 @@ letDefLoopParser defs =
             |> Parser.skip (Parser.keyword "in" (ExpectedKeyword "in"))
         , Parser.succeed (\def -> Parser.Loop <| Array.pushLast def defs)
             |> Parser.keep letDefParser
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]
 
 
@@ -324,15 +330,15 @@ ifBranchParser : Parser Context Error AST.IfBranch
 ifBranchParser =
     Parser.succeed (\test body -> { test = test, body = body })
         |> Parser.skip (Parser.keyword "if" (ExpectedKeyword "if"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.keyword "then" (ExpectedKeyword "then"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.keyword "else" (ExpectedKeyword "else"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
 
 
 ifElseLoop : { row : Int, col : Int } -> Array AST.IfBranch -> Parser Context Error (Parser.Step (Array AST.IfBranch) AST.Expression)
@@ -353,7 +359,7 @@ ifElseLoop startPos branches =
                         )
             )
             |> Parser.keep parser
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]
 
 
@@ -365,11 +371,11 @@ whenParser =
     Parser.succeed (\start expr firstBranch -> { start = start, expr = expr, firstBranch = firstBranch })
         |> Parser.keep Parser.getPosition
         |> Parser.skip (Parser.keyword "when" (ExpectedKeyword "when"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.keyword "is" (ExpectedKeyword "is"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep whenBranchParser
         |> Parser.andThen
             (\{ start, expr, firstBranch } ->
@@ -394,11 +400,11 @@ whenBranchParser : Parser Context Error AST.WhenBranch
 whenBranchParser =
     Parser.succeed (\pattern body -> { pattern = pattern, body = body })
         |> Parser.keep (Parser.mapError PatternError Pattern.parser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
 
 
 whenBranchLoopParser : Array AST.WhenBranch -> Parser Context Error (Parser.Step (Array AST.WhenBranch) (Array AST.WhenBranch))
@@ -419,9 +425,9 @@ function =
     Parser.succeed (\startPos firstArg -> { startPos = startPos, firstArg = firstArg })
         |> Parser.keep Parser.getPosition
         |> Parser.skip (Parser.chompChar '\\' (ExpectedChar '\\'))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.mapError PatternError Pattern.parser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.andThen
             (\{ startPos, firstArg } ->
                 Parser.succeed
@@ -436,9 +442,9 @@ function =
                             )
                     )
                     |> Parser.keep (Parser.loop [ firstArg ] (functionArgsParser "->"))
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
                     |> Parser.keep parser
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
             )
 
 
@@ -449,7 +455,7 @@ functionArgsParser terminator array =
             |> Parser.skip (Parser.token terminator (ExpectedKeyword terminator))
         , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
             |> Parser.keep (Parser.mapError PatternError Pattern.parser)
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]
 
 
@@ -475,9 +481,9 @@ term =
             ( Parser.oneOf
                 [ Parser.succeed AST.Parens
                     |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
                     |> Parser.keep (Parser.lazy (\_ -> parser))
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
                     |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
                 , lowerCaseVariable
                     |> Parser.map (\name -> AST.Var { name = name, varType = AST.LowVar })
@@ -580,7 +586,7 @@ arrayParser : Parser Context Error (Array AST.Expression)
 arrayParser =
     Parser.succeed identity
         |> Parser.skip (Parser.chompChar '[' (ExpectedChar '['))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep
             (Parser.oneOf
                 [ Parser.succeed []
@@ -589,7 +595,7 @@ arrayParser =
                     |> Parser.andThen
                         (\firstElement ->
                             Parser.succeed identity
-                                |> Parser.skip Space.parser
+                                |> Parser.skip spaceParser
                                 |> Parser.keep (Parser.loop [ firstElement ] innerArrayParser)
                         )
                 ]
@@ -603,9 +609,9 @@ innerArrayParser array =
             |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
         , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.keep (Parser.lazy (\_ -> parser))
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]
 
 
@@ -616,20 +622,20 @@ recordParser : Parser Context Error AST.Expression_
 recordParser =
     Parser.succeed identity
         |> Parser.skip (Parser.chompChar '{' (ExpectedChar '{'))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep
             (Parser.oneOf
                 [ Parser.succeed (AST.Record [])
                     |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
                 , Parser.succeed identity
                     |> Parser.keep (Parser.lazy (\_ -> parser))
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
                     |> Parser.andThen
                         (\firstVarName ->
                             Parser.oneOf
                                 [ Parser.succeed identity
                                     |> Parser.skip (Parser.chompChar '|' (ExpectedChar '|'))
-                                    |> Parser.skip Space.parser
+                                    |> Parser.skip spaceParser
                                     |> Parser.keep recordFieldParser
                                     |> Parser.andThen
                                         (\firstPair ->
@@ -640,14 +646,14 @@ recordParser =
                                                         , newValues = fields
                                                         }
                                                 )
-                                                |> Parser.skip Space.parser
+                                                |> Parser.skip spaceParser
                                                 |> Parser.keep (Parser.loop [ firstPair ] innerRecordParser)
                                         )
                                 , Parser.succeed identity
                                     |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
-                                    |> Parser.skip Space.parser
+                                    |> Parser.skip spaceParser
                                     |> Parser.keep (Parser.lazy (\_ -> parser))
-                                    |> Parser.skip Space.parser
+                                    |> Parser.skip spaceParser
                                     |> Parser.andThen
                                         (\value ->
                                             when firstVarName.value is
@@ -657,7 +663,7 @@ recordParser =
                                                             SourcePosition.at firstVarName.start firstVarName.end name
                                                     in
                                                     Parser.succeed AST.Record
-                                                        |> Parser.skip Space.parser
+                                                        |> Parser.skip spaceParser
                                                         |> Parser.keep
                                                             (Parser.loop
                                                                 [ { field = locatedField, value = value } ]
@@ -684,9 +690,9 @@ recordFieldParser =
         |> Parser.keep Parser.getPosition
         |> Parser.keep lowerCaseVariable
         |> Parser.keep Parser.getPosition
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
 
 
@@ -697,7 +703,7 @@ innerRecordParser array =
             |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
         , Parser.succeed (\expr -> Parser.Loop (Array.pushLast expr array))
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.keep recordFieldParser
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]

@@ -24,6 +24,12 @@ type Error
     | OperatorError Operator.Error
     | ExpectedIntPrecedence
     | DeclarationError Declaration.Error
+    | SpaceError Space.Error
+
+
+spaceParser : Parser Context Error {}
+spaceParser =
+    Parser.mapError SpaceError Space.parser
 
 
 parser : Parser Context Error AST.Module
@@ -61,17 +67,17 @@ parser =
             }
         )
         |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep moduleNameParser
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep parseExposingStatement
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Declaration.docParser ExpectedKeyword)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] importLoopParser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] operatorLoopParser)
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] declarationLoopParser)
 
 
@@ -88,19 +94,19 @@ parseExposingStatement : Parser Context Error AST.Exposing
 parseExposingStatement =
     Parser.succeed identity
         |> Parser.skip (Parser.token "exposing" (ExpectedKeyword "exposing"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep
             (Parser.oneOf
                 [ Parser.succeed AST.Open
                     |> Parser.skip (Parser.token ".." (ExpectedKeyword ".."))
-                    |> Parser.skip Space.parser
+                    |> Parser.skip spaceParser
                     |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
                 , Parser.succeed AST.Explicit
                     |> Parser.keep
                         (parseExposingValue
-                            |> Parser.skip Space.parser
+                            |> Parser.skip spaceParser
                             |> Parser.andThen
                                 (\firstExposing ->
                                     Parser.loop [ firstExposing ] parseExposingArray
@@ -117,9 +123,9 @@ parseExposingArray exps =
             |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
         , Parser.succeed (\next -> Parser.Loop <| Array.pushLast next exps)
             |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.keep parseExposingValue
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         ]
 
 
@@ -136,14 +142,14 @@ parseExposingValue =
                 (SourcePosition.parser Variable.upperCase
                     |> Parser.mapError VariableError
                 )
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.keep
                 (Parser.oneOf
                     [ Parser.succeed AST.Public
                         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
-                        |> Parser.skip Space.parser
+                        |> Parser.skip spaceParser
                         |> Parser.skip (Parser.token ".." (ExpectedKeyword ".."))
-                        |> Parser.skip Space.parser
+                        |> Parser.skip spaceParser
                         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
                     , Parser.succeed AST.Private
                     ]
@@ -196,17 +202,17 @@ parseOperatorDeclaration =
     )
         |> Parser.keep Parser.getPosition
         |> Parser.skip (Parser.token "infix" (ExpectedKeyword "infix"))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep parseAssociativity
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep parsePrecedence
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
         |> Parser.keep (SourcePosition.parser Operator.parser |> Parser.mapError OperatorError)
         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
-        |> Parser.skip Space.parser
+        |> Parser.skip spaceParser
         |> Parser.keep (SourcePosition.parser Variable.lowerCase |> Parser.mapError VariableError)
         |> Parser.keep Parser.getPosition
 
@@ -227,9 +233,9 @@ importLoopParser imps =
                     }
             )
             |> Parser.skip (Parser.token "import" (ExpectedKeyword "import"))
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.keep moduleNameParser
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
             |> Parser.andThen
                 (\baseImport ->
                     Parser.oneOf
@@ -244,9 +250,9 @@ importLoopParser imps =
                                 }
                             )
                             |> Parser.skip (Parser.token "as" (ExpectedKeyword "as"))
-                            |> Parser.skip Space.parser
+                            |> Parser.skip spaceParser
                             |> Parser.keep moduleNameParser
-                            |> Parser.skip Space.parser
+                            |> Parser.skip spaceParser
                         , Parser.succeed baseImport
                         ]
                 )
@@ -269,7 +275,7 @@ importLoopParser imps =
                                 ]
                             )
                         |> Parser.keep Parser.getPosition
-                        |> Parser.skip Space.parser
+                        |> Parser.skip spaceParser
                 )
             |> Parser.map
                 (\finalImport ->
@@ -291,7 +297,7 @@ operatorLoopParser ops =
                     Array.pushLast op ops
             )
             |> Parser.keep parseOperatorDeclaration
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         , Parser.succeed (Parser.Done ops)
         ]
 
@@ -307,7 +313,7 @@ declarationLoopParser decls =
                     Array.pushLast decl decls
             )
             |> Parser.keep (Parser.mapError DeclarationError Declaration.parser)
-            |> Parser.skip Space.parser
+            |> Parser.skip spaceParser
         , Parser.succeed (Parser.Done decls)
         ]
 

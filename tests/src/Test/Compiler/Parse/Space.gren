@@ -1,0 +1,62 @@
+module Test.Compiler.Parse.Space exposing ( tests )
+
+import Expect exposing (Expectation)
+import Test exposing (Test, describe, test)
+import String.Parser.Advanced as Parser exposing (Parser)
+import Compiler.Parse.Space as PS
+import Compiler.Parse.Context as Context exposing (Context)
+import Dict
+
+
+tests : Test
+tests =
+    describe "Parse.Space"
+        [ describe "parser"
+            [ test "parses spaces" <| \_ ->
+                Parser.run PS.parser Context.empty "   "
+                    |> Expect.equal (Ok {})
+            , test "parses newlines" <| \_ ->
+                Parser.run PS.parser Context.empty "\n"
+                    |> Expect.equal (Ok {})
+            , test "parses mixed whitespace" <| \_ ->
+                Parser.run PS.parser Context.empty " \n \r "
+                    |> Expect.equal (Ok {})
+            , test "parses empty string" <| \_ ->
+                Parser.run PS.parser Context.empty ""
+                    |> Expect.equal (Ok {})
+            , test "parses line comments" <| \_ ->
+                Parser.run payloadParser Context.empty "-- this is a line comment"
+                    |> expectLineComment 1 1 "this is a line comment"
+            , test "parses line comments even when prefixed with space" <| \_ ->
+                Parser.run payloadParser Context.empty "  -- this is a line comment"
+                    |> expectLineComment 1 3 "this is a line comment"
+            ]
+        ]
+
+
+payloadParser : Parser Context PS.Error Context
+payloadParser =
+    Parser.succeed identity
+        |> Parser.skip PS.parser
+        |> Parser.keep Parser.getPayload
+
+
+expectLineComment : Int -> Int -> String -> Result x Context -> Expectation
+expectLineComment row col comment resultContext =
+    when resultContext is
+        Err err ->
+            Expect.fail ("Failed to parse with error: " ++ Debug.toString err)
+
+        Ok ctx ->
+            when Dict.get row ctx.comments is
+                Nothing ->
+                    Expect.fail "Parsed successfully without comments"
+
+                Just commentsOnRow ->
+                    Expect.equal
+                        [ { row = row
+                          , col = col
+                          , value = Context.Line comment
+                          }
+                        ]
+                        commentsOnRow

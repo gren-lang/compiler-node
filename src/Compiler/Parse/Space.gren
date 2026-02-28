@@ -1,16 +1,69 @@
 module Compiler.Parse.Space exposing
-    ( parser
+    ( Error (..)
+    , parser
     , checkIndent
     )
 
 
-import Compiler.Parse.Context exposing (Context)
+import Compiler.Parse.Context as Context exposing (Context)
 import String.Parser.Advanced as Parser exposing (Parser)
+import Dict
 
 
-parser : Parser Context err {}
+type Error
+    = ExpectedLineComment
+    | InvalidWhiteSpace
+
+
+parser : Parser Context Error {}
 parser =
-    Parser.chompWhile (\c -> c == ' ' || c == '\n' || c == '\r')
+    Parser.loop {} parseLoop
+
+
+parseLoop : {} -> Parser Context Error (Parser.Step {} {})
+parseLoop _state =
+    Parser.oneOf
+        [ Parser.succeed
+            (\row col comment ->
+                { row = row
+                , col = col
+                , value =
+                    comment
+                        |> String.dropFirst 2
+                        |> String.trim
+                        |> Context.Line
+                }
+            )
+            |> Parser.keep Parser.getRow
+            |> Parser.keep Parser.getCol
+            |> Parser.keep (Parser.getChompedString <| Parser.lineComment "--" ExpectedLineComment)
+            |> Parser.andThen
+                (\value ->
+                    Parser.updatePayload
+                        (\payload  ->
+                            let
+                                commentsOnRow =
+                                    Dict.get value.row payload.comments
+                                        |> Maybe.withDefault []
+                                        |> Array.pushLast value
+                            in
+                            { payload
+                                | comments = Dict.set value.row commentsOnRow payload.comments
+                            }
+                        )
+                        Parser.getPayload
+                )
+            |> Parser.map (\_ -> Parser.Loop {})
+        , Parser.succeed (Parser.Loop {})
+            |> Parser.skip (Parser.chompIf validWhiteSpace InvalidWhiteSpace)
+            |> Parser.skip (Parser.chompWhile validWhiteSpace)
+        , Parser.succeed (Parser.Done {})
+        ]
+
+
+validWhiteSpace : Char -> Bool
+validWhiteSpace char =
+    char == ' ' || char == '\n' || char == '\r'
 
 
 checkIndent : Parser Context {} {}
