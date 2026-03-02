@@ -261,7 +261,13 @@ importLoopParser imps =
                     Parser.succeed
                         (\expose endPos ->
                             { importWithAlias
-                                | end = endPos
+                                | end =
+                                    -- implicitly check if we actually found an exposing list
+                                    if expose == AST.Explicit [] then
+                                        importWithAlias.end
+
+                                    else
+                                        endPos
                                 , value =
                                     { importWithAlias.value
                                         | expose = expose

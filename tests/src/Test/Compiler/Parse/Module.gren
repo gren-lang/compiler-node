@@ -232,6 +232,61 @@ tests =
                 , binops = []
                 , effects = AST.NoEffects
                 }
+        , test "imports end positions" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                module MyModule exposing (..)
+
+                import Array
+  
+                import Basics exposing
+                    (max)
+                """
+            |> expect
+                { name =
+                    SourcePosition.at
+                        { row = 1, col = 8 }
+                        { row = 1, col = 16 }
+                        "MyModule"
+                , exports = AST.Open
+                , docs = Nothing
+                , imports =
+                    [ SourcePosition.at
+                        { row = 3, col = 1 }
+                        { row = 3, col = 13 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 3, col = 8 }
+                                { row = 3, col = 13 }
+                                "Array"
+                        , alias = Nothing
+                        , expose = AST.Explicit []
+                        }
+                    , SourcePosition.at
+                        { row = 5, col = 1 }
+                        { row = 6, col = 10 }
+                        { module_ =
+                            SourcePosition.at
+                                { row = 5, col = 8 }
+                                { row = 5, col = 14 }
+                                "Basics"
+                        , alias = Nothing
+                        , expose =
+                            AST.Explicit
+                                [ AST.ExposedLower <|
+                                    SourcePosition.at
+                                        { row = 6, col = 6 }
+                                        { row = 6, col = 9 }
+                                        "max"
+                                ]
+                        }
+                    ]
+                , values = []
+                , unions = []
+                , aliases = []
+                , binops = []
+                , effects = AST.NoEffects
+                }
         , test "operators" <| \_ ->
             Parser.run PM.parser Context.empty
                 """
