@@ -1,6 +1,7 @@
 module Compiler.Parse.Operator exposing
   ( parser
   , Error (..)
+  , errorToString
   )
 
 
@@ -16,6 +17,28 @@ type Error
     | BadEquals
     | BadHasType
     | BadOperatorCharacter
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        BadDot ->
+            "Invalid use of '.'"
+        
+        BadPipe ->
+            "Invalid use of '|>'"
+        
+        BadArrow ->
+            "Invalid use of '->'"
+        
+        BadEquals ->
+            "Invalid use of '='"
+        
+        BadHasType ->
+            "Invalid use of ':'"
+        
+        BadOperatorCharacter ->
+            "Invalid operator character"
 
 
 parser : Parser Context Error String

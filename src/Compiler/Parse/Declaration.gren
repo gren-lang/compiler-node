@@ -4,6 +4,7 @@ module Compiler.Parse.Declaration exposing
     , Error (..)
     , parser
     , docParser
+    , errorToString
     )
 
 
@@ -38,6 +39,28 @@ type Error
     | TypeError Type.Error
     | ExprError Expr.Error
     | SpaceError Space.Error
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        ExpectedKeyword keyword ->
+            "Expected keyword '" ++ keyword ++ "'"
+        
+        ExpectedChar char ->
+            "Expected character '" ++ String.fromChar char ++ "'"
+        
+        VariableError varError ->
+            Variable.errorToString varError
+        
+        TypeError typeError ->
+            Type.errorToString typeError
+        
+        ExprError exprError ->
+            Expr.errorToString exprError
+        
+        SpaceError spaceError ->
+            Space.errorToString spaceError
 
 
 spaceParser : Parser Context Error {}

@@ -2,6 +2,7 @@ module Compiler.Parse.Module exposing
     ( Error (..)
     , parser
     , errorsToString
+    , errorToString
     )
 
 
@@ -25,6 +26,31 @@ type Error
     | ExpectedIntPrecedence
     | DeclarationError Declaration.Error
     | SpaceError Space.Error
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        ExpectedKeyword keyword ->
+            "Expected keyword '" ++ keyword ++ "'"
+        
+        ExpectedChar char ->
+            "Expected character '" ++ String.fromChar char ++ "'"
+        
+        VariableError varError ->
+            Variable.errorToString varError
+        
+        OperatorError opError ->
+            Operator.errorToString opError
+        
+        ExpectedIntPrecedence ->
+            "Expected integer precedence value"
+        
+        DeclarationError declError ->
+            Declaration.errorToString declError
+        
+        SpaceError spaceError ->
+            Space.errorToString spaceError
 
 
 spaceParser : Parser Context Error {}
@@ -408,8 +434,7 @@ errorsToString src deadEnds =
       , linesOfExtraContext = 2
       }
       { deadEndToString = \de -> { row = de.row, col = de.col, context = "" }
-      -- TODO: get rid of Debug
-      , problemToString = \err -> Parser.Other (Debug.toString err)
+      , problemToString = \err -> Parser.Other (errorToString err)
       }
       src
       (Array.map (\de -> { row = de.row, col = de.col, payload = {}, problem = de.problem }) deadEnds)

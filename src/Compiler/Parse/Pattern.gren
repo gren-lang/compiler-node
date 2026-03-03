@@ -1,6 +1,7 @@
 module Compiler.Parse.Pattern exposing
     ( Error (..)
     , parser
+    , errorToString
     )
 
 
@@ -23,6 +24,31 @@ type Error
     | FloatNotSupported
     | StringError String.Error
     | SpaceError Space.Error
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        ExpectedChar char ->
+            "Expected character '" ++ String.fromChar char ++ "'"
+        
+        ExpectedKeyword keyword ->
+            "Expected keyword '" ++ keyword ++ "'"
+        
+        VariableError varError ->
+            Variable.errorToString varError
+        
+        NumberError numError ->
+            Number.errorToString numError
+        
+        FloatNotSupported ->
+            "Float patterns are not supported"
+        
+        StringError strError ->
+            String.errorToString strError
+        
+        SpaceError spaceError ->
+            Space.errorToString spaceError
 
 
 spaceParser : Parser Context Error {}

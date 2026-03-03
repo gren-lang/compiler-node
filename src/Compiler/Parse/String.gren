@@ -2,6 +2,7 @@ module Compiler.Parse.String exposing
     ( Error (..)
     , char
     , string
+    , errorToString
     )
 
 
@@ -19,6 +20,34 @@ type Error
     | ExpectedUnicodeClosing
     | ExpectedNewline
     | MisalignedMultiQuotes
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        ExpectedQuote ->
+            "Expected quote"
+        
+        ExpectedChar ->
+            "Expected a character"
+        
+        ExpectedEscapeChar escapeSeq ->
+            "Invalid escape sequence: '" ++ escapeSeq ++ "'"
+        
+        ExpectedUnicodeOpening ->
+            "Expected unicode opening 'u{'"
+        
+        ExpectedValidUnicode ->
+            "Invalid unicode value"
+        
+        ExpectedUnicodeClosing ->
+            "Expected unicode closing '}'"
+        
+        ExpectedNewline ->
+            "Expected newline"
+        
+        MisalignedMultiQuotes ->
+            "Multi-line string quotes are misaligned"
 
 
 char : Parser Context Error Char

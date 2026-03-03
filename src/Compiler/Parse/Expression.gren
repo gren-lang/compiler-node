@@ -2,6 +2,7 @@ module Compiler.Parse.Expression exposing
     ( Error (..)
     , parser
     , letDefNamedParser
+    , errorToString
     )
 
 
@@ -36,6 +37,58 @@ type Error
     | SpaceError Space.Error
     | OperatorError Operator.Error
     | InternalError
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        ExpectedChar char ->
+            "Expected character '" ++ String.fromChar char ++ "'"
+        
+        ExpectedKeyword keyword ->
+            "Expected keyword '" ++ keyword ++ "'"
+        
+        VariableError varError ->
+            Variable.errorToString varError
+        
+        NumberError numError ->
+            Number.errorToString numError
+        
+        StringError strError ->
+            String.errorToString strError
+        
+        PatternError patError ->
+            Pattern.errorToString patError
+        
+        TypeError typeError ->
+            Type.errorToString typeError
+        
+        WildcardAttempt ->
+            "Wildcard patterns are not allowed in expressions"
+        
+        ExpectedLowerVariable _ ->
+            "Expected lower case variable"
+        
+        NameMismatch { first, second } ->
+            "Name mismatch: expected '" ++ first ++ "' but got '" ++ second ++ "'"
+        
+        IndentError ->
+            "Indentation error"
+        
+        BadOperator op ->
+            "Invalid operator: '" ++ op ++ "'"
+        
+        InvalidOperatorChar ->
+            "Invalid operator character"
+        
+        SpaceError spaceError ->
+            Space.errorToString spaceError
+        
+        OperatorError opError ->
+            Operator.errorToString opError
+        
+        InternalError ->
+            "Internal parser error"
 
 
 spaceParser : Parser Context Error {}

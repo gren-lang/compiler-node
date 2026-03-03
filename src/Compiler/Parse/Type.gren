@@ -1,6 +1,7 @@
 module Compiler.Parse.Type exposing
     ( Error (..)
     , expression
+    , errorToString
     )
 
 
@@ -18,6 +19,25 @@ type Error
     | VariableError Variable.Error
     | ExpectedIndent
     | SpaceError Space.Error
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        ExpectedChar char ->
+            "Expected '" ++ String.fromChar char ++ "'"
+        
+        ExpectedString str ->
+            "Expected string '" ++ str ++ "'"
+        
+        VariableError varError ->
+            Variable.errorToString varError
+        
+        ExpectedIndent ->
+            "Expected indentation"
+        
+        SpaceError spaceError ->
+            Space.errorToString spaceError
 
 
 spaceParser : Parser Context Error {}

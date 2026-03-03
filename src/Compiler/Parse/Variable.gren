@@ -7,6 +7,7 @@ module Compiler.Parse.Variable exposing
     , foreignUpper
     , foreignVar
     , reservedWords
+    , errorToString
     )
 
 
@@ -20,6 +21,19 @@ type Error
     = InvalidCharacter
     | ExpectedDot
     | ReservedWord String
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        InvalidCharacter ->
+            "Invalid character in variable name"
+        
+        ExpectedDot ->
+            "Expected '.' character"
+        
+        ReservedWord word ->
+            "Reserved word used as variable: '" ++ word ++ "'"
 
 
 lowerCase : Parser Context Error String

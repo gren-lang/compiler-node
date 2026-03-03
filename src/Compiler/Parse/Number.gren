@@ -3,6 +3,7 @@ module Compiler.Parse.Number exposing
     , Error (..)
     , parser
     , hexParser
+    , errorToString
     )
 
 
@@ -21,6 +22,22 @@ type Error
     | LeadingZero
     | ExpectedInt
     | ExpectedHex
+
+
+errorToString : Error -> String
+errorToString error =
+    when error is
+        NotANumber ->
+            "Not a valid number"
+        
+        LeadingZero ->
+            "Leading zero is not allowed"
+        
+        ExpectedInt ->
+            "Expected integer"
+        
+        ExpectedHex ->
+            "Expected hexadecimal digits"
 
 
 parser : Parser Context Error Outcome
