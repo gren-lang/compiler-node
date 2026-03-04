@@ -102,7 +102,6 @@ parser =
         [ ifParser
         , whenParser
         , letParser
-        , function
         , possiblyNegativeTerm
             |> Parser.andThen
                 (\firstTerm ->
@@ -473,26 +472,21 @@ whenBranchLoopParser branches =
 -- FUNCTION
 
 
-function : Parser Context Error AST.Expression
+function : Parser Context Error AST.Expression_
 function =
-    Parser.succeed (\startPos firstArg -> { startPos = startPos, firstArg = firstArg })
-        |> Parser.keep Parser.getPosition
+    Parser.succeed identity
         |> Parser.skip (Parser.chompChar '\\' (ExpectedChar '\\'))
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.mapError PatternError Pattern.parser)
         |> Parser.skip spaceParser
         |> Parser.andThen
-            (\{ startPos, firstArg } ->
+            (\firstArg ->
                 Parser.succeed
                     (\args body ->
-                        SourcePosition.at
-                            startPos
-                            body.end
-                            (AST.Lambda
-                                { patterns = args
-                                , body = body
-                                }
-                            )
+                        AST.Lambda
+                            { patterns = args
+                            , body = body
+                            }
                     )
                     |> Parser.keep (Parser.loop [ firstArg ] (functionArgsParser "->"))
                     |> Parser.skip spaceParser
@@ -538,6 +532,7 @@ term =
                     |> Parser.keep (Parser.lazy (\_ -> parser))
                     |> Parser.skip spaceParser
                     |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
+                , function
                 , lowerCaseVariable
                     |> Parser.map (\name -> AST.Var { name = name, varType = AST.LowVar })
                 , Variable.foreignVar
@@ -597,6 +592,15 @@ term =
                 when expr.value is
                     AST.Var { varType = AST.LowVar } ->
                         accessible expr
+
+                    AST.Lambda { body } ->
+                        -- Use body.end for entire expression
+                        Parser.succeed <|
+                            SourcePosition.at
+                                expr.start
+                                body.end
+                                expr.value
+                                
 
                     _ ->
                         Parser.succeed expr
