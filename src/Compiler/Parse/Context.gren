@@ -17,7 +17,7 @@ type alias Context =
 
 empty : Context
 empty =
-    { indent = 0
+    { indent = 1
     , comments = Dict.empty
     }
 

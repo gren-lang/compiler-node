@@ -84,7 +84,7 @@ checkIndent =
         |> Parser.keep Parser.getCol
         |> Parser.andThen
             (\{ indent, col } ->
-                if col > indent && col > 1 then
+                if col > indent then
                     Parser.succeed {}
 
                 else

@@ -31,7 +31,46 @@ tests =
                 Parser.run payloadParser Context.empty "  -- this is a line comment"
                     |> expectLineComment 1 3 "this is a line comment"
             ]
+    , describe "checkIndent" <|
+        let
+            indentParser =
+                Parser.succeed {}
+                    |> Parser.skip PS.parser
+                    |> Parser.mapError (\_ -> {})
+                    |> Parser.andThen (\_ -> PS.checkIndent)
+        in    
+        [ test "succeeds when column is greater than indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 2 }
+            in
+            Parser.run indentParser context "  x"
+                |> Expect.equal (Ok {})
+        , test "fails when column is less than indent" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 4 }
+            in
+            Parser.run indentParser context "  x"
+                |> expectProblem
+        , test "fails when column is 1" <| \_ ->
+            let
+                context =
+                    { Context.empty | indent = 1 }
+            in
+            Parser.run indentParser context "x"
+                |> expectProblem
         ]
+    ]
+
+
+expectProblem : Result x y -> Expectation
+expectProblem result =
+    when result is
+        Ok _ ->
+            Expect.fail "Expected parser to fail but it succeeded"
+        Err _ ->
+            Expect.pass
 
 
 payloadParser : Parser Context PS.Error Context

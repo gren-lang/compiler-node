@@ -179,6 +179,7 @@ term =
                     |> Parser.keep
                         (Parser.oneOf
                             [ Parser.lazy (\_ -> parser)
+                                -- TODO: why backtrackable?
                                 |> Parser.backtrackable
                                 |> Parser.map Just
                             , Parser.succeed Nothing
@@ -193,7 +194,7 @@ term =
                                         , arg = arg
                                         }
 
-                                Variable.Qualified { module_, name  } ->
+                                Variable.Qualified { module_, name } ->
                                     AST.PCtorQual
                                         { varRegion = { start = start, end = end }
                                         , module_ = module_
@@ -225,6 +226,29 @@ term =
             )
         |> Parser.keep Parser.getPosition
         |> Parser.skip spaceParser
+        -- Correct positions of Constructors
+        |> Parser.map
+            (\t ->
+                when t is
+                    { value = AST.PCtor { name, arg } } ->
+                        { start = t.start
+                        , value = t.value
+                        , end =
+                            Maybe.map .end arg
+                                |> Maybe.withDefault name.end
+                        }
+
+                    { value = AST.PCtorQual { varRegion, arg } } ->
+                        { start = t.start
+                        , value = t.value
+                        , end =
+                            Maybe.map .end arg
+                                |> Maybe.withDefault varRegion.end
+                        }
+
+                    _ ->
+                        t
+            )
 
 
 lowerCaseVariable : Parser Context Error String

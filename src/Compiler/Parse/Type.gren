@@ -61,13 +61,19 @@ expression =
                                 next.end
                                 (AST.TLambda { from = tipe, to = next })
                         )
-                        |> Parser.skip (Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent)
+                        |> Parser.skip checkIndent
                         |> Parser.skip (Parser.token "->" (ExpectedString "->"))
                         |> Parser.skip spaceParser
+                        |> Parser.skip checkIndent
                         |> Parser.keep (Parser.lazy (\_ -> expression))
                     , Parser.succeed tipe
                     ]
             )
+
+
+checkIndent : Parser Context Error {}
+checkIndent =
+    Parser.mapError (\_ -> ExpectedIndent) Space.checkIndent
 
 
 app : Parser Context Error AST.Type

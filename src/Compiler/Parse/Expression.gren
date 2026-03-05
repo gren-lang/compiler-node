@@ -301,10 +301,6 @@ letDefNamedParser =
                                 |> Parser.skip spaceParser
                                 |> Parser.keep
                                     (Type.expression
-                                        |> Parser.scopedUpdatePayload
-                                            var.start.col
-                                            .indent
-                                            (\nextValue payload -> { payload | indent = nextValue })
                                         |> Parser.mapError TypeError
                                     )
                                 |> Parser.skip
@@ -321,12 +317,17 @@ letDefNamedParser =
                                                 else
                                                     Parser.succeed {}
                                             )
-                                
+                            
                                     )
                                 |> Parser.skip spaceParser
                             , Parser.succeed Nothing
                             ]
                         )
+                    -- TODO: How to reverse this?
+                    |> Parser.scopedUpdatePayload
+                        var.start.col
+                        .indent
+                        (\nextValue payload -> { payload | indent = nextValue })
                     |> Parser.keep (Parser.loop [] (functionArgsParser "="))
                     |> Parser.skip spaceParser
                     |> Parser.keep (Parser.lazy (\_ -> parser))
@@ -446,6 +447,10 @@ whenParser =
                                 endLocation
                                 (AST.When { expression = expr, branches = branches })
                         )
+                    |> Parser.scopedUpdatePayload
+                        start.col
+                        .indent
+                        (\value payload -> { payload | indent = value })
             )
 
 whenBranchParser : Parser Context Error AST.WhenBranch
@@ -456,7 +461,6 @@ whenBranchParser =
         |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
-        |> Parser.skip spaceParser
 
 
 whenBranchLoopParser : Array AST.WhenBranch -> Parser Context Error (Parser.Step (Array AST.WhenBranch) (Array AST.WhenBranch))
