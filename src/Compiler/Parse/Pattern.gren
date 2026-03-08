@@ -146,6 +146,7 @@ array =
         |> Parser.keep
             ( Parser.oneOf
                 [ Parser.lazy (\_ -> parserNoAlias)
+                    |> Parser.skip spaceParser
                     |> Parser.andThen (\firstArg -> Parser.loop [ firstArg ] arrayInnerLoop)
                 , Parser.succeed []
                     |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
@@ -171,6 +172,7 @@ parenthesized : Parser Context Error AST.Pattern
 parenthesized =
     Parser.succeed identity
         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+        |> Parser.skip spaceParser
         -- When parens are used, allow `as` pattern
         |> Parser.keep
             (Parser.oneOf
@@ -178,6 +180,7 @@ parenthesized =
                 , Parser.lazy (\_ -> parser)
                 ]
             )
+        |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
 
 

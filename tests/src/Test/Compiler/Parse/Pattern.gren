@@ -109,7 +109,7 @@ tests =
                                 "myVar"
                         }
                     )
-        , test "constructor (parenthesized with args)" <| \_ ->
+        , test "constructor (parenthesized with arg)" <| \_ ->
             Parser.run PT.parser Context.empty "(Ctor arg)"
                 |> expectPattern
                     (AST.PCtor
@@ -123,6 +123,23 @@ tests =
                             SourcePosition.at
                                 { row = 1, col = 2 }
                                 { row = 1, col = 6 }
+                                "Ctor"
+                        }
+                    )
+        , test "constructor (parenthesized with arg and whitespace)" <| \_ ->
+            Parser.run PT.parser Context.empty "( Ctor arg )"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 8 }
+                                    { row = 1, col = 11 }
+                                    (AST.PVar "arg")
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 3 }
+                                { row = 1, col = 7 }
                                 "Ctor"
                         }
                     )
@@ -241,6 +258,60 @@ tests =
                                        (AST.PAnything "")
                            }
                         ]
+                    )
+        , test "constructor (with array argument)" <| \_ ->
+            Parser.run PT.parser Context.empty "MyArray [ one ]"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 9 }
+                                    { row = 1, col = 16 }
+                                    (AST.PArray
+                                        [ SourcePosition.at
+                                            { row = 1, col = 11 }
+                                            { row = 1, col = 14 }
+                                            (AST.PVar "one")
+                                        ]
+                                    )
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 8 }
+                                "MyArray"
+                        }
+                    )
+        , test "constructor (with record argument)" <| \_ ->
+            Parser.run PT.parser Context.empty "MyRecord { x = 1 }"
+                |> expectPattern
+                    (AST.PCtor
+                        { arg =
+                            Just <|
+                                SourcePosition.at
+                                    { row = 1, col = 10 }
+                                    { row = 1, col = 19 }
+                                    (AST.PRecord
+                                        [ { field =
+                                               SourcePosition.at
+                                                   { row = 1, col = 12 }
+                                                   { row = 1, col = 13 }
+                                                   "x"
+                                           , pattern =
+                                               Just <|
+                                                   SourcePosition.at
+                                                       { row = 1, col = 16 }
+                                                       { row = 1, col = 17 }
+                                                       (AST.PInt { isHex = False, value = 1 })
+                                           }
+                                        ]
+                                    )
+                        , name =
+                            SourcePosition.at
+                                { row = 1, col = 1 }
+                                { row = 1, col = 9 }
+                                "MyRecord"
+                        }
                     )
         ]
 
