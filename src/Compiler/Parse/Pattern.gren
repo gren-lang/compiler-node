@@ -172,7 +172,12 @@ parenthesized =
     Parser.succeed identity
         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
         -- When parens are used, allow `as` pattern
-        |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.keep
+            (Parser.oneOf
+                [ SourcePosition.parser (numberBy Number.parser)
+                , Parser.lazy (\_ -> parser)
+                ]
+            )
         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
 
 
@@ -192,18 +197,13 @@ term =
                         )
                 , lowerCaseVariable
                     |> Parser.map AST.PVar
-                , Parser.succeed (\start var end arg -> { ctor = SourcePosition.at start end var, arg = arg })
-                    |> Parser.keep Parser.getPosition
-                    |> Parser.keep Variable.foreignUpper
-                    |> Parser.mapError VariableError
-                    |> Parser.keep Parser.getPosition
+                , Parser.succeed (\var arg -> { ctor = var, arg = arg })
+                    |> Parser.keep (SourcePosition.parser (Parser.mapError VariableError Variable.foreignUpper))
                     |> Parser.skip spaceParser
                     |> Parser.keep
                         (Parser.oneOf
-                            [ Parser.lazy (\_ -> parserNoAlias)
-                                -- TODO: why backtrackable?
-                                |> Parser.backtrackable
-                                |> Parser.map Just
+                            [ Parser.succeed Just
+                                |> Parser.keep (Parser.lazy (\_ -> parserNoAlias))
                             , Parser.succeed Nothing
                             ]
                         )
@@ -224,20 +224,7 @@ term =
                                         , arg = arg
                                         }
                         )
-                , Number.parser
-                    |> Parser.mapError NumberError
-                    |> Parser.andThen
-                        (\num ->
-                            when num is
-                                Number.Integer int ->
-                                    Parser.succeed <| AST.PInt { isHex = False, value = int }
-
-                                Number.Hex int ->
-                                    Parser.succeed <| AST.PInt { isHex = True, value = int }
-
-                                Number.FloatingPoint _ ->
-                                    Parser.problem FloatNotSupported
-                        )
+                , numberBy Number.zeroOrHigher
                 , String.string
                     |> Parser.mapError StringError
                     |> Parser.map AST.PStr
@@ -280,3 +267,21 @@ spaceParser =
 lowerCaseVariable : Parser Context Error String
 lowerCaseVariable =
     Parser.mapError VariableError Variable.lowerCase
+
+
+numberBy : Parser Context Number.Error Number.Outcome -> Parser Context Error AST.Pattern_
+numberBy numParser =
+    numParser
+        |> Parser.mapError NumberError
+        |> Parser.andThen
+            (\num ->
+                when num is
+                    Number.Integer int ->
+                        Parser.succeed <| AST.PInt { isHex = False, value = int }
+
+                    Number.Hex int ->
+                        Parser.succeed <| AST.PInt { isHex = True, value = int }
+
+                    Number.FloatingPoint _ ->
+                        Parser.problem FloatNotSupported
+            )

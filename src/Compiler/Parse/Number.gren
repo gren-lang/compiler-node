@@ -2,6 +2,7 @@ module Compiler.Parse.Number exposing
     ( Outcome (..)
     , Error (..)
     , parser
+    , zeroOrHigher
     , hexParser
     , errorToString
     )
@@ -56,8 +57,8 @@ parser =
                         Hex (negate hex)
             )
             |> Parser.skip (Parser.token "-" NotANumber)
-            |> Parser.keep numParser
-        , numParser
+            |> Parser.keep zeroOrHigher
+        , zeroOrHigher
         ]
         |> Parser.andThen
             (\successCase ->
@@ -69,8 +70,8 @@ parser =
             )
 
 
-numParser : Parser Context Error Outcome
-numParser =
+zeroOrHigher : Parser Context Error Outcome
+zeroOrHigher =
     Parser.oneOf
         [ Parser.chompChar '0' NotANumber
             |> Parser.andThen
