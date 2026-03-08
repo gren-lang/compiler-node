@@ -194,6 +194,156 @@ tests =
                                 ]
                             }
                         )
+            , test "backward pipe operator with record" <| \_ ->
+                Parser.run PE.parser Context.empty
+                    "{ onInit = initWithCommand <| Compiler.Backend.Make { optimize = flags.optimize } }"
+                    |> expectExpression
+                        (AST.Record
+                            [ { field =
+                                    SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 9 }
+                                        "onInit"
+                              , value =
+                                    SourcePosition.at
+                                        { row = 1, col = 12 }
+                                        { row = 1, col = 82 }
+                                        (AST.Binops
+                                            { segments =
+                                                [ { leadingExpression =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 12 }
+                                                        { row = 1, col = 27 }
+                                                        (AST.Var { name = "initWithCommand", varType = AST.LowVar })
+                                                  , operatorName =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 28 }
+                                                        { row = 1, col = 30 }
+                                                        "<|"
+                                                  }
+                                                ]
+                                            , finalExpression =
+                                                SourcePosition.at
+                                                    { row = 1, col = 31 }
+                                                    { row = 1, col = 82 }
+                                                    (AST.Call
+                                                        { fn =
+                                                            SourcePosition.at
+                                                                { row = 1, col = 31 }
+                                                                { row = 1, col = 52 }
+                                                                (AST.VarQual { name = "Make", qualifier = "Compiler.Backend", varType = AST.CapVar })
+                                                        , args =
+                                                            [ SourcePosition.at
+                                                                { row = 1, col = 53 }
+                                                                { row = 1, col = 82 }
+                                                                (AST.Record
+                                                                    [ { field =
+                                                                            SourcePosition.at
+                                                                                { row = 1, col = 55 }
+                                                                                { row = 1, col = 63 }
+                                                                                "optimize"
+                                                                      , value =
+                                                                            SourcePosition.at
+                                                                                { row = 1, col = 72 }
+                                                                                { row = 1, col = 80 }
+                                                                                (AST.Access
+                                                                                    { accessor = "optimize"
+                                                                                    , expression =
+                                                                                        SourcePosition.at
+                                                                                            { row = 1, col = 66 }
+                                                                                            { row = 1, col = 71 }
+                                                                                            (AST.Var { name = "flags", varType = AST.LowVar })
+                                                                                    }
+                                                                                )
+                                                                      }
+                                                                    ]
+                                                                )
+                                                            ]
+                                                        }
+                                                    )
+                                            }
+                                        )
+                              }
+                            ]
+                        )
+            , test "complex function call with record argument" <| \_ ->
+                Parser.run PE.parser Context.empty
+                    """
+                    { onInit = initWithCommand <|
+                        Compiler.Backend.Make
+                            { optimize = flags.optimize
+                            }
+                    }
+                    """
+                    |> expectExpression
+                        (AST.Record
+                            [ { field =
+                                    SourcePosition.at
+                                        { row = 1, col = 3 }
+                                        { row = 1, col = 9 }
+                                        "onInit"
+                              , value =
+                                    SourcePosition.at
+                                        { row = 1, col = 12 }
+                                        { row = 4, col = 10 }
+                                        (AST.Binops
+                                            { segments =
+                                                [ { leadingExpression =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 12 }
+                                                        { row = 1, col = 27 }
+                                                        (AST.Var { name = "initWithCommand", varType = AST.LowVar })
+                                                  , operatorName =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 28 }
+                                                        { row = 1, col = 30 }
+                                                        "<|"
+                                                  }
+                                                ]
+                                            , finalExpression =
+                                                SourcePosition.at
+                                                    { row = 2, col = 5 }
+                                                    { row = 4, col = 10 }
+                                                    (AST.Call
+                                                        { fn =
+                                                            SourcePosition.at
+                                                                { row = 2, col = 5 }
+                                                                { row = 2, col = 26 }
+                                                                (AST.VarQual { name = "Make", qualifier = "Compiler.Backend", varType = AST.CapVar })
+                                                        , args =
+                                                            [ SourcePosition.at
+                                                                { row = 3, col = 9 }
+                                                                { row = 4, col = 10 }
+                                                                (AST.Record
+                                                                    [ { field =
+                                                                            SourcePosition.at
+                                                                                { row = 3, col = 11 }
+                                                                                { row = 3, col = 19 }
+                                                                                "optimize"
+                                                                      , value =
+                                                                            SourcePosition.at
+                                                                                { row = 3, col = 28 }
+                                                                                { row = 3, col = 36 }
+                                                                                (AST.Access
+                                                                                    { accessor = "optimize"
+                                                                                    , expression =
+                                                                                        SourcePosition.at
+                                                                                            { row = 3, col = 22 }
+                                                                                            { row = 3, col = 27 }
+                                                                                            (AST.Var { name = "flags", varType = AST.LowVar })
+                                                                                    }
+                                                                                )
+                                                                      }
+                                                                    ]
+                                                                )
+                                                            ]
+                                                        }
+                                                    )
+                                            }
+                                        )
+                              }
+                            ]
+                        )
             , test "operators" <| \_ ->
                 Parser.run PE.parser Context.empty "func a + b - c"
                     |> expectExpression

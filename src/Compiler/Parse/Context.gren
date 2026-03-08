@@ -11,6 +11,7 @@ import Dict exposing (Dict)
 
 type alias Context =
     { indent : Int
+    , lineStart : Int
     , comments : Dict Int (Array Comment)
     }
 
@@ -18,6 +19,7 @@ type alias Context =
 empty : Context
 empty =
     { indent = 1
+    , lineStart = 1
     , comments = Dict.empty
     }
 

@@ -1,6 +1,7 @@
 module Compiler.Parse.Space exposing
     ( Error (..)
     , parser
+    , setIndentToStartOfLine
     , checkIndent
     , errorToString
     )
@@ -28,7 +29,19 @@ errorToString error =
 
 parser : Parser Context Error {}
 parser =
-    Parser.loop {} parseLoop
+    Parser.succeed (\startPos endPos -> { startPos = startPos, endPos = endPos })
+        |> Parser.keep Parser.getPosition
+        |> Parser.skip (Parser.loop {} parseLoop)
+        |> Parser.keep Parser.getPosition
+        |> Parser.andThen
+            (\{ startPos, endPos } ->
+                if startPos.row /= endPos.row || startPos.col == 1 then
+                    Parser.succeed {}
+                        |> Parser.updatePayload (\pl -> { pl | lineStart = endPos.col })
+
+                else
+                    Parser.succeed {}
+            )
 
 
 parseLoop : {} -> Parser Context Error (Parser.Step {} {})
@@ -76,6 +89,11 @@ validWhiteSpace : Char -> Bool
 validWhiteSpace char =
     char == ' ' || char == '\n' || char == '\r'
 
+
+setIndentToStartOfLine : Parser Context e {}
+setIndentToStartOfLine =
+    Parser.updatePayload (\pl -> { pl | indent = pl.lineStart }) (Parser.succeed {})
+    
 
 checkIndent : Parser Context {} {}
 checkIndent =

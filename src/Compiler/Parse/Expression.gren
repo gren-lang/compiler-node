@@ -109,7 +109,7 @@ parser =
                         |> Parser.skip spaceParser
                         |> Parser.keep
                             (Parser.scopedUpdatePayload
-                                firstTerm.start.col
+                                .lineStart
                                 .indent
                                 (\newIndent payload -> { payload | indent = newIndent })
                                 (Parser.loop
@@ -156,11 +156,9 @@ type alias ArgOrOperatorState =
 argOrOperatorLoop : ArgOrOperatorState -> Parser Context Error (Parser.Step ArgOrOperatorState ArgOrOperatorState)
 argOrOperatorLoop state =
     Parser.oneOf
-        [ Parser.succeed (\start value end -> SourcePosition.at start end value)
+        [ Parser.succeed identity
             |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
-            |> Parser.keep Parser.getPosition
-            |> Parser.keep operatorParser
-            |> Parser.keep Parser.getPosition
+            |> Parser.keep (SourcePosition.parser operatorParser)
             |> Parser.skip spaceParser
             |> Parser.andThen
                 (\operator ->
@@ -325,7 +323,7 @@ letDefNamedParser =
                         )
                     -- TODO: How to reverse this?
                     |> Parser.scopedUpdatePayload
-                        var.start.col
+                        (\_ -> var.start.col)
                         .indent
                         (\nextValue payload -> { payload | indent = nextValue })
                     |> Parser.keep (Parser.loop [] (functionArgsParser "="))
@@ -448,7 +446,7 @@ whenParser =
                                 (AST.When { expression = expr, branches = branches })
                         )
                     |> Parser.scopedUpdatePayload
-                        start.col
+                        (\_ -> start.col)
                         .indent
                         (\value payload -> { payload | indent = value })
             )

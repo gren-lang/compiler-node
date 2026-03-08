@@ -24,6 +24,23 @@ tests =
             , test "parses empty string" <| \_ ->
                 Parser.run PS.parser Context.empty ""
                     |> Expect.equal (Ok {})
+            , test "can read from context where the first non-space col began" <| \_ ->
+                Parser.run payloadParser Context.empty "a"
+                    |> expectLineStart 1
+            , test "can read from context where the first non-space col began (indented)" <| \_ ->
+                Parser.run payloadParser Context.empty "   a"
+                    |> expectLineStart 4
+            , test "setIndentToStartOfLine" <| \_ ->
+                let
+                    setIndentParser =
+                        Parser.succeed identity
+                            |> Parser.skip PS.parser
+                            |> Parser.skip PS.setIndentToStartOfLine
+                            |> Parser.keep Parser.getPayload
+                in
+                Parser.run setIndentParser Context.empty "    b"
+                    |> Result.map .indent
+                    |> Expect.equal (Ok 5)
             , test "parses line comments" <| \_ ->
                 Parser.run payloadParser Context.empty "-- this is a line comment"
                     |> expectLineComment 1 1 "this is a line comment"
@@ -99,3 +116,13 @@ expectLineComment row col comment resultContext =
                           }
                         ]
                         commentsOnRow
+
+
+expectLineStart : Int -> Result x Context -> Expectation
+expectLineStart col resultContext =
+    when resultContext is
+        Err err ->
+            Expect.fail ("Failed to parse with error: " ++ Debug.toString err)
+
+        Ok ctx ->
+            Expect.equal col ctx.lineStart
