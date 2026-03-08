@@ -51,13 +51,37 @@ errorToString error =
             Space.errorToString spaceError
 
 
-spaceParser : Parser Context Error {}
-spaceParser =
-    Parser.mapError SpaceError Space.parser
 
 
 parser : Parser Context Error AST.Pattern
 parser =
+    Parser.succeed
+        (\pattern alias ->
+            when alias is
+                Just name ->
+                    SourcePosition.at
+                        pattern.start
+                        name.end
+                        (AST.PAlias { pattern = pattern, name = name })
+
+                Nothing ->
+                    pattern
+        )
+        |> Parser.keep parserNoAlias
+        |> Parser.skip spaceParser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed Just
+                    |> Parser.skip (Parser.token "as" (ExpectedKeyword "as"))
+                    |> Parser.skip spaceParser
+                    |> Parser.keep (SourcePosition.parser lowerCaseVariable)
+                , Parser.succeed Nothing
+                ]
+            )
+
+
+parserNoAlias : Parser Context Error AST.Pattern
+parserNoAlias =
     Parser.oneOf
         [ record
         , array
@@ -74,7 +98,6 @@ record =
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] recordInnerLoop)
         |> Parser.keep Parser.getPosition
-        |> Parser.skip spaceParser
 
 
 recordInnerLoop : Array AST.PRecordField -> Parser Context Error (Parser.Step (Array AST.PRecordField) (Array AST.PRecordField))
@@ -122,14 +145,13 @@ array =
         |> Parser.skip spaceParser
         |> Parser.keep
             ( Parser.oneOf
-                [ Parser.lazy (\_ -> parser)
+                [ Parser.lazy (\_ -> parserNoAlias)
                     |> Parser.andThen (\firstArg -> Parser.loop [ firstArg ] arrayInnerLoop)
                 , Parser.succeed []
                     |> Parser.skip (Parser.chompChar ']' (ExpectedChar ']'))
                 ]
             )
         |> Parser.keep Parser.getPosition
-        |> Parser.skip spaceParser
 
 
 arrayInnerLoop : Array AST.Pattern -> Parser Context Error (Parser.Step (Array AST.Pattern) (Array AST.Pattern))
@@ -149,9 +171,9 @@ parenthesized : Parser Context Error AST.Pattern
 parenthesized =
     Parser.succeed identity
         |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
+        -- When parens are used, allow `as` pattern
         |> Parser.keep (Parser.lazy (\_ -> parser))
         |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
-        |> Parser.skip spaceParser
 
 
 term : Parser Context Error AST.Pattern
@@ -178,7 +200,7 @@ term =
                     |> Parser.skip spaceParser
                     |> Parser.keep
                         (Parser.oneOf
-                            [ Parser.lazy (\_ -> parser)
+                            [ Parser.lazy (\_ -> parserNoAlias)
                                 -- TODO: why backtrackable?
                                 |> Parser.backtrackable
                                 |> Parser.map Just
@@ -225,7 +247,6 @@ term =
                 ]
             )
         |> Parser.keep Parser.getPosition
-        |> Parser.skip spaceParser
         -- Correct positions of Constructors
         |> Parser.map
             (\t ->
@@ -251,7 +272,11 @@ term =
             )
 
 
+spaceParser : Parser Context Error {}
+spaceParser =
+    Parser.mapError SpaceError Space.parser
+
+
 lowerCaseVariable : Parser Context Error String
 lowerCaseVariable =
-    Variable.lowerCase
-        |> Parser.mapError VariableError
+    Parser.mapError VariableError Variable.lowerCase
