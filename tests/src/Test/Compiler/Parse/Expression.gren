@@ -101,6 +101,32 @@ tests =
                                 ]
                             }
                         )
+            , test "function call over multiple lines" <| \_ ->
+                Parser.run PE.parser Context.empty
+                    """
+                    func
+                        a
+                        b
+                    """
+                    |> expectExpression
+                        (AST.Call
+                            { fn =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 5 }
+                                    (AST.Var { name = "func", varType = AST.LowVar })
+                            , args =
+                                [ SourcePosition.at
+                                    { row = 2, col = 5 }
+                                    { row = 2, col = 6 }
+                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                , SourcePosition.at
+                                    { row = 3, col = 5 }
+                                    { row = 3, col = 6 }
+                                    (AST.Var { name = "b", varType = AST.LowVar })
+                                ]
+                            }
+                        )
             , test "function calls (with parens)" <| \_ ->
                 Parser.run PE.parser Context.empty "foo a (bar b)"
                     |> expectExpression

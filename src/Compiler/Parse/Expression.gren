@@ -91,11 +91,6 @@ errorToString error =
             "Internal parser error"
 
 
-spaceParser : Parser Context Error {}
-spaceParser =
-    Parser.mapError SpaceError Space.parser
-
-
 parser : Parser Context Error AST.Expression
 parser =
     Parser.oneOf
@@ -108,14 +103,9 @@ parser =
                     Parser.succeed identity
                         |> Parser.skip spaceParser
                         |> Parser.keep
-                            (Parser.scopedUpdatePayload
-                                .lineStart
-                                .indent
-                                (\newIndent payload -> { payload | indent = newIndent })
-                                (Parser.loop
-                                    { currentTerm = firstTerm, currentArgs = [], binopSegments = [] }
-                                    argOrOperatorLoop
-                                )
+                            (Parser.loop
+                                { currentTerm = firstTerm, currentArgs = [], binopSegments = [] }
+                                argOrOperatorLoop
                             )
                         |> Parser.map
                             (\state ->
@@ -142,6 +132,10 @@ parser =
                                             }
                                         )
                             )
+                        |> Parser.scopedUpdatePayload
+                            .lineStart
+                            .indent
+                            (\newIndent payload -> { payload | indent = newIndent })
                 )
         ]
 
@@ -157,7 +151,7 @@ argOrOperatorLoop : ArgOrOperatorState -> Parser Context Error (Parser.Step ArgO
 argOrOperatorLoop state =
     Parser.oneOf
         [ Parser.succeed identity
-            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
+            |> Parser.skip checkIndent
             |> Parser.keep (SourcePosition.parser operatorParser)
             |> Parser.skip spaceParser
             |> Parser.andThen
@@ -183,7 +177,7 @@ argOrOperatorLoop state =
                 )
                 |> Parser.skip spaceParser
         , Parser.succeed (\arg -> Parser.Loop <| pushStateArg arg state)
-            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
+            |> Parser.skip checkIndent
             |> Parser.keep term
             |> Parser.skip spaceParser
         , Parser.succeed (Parser.Done state)
@@ -270,10 +264,8 @@ letDefParser =
 
 letDefNamedParser : Parser Context Error (SourcePosition.Located AST.DefineRecord)
 letDefNamedParser =
-    Parser.succeed (\nameStart name nameEnd -> SourcePosition.at nameStart nameEnd name )
-        |> Parser.keep Parser.getPosition
-        |> Parser.keep lowerCaseVariable
-        |> Parser.keep Parser.getPosition
+    Parser.succeed identity
+        |> Parser.keep (SourcePosition.parser lowerCaseVariable)
         |> Parser.skip spaceParser
         |> Parser.andThen
             (\var ->
@@ -321,7 +313,6 @@ letDefNamedParser =
                             , Parser.succeed Nothing
                             ]
                         )
-                    -- TODO: How to reverse this?
                     |> Parser.scopedUpdatePayload
                         (\_ -> var.start.col)
                         .indent
@@ -465,7 +456,7 @@ whenBranchLoopParser : Array AST.WhenBranch -> Parser Context Error (Parser.Step
 whenBranchLoopParser branches =
     Parser.oneOf
         [ Parser.succeed (\branch -> Parser.Loop (Array.pushLast branch branches))
-            |> Parser.skip (Parser.mapError (\_ -> IndentError) Space.checkIndent)
+            |> Parser.skip checkIndent
             |> Parser.keep whenBranchParser
         , Parser.succeed (Parser.Done branches)
         ]
@@ -766,3 +757,13 @@ innerRecordParser array =
             |> Parser.keep recordFieldParser
             |> Parser.skip spaceParser
         ]
+
+
+spaceParser : Parser Context Error {}
+spaceParser =
+    Parser.mapError SpaceError Space.parser
+
+
+checkIndent : Parser Context Error {}
+checkIndent =
+    Parser.mapError (\_ -> IndentError) Space.checkIndent
