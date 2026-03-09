@@ -100,42 +100,57 @@ parser =
         , possiblyNegativeTerm
             |> Parser.andThen
                 (\firstTerm ->
-                    Parser.succeed identity
-                        |> Parser.skip spaceParser
-                        |> Parser.keep
-                            (Parser.loop
-                                { currentTerm = firstTerm, currentArgs = [], binopSegments = [] }
-                                argOrOperatorLoop
-                            )
-                        |> Parser.map
-                            (\state ->
-                                let
-                                    finalExpression =
-                                        toCall state.currentTerm state.currentArgs
-                                in
-                                if Array.isEmpty state.binopSegments then
-                                    finalExpression
+                    let
+                        completionParser =
+                            Parser.succeed identity
+                                |> Parser.skip spaceParser
+                                |> Parser.keep
+                                    (Parser.loop
+                                        { currentTerm = firstTerm, currentArgs = [], binopSegments = [] }
+                                        argOrOperatorLoop
+                                    )
+                                |> Parser.map
+                                    (\state ->
+                                        let
+                                            finalExpression =
+                                                toCall state.currentTerm state.currentArgs
+                                        in
+                                        if Array.isEmpty state.binopSegments then
+                                            finalExpression
 
-                                else
-                                    let
-                                        expressionStart =
-                                            Array.first state.binopSegments
-                                                |> Maybe.map (\segment -> segment.leadingExpression.start)
-                                                |> Maybe.withDefault finalExpression.start
-                                    in
-                                    SourcePosition.at
-                                        expressionStart
-                                        finalExpression.end
-                                        (AST.Binops
-                                            { segments = state.binopSegments
-                                            , finalExpression = finalExpression
-                                            }
-                                        )
-                            )
-                        |> Parser.scopedUpdatePayload
-                            .lineStart
-                            .indent
-                            (\newIndent payload -> { payload | indent = newIndent })
+                                        else
+                                            let
+                                                expressionStart =
+                                                    Array.first state.binopSegments
+                                                        |> Maybe.map (\segment -> segment.leadingExpression.start)
+                                                        |> Maybe.withDefault finalExpression.start
+                                            in
+                                            SourcePosition.at
+                                                expressionStart
+                                                finalExpression.end
+                                                (AST.Binops
+                                                    { segments = state.binopSegments
+                                                    , finalExpression = finalExpression
+                                                    }
+                                                )
+                                    )
+
+                        indentationBumped =
+                            Parser.scopedUpdatePayload
+                                .lineStart
+                                .indent
+                                (\newIndent payload -> { payload | indent = newIndent })
+                                completionParser
+                    in
+                    when firstTerm.value is
+                        AST.Var _ ->
+                            indentationBumped
+
+                        AST.VarQual _ ->
+                            indentationBumped
+
+                        _ ->
+                            completionParser
                 )
         ]
 
@@ -151,7 +166,6 @@ argOrOperatorLoop : ArgOrOperatorState -> Parser Context Error (Parser.Step ArgO
 argOrOperatorLoop state =
     Parser.oneOf
         [ Parser.succeed identity
-            |> Parser.skip checkIndent
             |> Parser.keep (SourcePosition.parser operatorParser)
             |> Parser.skip spaceParser
             |> Parser.andThen
@@ -163,6 +177,7 @@ argOrOperatorLoop state =
                                     if operator.end.col == pos.col then
                                         -- negated term (no space between operator)
                                         Parser.succeed (\term_ -> Parser.Loop <| pushStateArg (SourcePosition.at operator.start term_.end (AST.Negate term_)) state)
+                                            |> Parser.skip checkIndent
                                             |> Parser.keep term
 
                                     else
@@ -260,6 +275,10 @@ letDefParser =
             |> Parser.map (\{ start, value, end } -> SourcePosition.at start end (AST.Define value))
         , letDefDestructParser
         ]
+        |> Parser.scopedUpdatePayload
+            .lineStart
+            .indent
+            (\newValue pl -> { pl | indent = newValue })
 
 
 letDefNamedParser : Parser Context Error (SourcePosition.Located AST.DefineRecord)
@@ -436,11 +455,11 @@ whenParser =
                                 endLocation
                                 (AST.When { expression = expr, branches = branches })
                         )
-                    |> Parser.scopedUpdatePayload
-                        (\_ -> start.col)
-                        .indent
-                        (\value payload -> { payload | indent = value })
             )
+        |> Parser.scopedUpdatePayload
+            .lineStart
+            .indent
+            (\value payload -> { payload | indent = value })
 
 whenBranchParser : Parser Context Error AST.WhenBranch
 whenBranchParser =
@@ -450,6 +469,10 @@ whenBranchParser =
         |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
+        |> Parser.scopedUpdatePayload
+            .lineStart
+            .indent
+            (\value payload -> { payload | indent = value })
 
 
 whenBranchLoopParser : Array AST.WhenBranch -> Parser Context Error (Parser.Step (Array AST.WhenBranch) (Array AST.WhenBranch))
