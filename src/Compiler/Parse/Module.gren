@@ -26,6 +26,7 @@ type Error
     | ExpectedIntPrecedence
     | DeclarationError Declaration.Error
     | SpaceError Space.Error
+    | ExpectedEnd
 
 
 errorToString : Error -> String
@@ -51,6 +52,9 @@ errorToString error =
         
         SpaceError spaceError ->
             Space.errorToString spaceError
+
+        ExpectedEnd ->
+            "Expected end of file"
 
 
 spaceParser : Parser Context Error {}
@@ -105,6 +109,7 @@ parser =
         |> Parser.keep (Parser.loop [] operatorLoopParser)
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] declarationLoopParser)
+        |> Parser.skip (Parser.end ExpectedEnd)
 
 
 moduleNameParser : Parser Context Error (SourcePosition.Located String)
