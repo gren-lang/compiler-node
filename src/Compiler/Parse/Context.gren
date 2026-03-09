@@ -33,4 +33,4 @@ type alias Comment =
 
 type CommentValue
     = Line String
-    | MultiLine String
+    | Block String

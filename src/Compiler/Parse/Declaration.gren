@@ -105,6 +105,12 @@ docParser toErr =
                 Space.ExpectedLineComment ->
                     toErr "expected line comment"
 
+                Space.ExpectedMultiLineOpen ->
+                    toErr "expected {-"
+
+                Space.ExpectedMultiLineClose ->
+                    toErr "expected -}"
+
                 Space.InvalidWhiteSpace ->
                     toErr "expected white space character"
     in
