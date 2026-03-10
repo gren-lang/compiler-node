@@ -106,7 +106,7 @@ parser =
                                 |> Parser.skip spaceParser
                                 |> Parser.keep
                                     (Parser.loop
-                                        { currentTerm = firstTerm, currentArgs = [], binopSegments = [] }
+                                        { currentTerm = firstTerm, currentArgs = [], binopExpression = Nothing }
                                         argOrOperatorLoop
                                     )
                                 |> Parser.map
@@ -115,24 +115,12 @@ parser =
                                             finalExpression =
                                                 toCall state.currentTerm state.currentArgs
                                         in
-                                        if Array.isEmpty state.binopSegments then
-                                            finalExpression
-
-                                        else
-                                            let
-                                                expressionStart =
-                                                    Array.first state.binopSegments
-                                                        |> Maybe.map (\segment -> segment.leadingExpression.start)
-                                                        |> Maybe.withDefault finalExpression.start
-                                            in
-                                            SourcePosition.at
-                                                expressionStart
-                                                finalExpression.end
-                                                (AST.Binops
-                                                    { segments = state.binopSegments
-                                                    , finalExpression = finalExpression
-                                                    }
-                                                )
+                                        when state.binopExpression is
+                                            Just binopExpr ->
+                                                binopExpr
+                                            
+                                            Nothing ->
+                                                finalExpression
                                     )
 
                         indentationBumped =
@@ -154,7 +142,7 @@ parser =
 type alias ArgOrOperatorState =
     { currentTerm : AST.Expression
     , currentArgs : Array AST.Expression
-    , binopSegments : Array AST.BinopsSegment
+    , binopExpression : Maybe AST.Expression
     }
 
 
@@ -177,12 +165,12 @@ argOrOperatorLoop state =
                                             |> Parser.keep term
 
                                     else
-                                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
+                                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateOperator nextTerm operator state)
                                             |> Parser.keep parser
                                 )
 
                     else
-                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
+                        Parser.succeed (\nextTerm -> Parser.Loop <| pushStateOperator nextTerm operator state)
                             |> Parser.keep parser
                 )
                 |> Parser.skip spaceParser
@@ -199,17 +187,36 @@ pushStateArg arg state =
     { state | currentArgs = Array.pushLast arg state.currentArgs }
 
 
-pushStateSegment : AST.Expression -> SourcePosition.Located String -> ArgOrOperatorState -> ArgOrOperatorState 
-pushStateSegment expr operator state =
-    { currentTerm = expr
-    , currentArgs = []
-    , binopSegments =
-        Array.pushLast
-            { leadingExpression = toCall state.currentTerm state.currentArgs
-            , operatorName = operator
+pushStateOperator : AST.Expression -> SourcePosition.Located String -> ArgOrOperatorState -> ArgOrOperatorState 
+pushStateOperator expr operator state =
+    let
+        leftExpression =
+            toCall state.currentTerm state.currentArgs
+        
+        binopExpression =
+            SourcePosition.at
+                leftExpression.start
+                expr.end
+                (AST.Binops
+                    { left = leftExpression
+                    , operator = operator
+                    , right = expr
+                    }
+                )
+    in
+    
+    when state.binopExpression is
+        Just existingBinop ->
+            { currentTerm = binopExpression
+            , currentArgs = []
+            , binopExpression = Just (SourcePosition.at existingBinop.start binopExpression.end (AST.Binops { left = existingBinop, operator = operator, right = binopExpression }))
             }
-            state.binopSegments
-    }
+        
+        Nothing ->
+            { currentTerm = expr
+            , currentArgs = []
+            , binopExpression = Just binopExpression
+            }
 
 
 toCall : AST.Expression -> Array AST.Expression -> AST.Expression

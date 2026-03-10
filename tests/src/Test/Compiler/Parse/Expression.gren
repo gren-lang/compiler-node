@@ -195,20 +195,17 @@ tests =
                                                 { row = 1, col = 16 }
                                                 { row = 1, col = 21 }
                                                 (AST.Binops
-                                                    { segments =
-                                                        [ { leadingExpression =
-                                                            SourcePosition.at
-                                                                { row = 1, col = 16 }
-                                                                { row = 1, col = 17 }
-                                                                (AST.Var { name = "b", varType = AST.LowVar })
-                                                          , operatorName =
-                                                            SourcePosition.at
-                                                                { row = 1, col = 18 }
-                                                                { row = 1, col = 19 }
-                                                                "+"
-                                                          }
-                                                        ]
-                                                    , finalExpression =
+                                                    { left =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 16 }
+                                                            { row = 1, col = 17 }
+                                                            (AST.Var { name = "b", varType = AST.LowVar })
+                                                    , operator =
+                                                        SourcePosition.at
+                                                            { row = 1, col = 18 }
+                                                            { row = 1, col = 19 }
+                                                            "+"
+                                                    , right =
                                                         SourcePosition.at
                                                             { row = 1, col = 20 }
                                                             { row = 1, col = 21 }
@@ -230,37 +227,34 @@ tests =
                     """
                     |> expectExpression
                         (AST.Binops
-                            { segments =
-                                [ { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 1 }
-                                        { row = 1, col = 11 }
-                                        (AST.Call
-                                            { fn =
-                                                SourcePosition.at
-                                                    { row = 1, col = 1 }
-                                                    { row = 1, col = 7 }
-                                                    (AST.Var { name = "myFunc", varType = AST.LowVar })
-                                            , args =
-                                                [ SourcePosition.at
-                                                    { row = 1, col = 8 }
-                                                    { row = 1, col = 9 }
-                                                    (AST.NumberLiteral (Number.Integer 1))
-                                                , SourcePosition.at
-                                                    { row = 1, col = 10 }
-                                                    { row = 1, col = 11 }
-                                                    (AST.NumberLiteral (Number.Integer 2))
-                                                ]
-                                            }
-                                        )
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 1, col = 12 }
-                                            { row = 1, col = 14 }
-                                            "<|"
-                                  }
-                                ]
-                            , finalExpression =
+                            { left =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 11 }
+                                    (AST.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 1 }
+                                                { row = 1, col = 7 }
+                                                (AST.Var { name = "myFunc", varType = AST.LowVar })
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 8 }
+                                                { row = 1, col = 9 }
+                                                (AST.NumberLiteral (Number.Integer 1))
+                                            , SourcePosition.at
+                                                { row = 1, col = 10 }
+                                                { row = 1, col = 11 }
+                                                (AST.NumberLiteral (Number.Integer 2))
+                                            ]
+                                        }
+                                    )
+                            , operator =
+                                SourcePosition.at
+                                    { row = 1, col = 12 }
+                                    { row = 1, col = 14 }
+                                    "<|"
+                            , right =
                                 SourcePosition.at
                                     { row = 2, col = 3 }
                                     { row = 4, col = 16 }
@@ -313,20 +307,17 @@ tests =
                                         { row = 1, col = 12 }
                                         { row = 1, col = 82 }
                                         (AST.Binops
-                                            { segments =
-                                                [ { leadingExpression =
-                                                    SourcePosition.at
-                                                        { row = 1, col = 12 }
-                                                        { row = 1, col = 27 }
-                                                        (AST.Var { name = "initWithCommand", varType = AST.LowVar })
-                                                  , operatorName =
-                                                    SourcePosition.at
-                                                        { row = 1, col = 28 }
-                                                        { row = 1, col = 30 }
-                                                        "<|"
-                                                  }
-                                                ]
-                                            , finalExpression =
+                                            { left =
+                                                SourcePosition.at
+                                                    { row = 1, col = 12 }
+                                                    { row = 1, col = 27 }
+                                                    (AST.Var { name = "initWithCommand", varType = AST.LowVar })
+                                            , operator =
+                                                SourcePosition.at
+                                                    { row = 1, col = 28 }
+                                                    { row = 1, col = 30 }
+                                                    "<|"
+                                            , right =
                                                 SourcePosition.at
                                                     { row = 1, col = 31 }
                                                     { row = 1, col = 82 }
@@ -391,20 +382,17 @@ tests =
                                         { row = 1, col = 12 }
                                         { row = 4, col = 10 }
                                         (AST.Binops
-                                            { segments =
-                                                [ { leadingExpression =
-                                                    SourcePosition.at
-                                                        { row = 1, col = 12 }
-                                                        { row = 1, col = 27 }
-                                                        (AST.Var { name = "initWithCommand", varType = AST.LowVar })
-                                                  , operatorName =
-                                                    SourcePosition.at
-                                                        { row = 1, col = 28 }
-                                                        { row = 1, col = 30 }
-                                                        "<|"
-                                                  }
-                                                ]
-                                            , finalExpression =
+                                            { left =
+                                                SourcePosition.at
+                                                    { row = 1, col = 12 }
+                                                    { row = 1, col = 27 }
+                                                    (AST.Var { name = "initWithCommand", varType = AST.LowVar })
+                                            , operator =
+                                                SourcePosition.at
+                                                    { row = 1, col = 28 }
+                                                    { row = 1, col = 30 }
+                                                    "<|"
+                                            , right =
                                                 SourcePosition.at
                                                     { row = 2, col = 5 }
                                                     { row = 4, col = 10 }
@@ -452,51 +440,45 @@ tests =
                 Parser.run PE.parser Context.empty "func a + b - c"
                     |> expectExpression
                         (AST.Binops
-                            { segments =
-                                [ { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 1 }
-                                        { row = 1, col = 7 }
-                                        (AST.Call
-                                            { fn =
-                                                SourcePosition.at
-                                                    { row = 1, col = 1 }
-                                                    { row = 1, col = 5 }
-                                                    (AST.Var { name = "func", varType = AST.LowVar })
-                                            , args =
-                                                [ SourcePosition.at
-                                                    { row = 1, col = 6 }
-                                                    { row = 1, col = 7 }
-                                                    (AST.Var { name = "a", varType = AST.LowVar })
-                                                ]
-                                            }
-                                        )
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 1, col = 8 }
-                                            { row = 1, col = 9 }
-                                            "+"
-                                  }
-                                ]
-                            , finalExpression =
+                            { left =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 7 }
+                                    (AST.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 1 }
+                                                { row = 1, col = 5 }
+                                                (AST.Var { name = "func", varType = AST.LowVar })
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 6 }
+                                                { row = 1, col = 7 }
+                                                (AST.Var { name = "a", varType = AST.LowVar })
+                                            ]
+                                        }
+                                    )
+                            , operator =
+                                SourcePosition.at
+                                    { row = 1, col = 8 }
+                                    { row = 1, col = 9 }
+                                    "+"
+                            , right =
                                 SourcePosition.at
                                     { row = 1, col = 10 }
                                     { row = 1, col = 15 }
                                     (AST.Binops
-                                        { segments =
-                                            [ { leadingExpression =
-                                                SourcePosition.at
-                                                    { row = 1, col = 10 }
-                                                    { row = 1, col = 11 }
-                                                    (AST.Var { name = "b", varType = AST.LowVar })
-                                              , operatorName =
-                                                SourcePosition.at
-                                                    { row = 1, col = 12 }
-                                                    { row = 1, col = 13 }
-                                                    "-"
-                                              }
-                                            ]
-                                        , finalExpression =
+                                        { left =
+                                            SourcePosition.at
+                                                { row = 1, col = 10 }
+                                                { row = 1, col = 11 }
+                                                (AST.Var { name = "b", varType = AST.LowVar })
+                                        , operator =
+                                            SourcePosition.at
+                                                { row = 1, col = 12 }
+                                                { row = 1, col = 13 }
+                                                "-"
+                                        , right =
                                             SourcePosition.at
                                                 { row = 1, col = 14 }
                                                 { row = 1, col = 15 }
@@ -509,56 +491,50 @@ tests =
                 Parser.run PE.parser Context.empty "func a + -b - c"
                     |> expectExpression
                         (AST.Binops
-                            { segments =
-                                [ { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 1 }
-                                        { row = 1, col = 7 }
-                                        (AST.Call
-                                            { fn =
-                                                SourcePosition.at
-                                                    { row = 1, col = 1 }
-                                                    { row = 1, col = 5 }
-                                                    (AST.Var { name = "func", varType = AST.LowVar })
-                                            , args =
-                                                [ SourcePosition.at
-                                                    { row = 1, col = 6 }
-                                                    { row = 1, col = 7 }
-                                                    (AST.Var { name = "a", varType = AST.LowVar })
-                                                ]
-                                            }
-                                        )
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 1, col = 8 }
-                                            { row = 1, col = 9 }
-                                            "+"
-                                  }
-                                ]
-                            , finalExpression =
+                            { left =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 7 }
+                                    (AST.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 1 }
+                                                { row = 1, col = 5 }
+                                                (AST.Var { name = "func", varType = AST.LowVar })
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 6 }
+                                                { row = 1, col = 7 }
+                                                (AST.Var { name = "a", varType = AST.LowVar })
+                                            ]
+                                        }
+                                    )
+                            , operator =
+                                SourcePosition.at
+                                    { row = 1, col = 8 }
+                                    { row = 1, col = 9 }
+                                    "+"
+                            , right =
                                 SourcePosition.at
                                     { row = 1, col = 10 }
                                     { row = 1, col = 16 }
                                     (AST.Binops
-                                        { segments =
-                                            [ { leadingExpression =
-                                                SourcePosition.at
-                                                    { row = 1, col = 10}
-                                                    { row = 1, col = 12}
-                                                    (AST.Negate <|
-                                                        SourcePosition.at
-                                                            { row = 1, col = 11 }
-                                                            { row = 1, col = 12 }
-                                                            (AST.Var { name = "b", varType = AST.LowVar })
-                                                    )
-                                              , operatorName =
-                                                SourcePosition.at
-                                                    { row = 1, col = 13 }
-                                                    { row = 1, col = 14 }
-                                                    "-"
-                                              }
-                                            ]
-                                        , finalExpression =
+                                        { left =
+                                            SourcePosition.at
+                                                { row = 1, col = 10}
+                                                { row = 1, col = 12}
+                                                (AST.Negate <|
+                                                    SourcePosition.at
+                                                        { row = 1, col = 11 }
+                                                        { row = 1, col = 12 }
+                                                        (AST.Var { name = "b", varType = AST.LowVar })
+                                                )
+                                        , operator =
+                                            SourcePosition.at
+                                                { row = 1, col = 13 }
+                                                { row = 1, col = 14 }
+                                                "-"
+                                        , right =
                                             SourcePosition.at
                                                 { row = 1, col = 15 }
                                                 { row = 1, col = 16 }
@@ -575,33 +551,30 @@ tests =
                     """
                     |> expectExpression
                         (AST.Binops
-                            { segments =
-                                [ { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 1 }
-                                        { row = 1, col = 7 }
-                                        (AST.Call
-                                            { fn =
-                                                SourcePosition.at
-                                                    { row = 1, col = 1 }
-                                                    { row = 1, col = 5 }
-                                                    (AST.Var { name = "func", varType = AST.LowVar })
-                                            , args =
-                                                [ SourcePosition.at
-                                                    { row = 1, col = 6 }
-                                                    { row = 1, col = 7 }
-                                                    (AST.Var { name = "a", varType = AST.LowVar })
-                                                ]
-                                            }
-                                        )
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 2, col = 1 }
-                                            { row = 2, col = 2 }
-                                            "+"
-                                  }
-                                ]
-                            , finalExpression =
+                            { left =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 7 }
+                                    (AST.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 1 }
+                                                { row = 1, col = 5 }
+                                                (AST.Var { name = "func", varType = AST.LowVar })
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 6 }
+                                                { row = 1, col = 7 }
+                                                (AST.Var { name = "a", varType = AST.LowVar })
+                                            ]
+                                        }
+                                    )
+                            , operator =
+                                SourcePosition.at
+                                    { row = 2, col = 1 }
+                                    { row = 2, col = 2 }
+                                    "+"
+                            , right =
                                 SourcePosition.at
                                     { row = 2, col = 3 }
                                     { row = 2, col = 4 }
@@ -616,38 +589,32 @@ tests =
                     """
                     |> expectExpression
                         (AST.Binops
-                            { segments =
-                                [ { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 1 }
-                                        { row = 1, col = 2 }
-                                        (AST.Var { name = "a", varType = AST.LowVar })
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 1, col = 3 }
-                                            { row = 1, col = 4 }
-                                            "+"
-                                  }
-                                ]
-                            , finalExpression =
+                            { left =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 2 }
+                                    (AST.Var { name = "a", varType = AST.LowVar })
+                            , operator =
+                                SourcePosition.at
+                                    { row = 1, col = 3 }
+                                    { row = 1, col = 4 }
+                                    "+"
+                            , right =
                                 SourcePosition.at
                                     { row = 1, col = 5 }
                                     { row = 2, col = 8 }
                                     (AST.Binops
-                                        { segments =
-                                            [ { leadingExpression =
-                                                SourcePosition.at
-                                                    { row = 1, col = 5 }
-                                                    { row = 1, col = 6 }
-                                                    (AST.Var { name = "b", varType = AST.LowVar })
-                                              , operatorName =
-                                                SourcePosition.at
-                                                    { row = 2, col = 1 }
-                                                    { row = 2, col = 3 }
-                                                    "|>"
-                                              }
-                                            ]
-                                        , finalExpression =
+                                        { left =
+                                            SourcePosition.at
+                                                { row = 1, col = 5 }
+                                                { row = 1, col = 6 }
+                                                (AST.Var { name = "b", varType = AST.LowVar })
+                                        , operator =
+                                            SourcePosition.at
+                                                { row = 2, col = 1 }
+                                                { row = 2, col = 3 }
+                                                "|>"
+                                        , right =
                                             SourcePosition.at
                                                 { row = 2, col = 4 }
                                                 { row = 2, col = 8 }
@@ -664,34 +631,31 @@ tests =
                     """
                     |> expectExpression
                         (AST.Binops
-                            { segments =
-                                [ { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 1 }
-                                        { row = 1, col = 12 }
-                                        (AST.ArrayLiteral
-                                            [ { start = { row = 1, col = 3 }
-                                              , end = { row = 1, col = 4 }
-                                              , value = AST.NumberLiteral (Number.Integer 1)
-                                              }
-                                            , { start = { row = 1, col = 6 }
-                                              , end = { row = 1, col = 7 }
-                                              , value = AST.NumberLiteral (Number.Integer 2)
-                                              }
-                                            , { start = { row = 1, col = 9 }
-                                              , end = { row = 1, col = 10 }
-                                              , value = AST.NumberLiteral (Number.Integer 3)
-                                              }
-                                            ]
-                                        )
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 2, col = 1 }
-                                            { row = 2, col = 3 }
-                                            "|>"
-                                  }
-                                ]
-                            , finalExpression =
+                            { left =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 12 }
+                                    (AST.ArrayLiteral
+                                        [ { start = { row = 1, col = 3 }
+                                          , end = { row = 1, col = 4 }
+                                          , value = AST.NumberLiteral (Number.Integer 1)
+                                          }
+                                        , { start = { row = 1, col = 6 }
+                                          , end = { row = 1, col = 7 }
+                                          , value = AST.NumberLiteral (Number.Integer 2)
+                                          }
+                                        , { start = { row = 1, col = 9 }
+                                          , end = { row = 1, col = 10 }
+                                          , value = AST.NumberLiteral (Number.Integer 3)
+                                          }
+                                        ]
+                                    )
+                            , operator =
+                                SourcePosition.at
+                                    { row = 2, col = 1 }
+                                    { row = 2, col = 3 }
+                                    "|>"
+                            , right =
                                 SourcePosition.at
                                     { row = 2, col = 4 }
                                     { row = 2, col = 8 }
@@ -706,37 +670,34 @@ tests =
                     """
                     |> expectExpression
                         (AST.Binops
-                            { segments =
-                                [ { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 1 }
-                                        { row = 1, col = 8 }
-                                        (AST.Call
-                                            { fn =
-                                                SourcePosition.at
-                                                    { row = 1, col = 1 }
-                                                    { row = 1, col = 4 }
-                                                    (AST.Var { name = "foo", varType = AST.LowVar })
-                                            , args =
-                                                [ SourcePosition.at
-                                                    { row = 1, col = 5 }
-                                                    { row = 1, col = 6 }
-                                                    (AST.Var { name = "a", varType = AST.LowVar })
-                                                , SourcePosition.at
-                                                    { row = 1, col = 7 }
-                                                    { row = 1, col = 8 }
-                                                    (AST.Var { name = "b", varType = AST.LowVar })
-                                                ]
-                                            }
-                                        )
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 2, col = 1 }
-                                            { row = 2, col = 3 }
-                                            "|>"
-                                  }
-                                ]
-                            , finalExpression =
+                            { left =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 8 }
+                                    (AST.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 1, col = 1 }
+                                                { row = 1, col = 4 }
+                                                (AST.Var { name = "foo", varType = AST.LowVar })
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 1, col = 5 }
+                                                { row = 1, col = 6 }
+                                                (AST.Var { name = "a", varType = AST.LowVar })
+                                            , SourcePosition.at
+                                                { row = 1, col = 7 }
+                                                { row = 1, col = 8 }
+                                                (AST.Var { name = "b", varType = AST.LowVar })
+                                            ]
+                                        }
+                                    )
+                            , operator =
+                                SourcePosition.at
+                                    { row = 2, col = 1 }
+                                    { row = 2, col = 3 }
+                                    "|>"
+                            , right =
                                 SourcePosition.at
                                     { row = 2, col = 4 }
                                     { row = 2, col = 11 }
@@ -839,20 +800,17 @@ tests =
                               , end = { row = 1, col = 8 }
                               , value =
                                     (AST.Binops
-                                        { segments =
-                                            [ { leadingExpression =
-                                                SourcePosition.at
-                                                    { row = 1, col = 3 }
-                                                    { row = 1, col = 4 }
-                                                    (AST.NumberLiteral (Number.Integer 1))
-                                              , operatorName =
-                                                SourcePosition.at
-                                                    { row = 1, col = 5 }
-                                                    { row = 1, col = 6 }
-                                                    "+"
-                                              }
-                                            ]
-                                        , finalExpression =
+                                        { left =
+                                            SourcePosition.at
+                                                { row = 1, col = 3 }
+                                                { row = 1, col = 4 }
+                                                (AST.NumberLiteral (Number.Integer 1))
+                                        , operator =
+                                            SourcePosition.at
+                                                { row = 1, col = 5 }
+                                                { row = 1, col = 6 }
+                                                "+"
+                                        , right =
                                             SourcePosition.at
                                                 { row = 1, col = 7 }
                                                 { row = 1, col = 8 }
@@ -864,20 +822,17 @@ tests =
                               , end = { row = 1, col = 18 }
                               , value =
                                     (AST.Binops
-                                        { segments =
-                                            [ { leadingExpression =
-                                                SourcePosition.at
-                                                    { row = 1, col = 10 }
-                                                    { row = 1, col = 11 }
-                                                    (AST.NumberLiteral (Number.Integer 3))
-                                              , operatorName =
-                                                SourcePosition.at
-                                                    { row = 1, col = 12 }
-                                                    { row = 1, col = 14 }
-                                                    "|>"
-                                              }
-                                            ]
-                                        , finalExpression =
+                                        { left =
+                                            SourcePosition.at
+                                                { row = 1, col = 10 }
+                                                { row = 1, col = 11 }
+                                                (AST.NumberLiteral (Number.Integer 3))
+                                        , operator =
+                                            SourcePosition.at
+                                                { row = 1, col = 12 }
+                                                { row = 1, col = 14 }
+                                                "|>"
+                                        , right =
                                             SourcePosition.at
                                                 { row = 1, col = 15 }
                                                 { row = 1, col = 18 }
@@ -991,20 +946,17 @@ tests =
                                             { row = 1, col = 12 }
                                             { row = 1, col = 17 }
                                             (AST.Binops
-                                                { segments =
-                                                    [ { leadingExpression =
-                                                        SourcePosition.at
-                                                            { row = 1, col = 12 }
-                                                            { row = 1, col = 13 }
-                                                            (AST.NumberLiteral (Number.Integer 1))
-                                                      , operatorName =
-                                                        SourcePosition.at
-                                                            { row = 1, col = 14 }
-                                                            { row = 1, col = 15 }
-                                                            "+"
-                                                      }
-                                                    ]
-                                                , finalExpression =
+                                                { left =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 12 }
+                                                        { row = 1, col = 13 }
+                                                        (AST.NumberLiteral (Number.Integer 1))
+                                                , operator =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 14 }
+                                                        { row = 1, col = 15 }
+                                                        "+"
+                                                , right =
                                                     SourcePosition.at
                                                         { row = 1, col = 16 }
                                                         { row = 1, col = 17 }
@@ -1022,20 +974,17 @@ tests =
                                             { row = 1, col = 28 }
                                             { row = 1, col = 36 }
                                             (AST.Binops
-                                                { segments =
-                                                    [ { leadingExpression =
-                                                        SourcePosition.at
-                                                            { row = 1, col = 28 }
-                                                            { row = 1, col = 29 }
-                                                            (AST.NumberLiteral (Number.Integer 3))
-                                                      , operatorName =
-                                                        SourcePosition.at
-                                                            { row = 1, col = 30 }
-                                                            { row = 1, col = 32 }
-                                                            "|>"
-                                                      }
-                                                    ]
-                                                , finalExpression =
+                                                { left =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 28 }
+                                                        { row = 1, col = 29 }
+                                                        (AST.NumberLiteral (Number.Integer 3))
+                                                , operator =
+                                                    SourcePosition.at
+                                                        { row = 1, col = 30 }
+                                                        { row = 1, col = 32 }
+                                                        "|>"
+                                                , right =
                                                     SourcePosition.at
                                                         { row = 1, col = 33 }
                                                         { row = 1, col = 36 }

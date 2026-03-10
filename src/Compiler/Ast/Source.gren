@@ -2,7 +2,6 @@ module Compiler.Ast.Source exposing
     ( Expression
     , Expression_ (..)
     , VarType (..)
-    , BinopsSegment
     , IfBranch
     , WhenBranch
     , RecordField
@@ -62,8 +61,9 @@ type Expression_
   | Operator String
   | Negate Expression
   | Binops
-    { segments : Array BinopsSegment
-    , finalExpression : Expression
+    { left : Expression
+    , operator : SourcePosition.Located String
+    , right : Expression
     }
   | Lambda
     { patterns : Array Pattern
@@ -96,12 +96,6 @@ type Expression_
 type VarType
     = LowVar
     | CapVar
-
-
-type alias BinopsSegment =
-    { leadingExpression : Expression
-    , operatorName : SourcePosition.Located String
-    }
 
 
 type alias IfBranch =
