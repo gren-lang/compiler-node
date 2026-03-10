@@ -39,6 +39,7 @@ type Error
     | TypeError Type.Error
     | ExprError Expr.Error
     | SpaceError Space.Error
+    | IndentationError
 
 
 errorToString : Error -> String
@@ -61,6 +62,9 @@ errorToString error =
         
         SpaceError spaceError ->
             Space.errorToString spaceError
+
+        IndentationError ->
+            "Expected more indentation than above line"
 
 
 spaceParser : Parser Context Error {}
@@ -146,18 +150,16 @@ typeParser =
 aliasParser : Parser Context Error DeclarationValue
 aliasParser =
     Parser.succeed
-        (\nameStart name nameEnd vars tipe ->
+        (\name vars tipe ->
             Alias
-                { name = SourcePosition.at nameStart nameEnd name
+                { name = name
                 , vars = vars
                 , type_ = tipe
                 }
         )
         |> Parser.skip (Parser.token "alias" (ExpectedKeyword "alias"))
         |> Parser.skip spaceParser
-        |> Parser.keep Parser.getPosition
-        |> Parser.keep (Parser.mapError VariableError Variable.upperCase)
-        |> Parser.keep Parser.getPosition
+        |> Parser.keep (SourcePosition.parser upperCaseVariable)
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] typeArgLoopParser)
         |> Parser.skip spaceParser
@@ -170,13 +172,8 @@ typeArgLoopParser vars =
         [ Parser.succeed (Parser.Done vars)
             |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
         , Parser.succeed
-            (\varStart var varEnd ->
-                Parser.Loop <|
-                    Array.pushLast (SourcePosition.at varStart varEnd var) vars
-            )
-            |> Parser.keep Parser.getPosition
-            |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
-            |> Parser.keep Parser.getPosition
+            (\var -> Parser.Loop <| Array.pushLast var vars)
+            |> Parser.keep (SourcePosition.parser lowerCaseVariable)
             |> Parser.skip spaceParser
         ]
 
@@ -184,16 +181,14 @@ typeArgLoopParser vars =
 unionParser : Parser Context Error DeclarationValue
 unionParser =
     Parser.succeed
-        (\nameStart name nameEnd vars variants ->
+        (\name vars variants ->
             Union
-                { name = SourcePosition.at nameStart nameEnd name
+                { name = name
                 , vars = vars
                 , variants = variants
                 }
         )
-        |> Parser.keep Parser.getPosition
-        |> Parser.keep (Parser.mapError VariableError Variable.upperCase)
-        |> Parser.keep Parser.getPosition
+        |> Parser.keep (SourcePosition.parser upperCaseVariable)
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.loop [] typeArgLoopParser)
         |> Parser.skip spaceParser
@@ -206,30 +201,31 @@ unionParser =
             )
 
 
+
+
 variantParser : Parser Context Error (SourcePosition.Located AST.UnionVariant)
 variantParser =
     Parser.succeed
-        (\nameStart name nameEnd payload ->
+        (\name payload ->
             let
                 variantEnd =
                     payload
                         |> Maybe.map .end
-                        |> Maybe.withDefault nameEnd
+                        |> Maybe.withDefault name.end
             in
             SourcePosition.at
-                nameStart
+                name.start
                 variantEnd
-                { name = SourcePosition.at nameStart nameEnd name
+                { name = name
                 , payload = payload
                 }
         )
-        |> Parser.keep Parser.getPosition
-        |> Parser.keep (Parser.mapError VariableError Variable.upperCase)
-        |> Parser.keep Parser.getPosition
+        |> Parser.keep (SourcePosition.parser upperCaseVariable)
         |> Parser.skip spaceParser
         |> Parser.keep
             (Parser.oneOf
                 [ Parser.succeed Just
+                    |> Parser.skip (Parser.mapError (\_ -> IndentationError) Space.checkIndent)
                     |> Parser.keep (Parser.mapError TypeError Type.expression)
                 , Parser.succeed Nothing
                 ]
@@ -240,10 +236,7 @@ variantLoopParser : Array (SourcePosition.Located AST.UnionVariant) -> Parser Co
 variantLoopParser variants =
     Parser.oneOf
         [ Parser.succeed
-            (\variant ->
-                Parser.Loop <|
-                    Array.pushLast variant variants
-            )
+            (\variant -> Parser.Loop <| Array.pushLast variant variants)
             |> Parser.skip (Parser.chompChar '|' (ExpectedChar '|'))
             |> Parser.skip spaceParser
             |> Parser.keep variantParser
@@ -254,18 +247,26 @@ variantLoopParser variants =
 portParser : Parser Context Error DeclarationValue
 portParser =
     Parser.succeed
-        (\nameStart name nameEnd tipe ->
+        (\name tipe ->
             Port
-                { name = SourcePosition.at nameStart nameEnd name
+                { name = name
                 , signature = tipe
                 }
         )
         |> Parser.skip (Parser.token "port" (ExpectedKeyword "port"))
         |> Parser.skip spaceParser
-        |> Parser.keep Parser.getPosition
-        |> Parser.keep (Parser.mapError VariableError Variable.lowerCase)
-        |> Parser.keep Parser.getPosition
+        |> Parser.keep (SourcePosition.parser lowerCaseVariable)
         |> Parser.skip spaceParser
         |> Parser.skip (Parser.chompChar ':' (ExpectedChar ':'))
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.mapError TypeError Type.expression)
+
+
+lowerCaseVariable : Parser Context Error String
+lowerCaseVariable =
+    Parser.mapError VariableError Variable.lowerCase
+
+
+upperCaseVariable : Parser Context Error String
+upperCaseVariable =
+    Parser.mapError VariableError Variable.upperCase

@@ -122,6 +122,36 @@ tests =
                                     )
                             }
                         )
+            , test "Should stop parsing after type alias, not consume following value" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type alias Person = Worker
+
+                    num = 1
+                    """
+                    |> expect
+                        (PD.Alias
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 12 }
+                                    { row = 1, col = 18 }
+                                    "Person"
+                            , vars = []
+                            , type_ =
+                                SourcePosition.at
+                                    { row = 1, col = 21 }
+                                    { row = 1, col = 27 }
+                                    (AST.TType
+                                        { name =
+                                            SourcePosition.at
+                                                { row = 1, col = 21 }
+                                                { row = 1, col = 27 }
+                                                "Worker"
+                                        , args = []
+                                        }
+                                    )
+                            }
+                        )
             ]
         , describe "type union"
             [ test "Simple case" <| \_ ->
@@ -465,6 +495,47 @@ tests =
                                         , args = []
                                         }
                                     )
+                            }
+                        )
+            , test "Should stop parsing after type union, not consume following value" <| \_ ->
+                Parser.run PD.parser Context.empty
+                    """
+                    type Foo
+                      = Bar
+                      | Baz
+
+                    num = 1
+                    """
+                    |> expect
+                        (PD.Union
+                            { name =
+                                SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 9 }
+                                    "Foo"
+                            , vars = []
+                            , variants =
+                                [ SourcePosition.at
+                                    { row = 2, col = 5 }
+                                    { row = 2, col = 8 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 2, col = 5 }
+                                            { row = 2, col = 8 }
+                                            "Bar"
+                                    , payload = Nothing
+                                    }
+                                , SourcePosition.at
+                                    { row = 3, col = 5 }
+                                    { row = 3, col = 8 }
+                                    { name =
+                                        SourcePosition.at
+                                            { row = 3, col = 5 }
+                                            { row = 3, col = 8 }
+                                            "Baz"
+                                    , payload = Nothing
+                                    }
+                                ]
                             }
                         )
             ]
