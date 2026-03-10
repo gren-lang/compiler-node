@@ -175,20 +175,19 @@ argOrOperatorLoop state =
                             |> Parser.andThen
                                 (\pos ->
                                     if operator.end.col == pos.col then
-                                        -- negated term (no space between operator)
+                                        -- negated term (no space after operator)
                                         Parser.succeed (\term_ -> Parser.Loop <| pushStateArg (SourcePosition.at operator.start term_.end (AST.Negate term_)) state)
                                             |> Parser.skip checkIndent
                                             |> Parser.keep term
 
                                     else
                                         Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
-                                            |> Parser.keep possiblyNegativeTerm
+                                            |> Parser.keep parser
                                 )
 
                     else
                         Parser.succeed (\nextTerm -> Parser.Loop <| pushStateSegment nextTerm operator state)
-                            |> Parser.skip spaceParser
-                            |> Parser.keep possiblyNegativeTerm
+                            |> Parser.keep parser
                 )
                 |> Parser.skip spaceParser
         , Parser.succeed (\arg -> Parser.Loop <| pushStateArg arg state)

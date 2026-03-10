@@ -220,6 +220,84 @@ tests =
                                 ]
                             }
                         )
+            , test "function calls with when-is as argument" <| \_ ->
+                Parser.run PE.parser Context.empty
+                    """
+                    myFunc 1 2 <|
+                      when x is
+                        1 -> "One"
+                        _ -> "None"
+                    """
+                    |> expectExpression
+                        (AST.Binops
+                            { segments =
+                                [ { leadingExpression =
+                                    SourcePosition.at
+                                        { row = 1, col = 1 }
+                                        { row = 1, col = 11 }
+                                        (AST.Call
+                                            { fn =
+                                                SourcePosition.at
+                                                    { row = 1, col = 1 }
+                                                    { row = 1, col = 7 }
+                                                    (AST.Var { name = "myFunc", varType = AST.LowVar })
+                                            , args =
+                                                [ SourcePosition.at
+                                                    { row = 1, col = 8 }
+                                                    { row = 1, col = 9 }
+                                                    (AST.NumberLiteral (Number.Integer 1))
+                                                , SourcePosition.at
+                                                    { row = 1, col = 10 }
+                                                    { row = 1, col = 11 }
+                                                    (AST.NumberLiteral (Number.Integer 2))
+                                                ]
+                                            }
+                                        )
+                                    , operatorName =
+                                        SourcePosition.at
+                                            { row = 1, col = 12 }
+                                            { row = 1, col = 14 }
+                                            "<|"
+                                  }
+                                ]
+                            , finalExpression =
+                                SourcePosition.at
+                                    { row = 2, col = 3 }
+                                    { row = 4, col = 16 }
+                                    (AST.When
+                                        { expression =
+                                            SourcePosition.at
+                                                { row = 2, col = 8 }
+                                                { row = 2, col = 9 }
+                                                (AST.Var { name = "x", varType = AST.LowVar })
+                                        , branches =
+                                            [ { pattern =
+                                                  SourcePosition.at
+                                                      { row = 3, col = 5 }
+                                                      { row = 3, col = 6 }
+                                                      (AST.PInt { isHex = False, value = 1 })
+                                              , body =
+                                                  SourcePosition.at
+                                                      { row = 3, col = 10 }
+                                                      { row = 3, col = 15 }
+                                                      (AST.StringLiteral "One")
+                                              }
+                                            , { pattern =
+                                                  SourcePosition.at
+                                                      { row = 4, col = 5 }
+                                                      { row = 4, col = 6 }
+                                                      (AST.PAnything "")
+                                              , body =
+                                                  SourcePosition.at
+                                                      { row = 4, col = 10 }
+                                                      { row = 4, col = 16 }
+                                                      (AST.StringLiteral "None")
+                                              }
+                                            ]
+                                        }
+                                    )
+                            }
+                        )
             , test "backward pipe operator with record" <| \_ ->
                 Parser.run PE.parser Context.empty
                     "{ onInit = initWithCommand <| Compiler.Backend.Make { optimize = flags.optimize } }"
@@ -399,23 +477,32 @@ tests =
                                             { row = 1, col = 9 }
                                             "+"
                                   }
-                                , { leadingExpression =
-                                        SourcePosition.at
-                                            { row = 1, col = 10 }
-                                            { row = 1, col = 11 }
-                                            (AST.Var { name = "b", varType = AST.LowVar })
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 1, col = 12 }
-                                            { row = 1, col = 13 }
-                                            "-"
-                                  }
                                 ]
                             , finalExpression =
                                 SourcePosition.at
-                                    { row = 1, col = 14 }
+                                    { row = 1, col = 10 }
                                     { row = 1, col = 15 }
-                                    (AST.Var { name = "c", varType = AST.LowVar })
+                                    (AST.Binops
+                                        { segments =
+                                            [ { leadingExpression =
+                                                SourcePosition.at
+                                                    { row = 1, col = 10 }
+                                                    { row = 1, col = 11 }
+                                                    (AST.Var { name = "b", varType = AST.LowVar })
+                                              , operatorName =
+                                                SourcePosition.at
+                                                    { row = 1, col = 12 }
+                                                    { row = 1, col = 13 }
+                                                    "-"
+                                              }
+                                            ]
+                                        , finalExpression =
+                                            SourcePosition.at
+                                                { row = 1, col = 14 }
+                                                { row = 1, col = 15 }
+                                                (AST.Var { name = "c", varType = AST.LowVar })
+                                        }
+                                    )
                             }
                         )
             , test "operators (with negated var)" <| \_ ->
@@ -447,28 +534,37 @@ tests =
                                             { row = 1, col = 9 }
                                             "+"
                                   }
-                                , { leadingExpression =
-                                        SourcePosition.at
-                                            { row = 1, col = 10}
-                                            { row = 1, col = 12}
-                                            (AST.Negate <|
-                                                SourcePosition.at
-                                                    { row = 1, col = 11 }
-                                                    { row = 1, col = 12 }
-                                                    (AST.Var { name = "b", varType = AST.LowVar })
-                                            )
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 1, col = 13 }
-                                            { row = 1, col = 14 }
-                                            "-"
-                                  }
                                 ]
                             , finalExpression =
                                 SourcePosition.at
-                                    { row = 1, col = 15 }
+                                    { row = 1, col = 10 }
                                     { row = 1, col = 16 }
-                                    (AST.Var { name = "c", varType = AST.LowVar })
+                                    (AST.Binops
+                                        { segments =
+                                            [ { leadingExpression =
+                                                SourcePosition.at
+                                                    { row = 1, col = 10}
+                                                    { row = 1, col = 12}
+                                                    (AST.Negate <|
+                                                        SourcePosition.at
+                                                            { row = 1, col = 11 }
+                                                            { row = 1, col = 12 }
+                                                            (AST.Var { name = "b", varType = AST.LowVar })
+                                                    )
+                                              , operatorName =
+                                                SourcePosition.at
+                                                    { row = 1, col = 13 }
+                                                    { row = 1, col = 14 }
+                                                    "-"
+                                              }
+                                            ]
+                                        , finalExpression =
+                                            SourcePosition.at
+                                                { row = 1, col = 15 }
+                                                { row = 1, col = 16 }
+                                                (AST.Var { name = "c", varType = AST.LowVar })
+                                        }
+                                    )
                             }
                         )
             , test "operators over multiple lines without indent" <| \_ ->
@@ -532,23 +628,32 @@ tests =
                                             { row = 1, col = 4 }
                                             "+"
                                   }
-                                , { leadingExpression =
-                                    SourcePosition.at
-                                        { row = 1, col = 5 }
-                                        { row = 1, col = 6 }
-                                        (AST.Var { name = "b", varType = AST.LowVar })
-                                    , operatorName =
-                                        SourcePosition.at
-                                            { row = 2, col = 1 }
-                                            { row = 2, col = 3 }
-                                            "|>"
-                                  }
                                 ]
                             , finalExpression =
                                 SourcePosition.at
-                                    { row = 2, col = 4 }
+                                    { row = 1, col = 5 }
                                     { row = 2, col = 8 }
-                                    (AST.Var { name = "func", varType = AST.LowVar })
+                                    (AST.Binops
+                                        { segments =
+                                            [ { leadingExpression =
+                                                SourcePosition.at
+                                                    { row = 1, col = 5 }
+                                                    { row = 1, col = 6 }
+                                                    (AST.Var { name = "b", varType = AST.LowVar })
+                                              , operatorName =
+                                                SourcePosition.at
+                                                    { row = 2, col = 1 }
+                                                    { row = 2, col = 3 }
+                                                    "|>"
+                                              }
+                                            ]
+                                        , finalExpression =
+                                            SourcePosition.at
+                                                { row = 2, col = 4 }
+                                                { row = 2, col = 8 }
+                                                (AST.Var { name = "func", varType = AST.LowVar })
+                                        }
+                                    )
                             }
                         )
             , test "array literal with pipe operator over multiple lines" <| \_ ->
@@ -591,6 +696,68 @@ tests =
                                     { row = 2, col = 4 }
                                     { row = 2, col = 8 }
                                     (AST.Var { name = "func", varType = AST.LowVar })
+                            }
+                        )
+            , test "pipe operator with function having multiple arguments" <| \_ ->
+                Parser.run PE.parser Context.empty
+                    """
+                    foo a b
+                    |> bar x y
+                    """
+                    |> expectExpression
+                        (AST.Binops
+                            { segments =
+                                [ { leadingExpression =
+                                    SourcePosition.at
+                                        { row = 1, col = 1 }
+                                        { row = 1, col = 8 }
+                                        (AST.Call
+                                            { fn =
+                                                SourcePosition.at
+                                                    { row = 1, col = 1 }
+                                                    { row = 1, col = 4 }
+                                                    (AST.Var { name = "foo", varType = AST.LowVar })
+                                            , args =
+                                                [ SourcePosition.at
+                                                    { row = 1, col = 5 }
+                                                    { row = 1, col = 6 }
+                                                    (AST.Var { name = "a", varType = AST.LowVar })
+                                                , SourcePosition.at
+                                                    { row = 1, col = 7 }
+                                                    { row = 1, col = 8 }
+                                                    (AST.Var { name = "b", varType = AST.LowVar })
+                                                ]
+                                            }
+                                        )
+                                    , operatorName =
+                                        SourcePosition.at
+                                            { row = 2, col = 1 }
+                                            { row = 2, col = 3 }
+                                            "|>"
+                                  }
+                                ]
+                            , finalExpression =
+                                SourcePosition.at
+                                    { row = 2, col = 4 }
+                                    { row = 2, col = 11 }
+                                    (AST.Call
+                                        { fn =
+                                            SourcePosition.at
+                                                { row = 2, col = 4 }
+                                                { row = 2, col = 7 }
+                                                (AST.Var { name = "bar", varType = AST.LowVar })
+                                        , args =
+                                            [ SourcePosition.at
+                                                { row = 2, col = 8 }
+                                                { row = 2, col = 9 }
+                                                (AST.Var { name = "x", varType = AST.LowVar })
+                                            , SourcePosition.at
+                                                { row = 2, col = 10 }
+                                                { row = 2, col = 11 }
+                                                (AST.Var { name = "y", varType = AST.LowVar })
+                                            ]
+                                        }
+                                    )
                             }
                         )
             ]
