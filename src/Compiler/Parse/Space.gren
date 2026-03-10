@@ -1,7 +1,7 @@
 module Compiler.Parse.Space exposing
     ( Error (..)
     , parser
-    , setIndentToStartOfLine
+    , scopeIndentToLineStart
     , checkIndent
     , errorToString
     )
@@ -141,9 +141,13 @@ validWhiteSpace char =
     char == ' ' || char == '\n' || char == '\r'
 
 
-setIndentToStartOfLine : Parser Context e {}
-setIndentToStartOfLine =
-    Parser.updatePayload (\pl -> { pl | indent = pl.lineStart }) (Parser.succeed {})
+scopeIndentToLineStart : Parser Context e v -> Parser Context e v
+scopeIndentToLineStart p =
+    Parser.scopedUpdatePayload
+        .lineStart
+        .indent
+        (\newIndent payload -> { payload | indent = newIndent })
+        p
     
 
 checkIndent : Parser Context {} {}

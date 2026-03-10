@@ -35,8 +35,7 @@ tests =
                     setIndentParser =
                         Parser.succeed identity
                             |> Parser.skip PS.parser
-                            |> Parser.skip PS.setIndentToStartOfLine
-                            |> Parser.keep Parser.getPayload
+                            |> Parser.keep (PS.scopeIndentToLineStart Parser.getPayload)
                 in
                 Parser.run setIndentParser Context.empty "    b"
                     |> Result.map .indent

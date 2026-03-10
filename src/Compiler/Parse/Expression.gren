@@ -136,11 +136,7 @@ parser =
                                     )
 
                         indentationBumped =
-                            Parser.scopedUpdatePayload
-                                .lineStart
-                                .indent
-                                (\newIndent payload -> { payload | indent = newIndent })
-                                completionParser
+                            Space.scopeIndentToLineStart completionParser
                     in
                     when firstTerm.value is
                         AST.Var _ ->
@@ -274,10 +270,7 @@ letDefParser =
             |> Parser.map (\{ start, value, end } -> SourcePosition.at start end (AST.Define value))
         , letDefDestructParser
         ]
-        |> Parser.scopedUpdatePayload
-            .lineStart
-            .indent
-            (\newValue pl -> { pl | indent = newValue })
+        |> Space.scopeIndentToLineStart
 
 
 letDefNamedParser : Parser Context Error (SourcePosition.Located AST.DefineRecord)
@@ -455,10 +448,7 @@ whenParser =
                                 (AST.When { expression = expr, branches = branches })
                         )
             )
-        |> Parser.scopedUpdatePayload
-            .lineStart
-            .indent
-            (\value payload -> { payload | indent = value })
+        |> Space.scopeIndentToLineStart
 
 whenBranchParser : Parser Context Error AST.WhenBranch
 whenBranchParser =
@@ -468,10 +458,7 @@ whenBranchParser =
         |> Parser.skip (Parser.keyword "->" (ExpectedKeyword "->"))
         |> Parser.skip spaceParser
         |> Parser.keep (Parser.lazy (\_ -> parser))
-        |> Parser.scopedUpdatePayload
-            .lineStart
-            .indent
-            (\value payload -> { payload | indent = value })
+        |> Space.scopeIndentToLineStart
 
 
 whenBranchLoopParser : Array AST.WhenBranch -> Parser Context Error (Parser.Step (Array AST.WhenBranch) (Array AST.WhenBranch))
