@@ -166,6 +166,29 @@ tests =
                                 ]
                             }
                         )
+            , test "function with operator as argument" <| \_ ->
+                Parser.run PE.parser Context.empty "func (+)"
+                    |> expectExpression
+                        (AST.Call
+                            { fn =
+                                SourcePosition.at
+                                    { row = 1, col = 1 }
+                                    { row = 1, col = 5 }
+                                    (AST.Var { name = "func", varType = AST.LowVar })
+                            , args =
+                                [ SourcePosition.at
+                                    { row = 1, col = 6 }
+                                    { row = 1, col = 9 }
+                                    (AST.Parens
+                                        (SourcePosition.at
+                                            { row = 1, col = 7 }
+                                            { row = 1, col = 8 }
+                                            (AST.Operator "+")
+                                        )
+                                    )
+                                ]
+                            }
+                        )
             , test "function calls with lambda" <| \_ ->
                 Parser.run PE.parser Context.empty "myFunc a \\b -> b + 1"
                     |> expectExpression

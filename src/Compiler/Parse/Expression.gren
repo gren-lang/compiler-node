@@ -538,7 +538,36 @@ term =
                 [ Parser.succeed AST.Parens
                     |> Parser.skip (Parser.chompChar '(' (ExpectedChar '('))
                     |> Parser.skip spaceParser
-                    |> Parser.keep (Parser.lazy (\_ -> parser))
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ Parser.succeed identity
+                                |> Parser.keep (SourcePosition.parser operatorParser)
+                                |> Parser.skip spaceParser
+                                |> Parser.andThen
+                                    (\operator ->
+                                        if operator.value == "-" then
+                                            Parser.getPosition
+                                                |> Parser.andThen
+                                                    (\pos ->
+                                                        if operator.end.col == pos.col then
+                                                            -- negated term (no space after operator)
+                                                            Parser.succeed (\term_ -> SourcePosition.at operator.start term_.end (AST.Negate term_))
+                                                                |> Parser.keep term
+
+                                                        else
+                                                            parser
+                                                    )
+
+                                        else
+                                            Parser.succeed
+                                                { start = operator.start
+                                                , value = AST.Operator operator.value
+                                                , end = operator.end
+                                                }
+                                    )
+                             , Parser.lazy (\_ -> parser)
+                            ]
+                        )
                     |> Parser.skip spaceParser
                     |> Parser.skip (Parser.chompChar ')' (ExpectedChar ')'))
                 , function
