@@ -81,6 +81,26 @@ tests =
                     , binops = []
                     , effects = AST.NoEffects
                     }
+        , test "the port keyword is optional (going away in future release)" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                port module PortModule exposing (..)
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 13 }
+                            { row = 1, col = 23 }
+                            "PortModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects = AST.NoEffects
+                    }
         , test "Docs" <| \_ ->
             Parser.run PM.parser Context.empty
                 """

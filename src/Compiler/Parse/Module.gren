@@ -96,6 +96,14 @@ parser =
                         AST.Ports ports
             }
         )
+        |> Parser.skip
+            (Parser.oneOf
+                [ Parser.succeed {}
+                    |> Parser.skip (Parser.token "port" (ExpectedKeyword "port"))
+                    |> Parser.skip spaceParser
+                , Parser.succeed {}
+                ]
+            )
         |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
         |> Parser.skip spaceParser
         |> Parser.keep moduleNameParser
