@@ -101,6 +101,91 @@ tests =
                     , binops = []
                     , effects = AST.NoEffects
                     }
+        , test "effect module with defined cmd" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                effect module CmdModule where { command = MyCmd } exposing (..)
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 15 }
+                            { row = 1, col = 24 }
+                            "CmdModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects =
+                        SourcePosition.at
+                            { row = 1, col = 43 }
+                            { row = 1, col = 48 }
+                            "MyCmd"
+                            |> AST.Cmd
+                            |> AST.Manager
+                    }
+        , test "effect module with defined sub" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                effect module SubModule where { subscription = MySub } exposing (..)
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 15 }
+                            { row = 1, col = 24 }
+                            "SubModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects =
+                        SourcePosition.at
+                            { row = 1, col = 48 }
+                            { row = 1, col = 53 }
+                            "MySub"
+                            |> AST.Sub
+                            |> AST.Manager
+                    }
+        , test "effect module with defined fx" <| \_ ->
+            Parser.run PM.parser Context.empty
+                """
+                effect module FxModule where { command = MyCmd, subscription = MySub } exposing (..)
+                """
+                |> expect
+                    { name =
+                        SourcePosition.at
+                            { row = 1, col = 15 }
+                            { row = 1, col = 23 }
+                            "FxModule"
+                    , exports = AST.Open
+                    , docs = Nothing
+                    , imports = []
+                    , values = []
+                    , unions = []
+                    , aliases = []
+                    , binops = []
+                    , effects =
+                        { cmd =
+                            SourcePosition.at
+                                { row = 1, col = 42 }
+                                { row = 1, col = 47 }
+                                "MyCmd"
+                        , sub =
+                            SourcePosition.at
+                                { row = 1, col = 64 }
+                                { row = 1, col = 69 }
+                                "MySub"
+                        }
+                            |> AST.Fx
+                            |> AST.Manager
+                    }
         , test "Docs" <| \_ ->
             Parser.run PM.parser Context.empty
                 """

@@ -65,7 +65,7 @@ spaceParser =
 parser : Parser Context Error AST.Module
 parser =
     Parser.succeed
-        (\name exports docs imports binops decls ->
+        (\{ name, effects } exports docs imports binops decls ->
             let
                 values =
                     Array.mapAndKeepJust declarationToModuleValue decls
@@ -90,23 +90,39 @@ parser =
             , effects =
                 when ports is
                     [] ->
-                        AST.NoEffects
+                        -- TODO: support both ports and effects
+                        -- currently, only kernel devs can define effects
+                        -- so don't worry about it for now
+                        effects
 
                     _ ->
                         AST.Ports ports
             }
         )
-        |> Parser.skip
+        |> Parser.keep
             (Parser.oneOf
-                [ Parser.succeed {}
-                    |> Parser.skip (Parser.token "port" (ExpectedKeyword "port"))
+                [ Parser.succeed (\name effects -> { name = name, effects = AST.Manager effects })
+                    |> Parser.skip (Parser.token "effect" (ExpectedKeyword "effect"))
                     |> Parser.skip spaceParser
-                , Parser.succeed {}
+                    |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
+                    |> Parser.skip spaceParser
+                    |> Parser.keep moduleNameParser
+                    |> Parser.skip spaceParser
+                    |> Parser.keep effectParser
+                , Parser.succeed (\name -> { name = name, effects = AST.NoEffects })
+                    |> Parser.skip
+                        (Parser.oneOf
+                            [ Parser.succeed {}
+                                |> Parser.skip (Parser.token "port" (ExpectedKeyword "port"))
+                                |> Parser.skip spaceParser
+                            , Parser.succeed {}
+                            ]
+                        )
+                    |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
+                    |> Parser.skip spaceParser
+                    |> Parser.keep moduleNameParser
                 ]
             )
-        |> Parser.skip (Parser.token "module" (ExpectedKeyword "module"))
-        |> Parser.skip spaceParser
-        |> Parser.keep moduleNameParser
         |> Parser.skip spaceParser
         |> Parser.keep parseExposingStatement
         |> Parser.skip spaceParser
@@ -126,6 +142,76 @@ moduleNameParser =
             |> Parser.mapError VariableError
             |> Parser.map Variable.foreignVarToString
         )
+
+
+effectParser : Parser Context Error AST.Manager
+effectParser =
+    Parser.succeed identity
+        |> Parser.skip (Parser.token "where" (ExpectedKeyword "where"))
+        |> Parser.skip spaceParser
+        |> Parser.skip (Parser.chompChar '{' (ExpectedChar '{'))
+        |> Parser.skip spaceParser
+        |> Parser.keep
+            (Parser.oneOf
+                [ Parser.succeed
+                    (\cmd maybeSub ->
+                        when maybeSub is
+                            Just sub ->
+                                AST.Fx { cmd = cmd, sub = sub }
+
+                            Nothing ->
+                                AST.Cmd cmd
+                    )
+                    |> Parser.keep (cmdSubParser "command")
+                    |> Parser.skip spaceParser
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ Parser.succeed Just
+                                |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+                                |> Parser.skip spaceParser
+                                |> Parser.keep (cmdSubParser "subscription")
+                            , Parser.succeed Nothing
+                            ]
+                        )
+                , Parser.succeed
+                    (\sub maybeCmd ->
+                        when maybeCmd is
+                            Just cmd ->
+                                AST.Fx { cmd = cmd, sub = sub }
+
+                            Nothing ->
+                                AST.Sub sub
+                    )
+                    |> Parser.keep (cmdSubParser "subscription")
+                    |> Parser.skip spaceParser
+                    |> Parser.keep
+                        (Parser.oneOf
+                            [ Parser.succeed Just
+                                |> Parser.skip (Parser.chompChar ',' (ExpectedChar ','))
+                                |> Parser.skip spaceParser
+                                |> Parser.keep (cmdSubParser "command")
+                            , Parser.succeed Nothing
+                            ]
+                        )
+                ]
+            )
+        |> Parser.skip spaceParser
+        |> Parser.skip (Parser.chompChar '}' (ExpectedChar '}'))
+
+
+cmdSubParser : String -> Parser Context Error (SourcePosition.Located String)
+cmdSubParser fieldName =
+    Parser.succeed identity
+        |> Parser.skip (Parser.token fieldName (ExpectedKeyword fieldName))
+        |> Parser.skip spaceParser
+        |> Parser.skip (Parser.chompChar '=' (ExpectedChar '='))
+        |> Parser.skip spaceParser
+        |> Parser.keep ctorNameParser
+
+
+ctorNameParser : Parser Context Error (SourcePosition.Located String)
+ctorNameParser =
+    SourcePosition.parser (Parser.mapError VariableError Variable.upperCase)
 
 
 parseExposingStatement : Parser Context Error AST.Exposing
