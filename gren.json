@@ -10,6 +10,7 @@
         "Cli.PrettyPrinter",
         "Compiler.Backend",
         "Compiler.Outline",
+        "Compiler.Package",
         "Compiler.Paths",
         "FileSystem.Lock"
     ],

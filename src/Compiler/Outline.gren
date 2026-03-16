@@ -7,6 +7,9 @@ module Compiler.Outline exposing
     --
     , defaultSummary
     --
+    , ReadFromPathError (..)
+    , readFromPath
+    --
     , FindSourceFilesError (..)
     , findSourceFiles
     --
@@ -90,6 +93,32 @@ type VersionConstraint a
 defaultSummary : String
 defaultSummary =
     "helpful summary of your project, less than 80 characters"
+
+
+type ReadFromPathError
+    = FromPathFileSystemError FileSystem.Error
+    | FromPathInvalidString
+    | FromPathInvalidJson Decode.Error
+
+
+readFromPath : FileSystem.Permission -> Path -> Task ReadFromPathError Outline
+readFromPath fsPerm path =
+    FileSystem.readFile fsPerm path
+        |> Task.mapError FromPathFileSystemError
+        |> Task.andThen
+            (\bytes ->
+                when Bytes.toString bytes is
+                    Just str ->
+                        when Decode.decodeString jsonDecoder str is
+                            Ok outline ->
+                                Task.succeed outline
+
+                            Err jsonErr ->
+                                Task.fail <| FromPathInvalidJson jsonErr
+
+                    Nothing ->
+                        Task.fail FromPathInvalidString
+            )
 
 
 {-|-}

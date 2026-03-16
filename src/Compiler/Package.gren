@@ -1,0 +1,135 @@
+module Compiler.Package exposing
+    ( Package
+    , LoadFromPathError (..)
+    , loadFromPath
+    , LoadFromStreamError (..)
+    , loadFromStream
+    , saveToStream
+    )
+
+
+import Bytes exposing (Bytes)
+import Dict exposing (Dict)
+import Compiler.ModuleName as ModuleName
+import Compiler.PackageName as PackageName exposing (PackageName)
+import Compiler.Outline as Outline
+import FileSystem
+import FileSystem.Path as Path exposing (Path)
+import SemanticVersion exposing (SemanticVersion)
+import Stream
+import Task exposing (Task)
+import Json.Encode as Json
+import Json.Decode as Decode exposing (Decoder)
+
+
+type alias Package =
+    { outline : Outline.PkgOutline
+    , sources : Dict String String
+    }
+
+
+type LoadFromPathError
+    = FromPathOutlineFileSystemError FileSystem.Error
+    | FromPathOutlineInvalidString
+    | FromPathOutlineInvalidJson Decode.Error
+    | FromPathOutlineIsApp
+    | FromPathFindSourcesError Outline.FindSourceFilesError
+
+
+loadFromPath : FileSystem.Permission -> Path -> Task LoadFromPathError Package
+loadFromPath fsPermission path =
+    FileSystem.realPath fsPermission path
+        |> Task.mapError FromPathOutlineFileSystemError
+        |> Task.andThen
+            (\realPath ->
+                let
+                    outlinePath =
+                        Path.append (Path.fromPosixString "gren.json") realPath
+                in
+                Outline.readFromPath fsPermission outlinePath
+                    |> Task.mapError
+                        (\readError ->
+                            when readError is
+                                Outline.FromPathFileSystemError fsErr ->
+                                    FromPathOutlineFileSystemError fsErr
+
+                                Outline.FromPathInvalidString ->
+                                    FromPathOutlineInvalidString
+
+                                Outline.FromPathInvalidJson jsonErr ->
+                                    FromPathOutlineInvalidJson jsonErr
+                        )
+                    |> Task.andThen
+                        (\outline ->
+                            when outline is
+                                Outline.App _ ->
+                                    Task.fail FromPathOutlineIsApp
+
+                                Outline.Pkg pkgOutline ->
+                                    Outline.findSourceFiles fsPermission outline realPath
+                                        |> Task.mapError FromPathFindSourcesError
+                                        |> Task.map
+                                            (\sourceFiles ->
+                                                { outline = pkgOutline
+                                                , sources =
+                                                    Array.foldl
+                                                        (\{ moduleName, source } acc ->
+                                                            Dict.set (ModuleName.toString moduleName) source acc
+                                                        )
+                                                        Dict.empty
+                                                        sourceFiles
+                                                }
+                                            )
+                        )
+            )
+
+
+type LoadFromStreamError
+    = FromStreamStreamError Stream.Error
+    | FromStreamInvalidJson Decode.Error
+
+
+loadFromStream : Stream.Readable Bytes -> Task LoadFromStreamError Package
+loadFromStream stream =
+    stream
+        |> Stream.awaitAndPipeThrough Stream.gzipDecompression
+        |> Task.andThen (Stream.awaitAndPipeThrough Stream.textDecoder)
+        |> Task.andThen consumeString
+        |> Task.mapError FromStreamStreamError
+        |> Task.andThen
+            (\data ->
+                when Decode.decodeString jsonDecoder data is
+                    Ok bundle ->
+                        Task.succeed bundle
+
+                    Err jsonErr ->
+                        Task.fail <| FromStreamInvalidJson jsonErr
+            )
+
+
+consumeString : Stream.Readable String -> Task Stream.Error String
+consumeString stream =
+    Stream.readUntilClosed (\chunk result -> Ok (result ++ chunk)) "" stream
+
+
+saveToStream : Package -> Stream.Writable Bytes -> Task Stream.Error {}
+saveToStream bundle stream =
+    Stream.fromArray [ Json.encode 0 (toJson bundle) ]
+        |> Task.andThen (Stream.awaitAndPipeThrough Stream.textEncoder)
+        |> Task.andThen (Stream.awaitAndPipeThrough Stream.gzipCompression)
+        |> Task.andThen (Stream.pipeTo stream)
+
+
+toJson : Package -> Json.Value
+toJson { outline, sources } =
+    Json.object
+        [ { key = "outline", value = Outline.toJson (Outline.Pkg outline) }
+        , { key = "sources", value = Json.dict identity Json.string sources }
+        ]
+
+
+jsonDecoder : Decoder Package
+jsonDecoder =
+    Decode.map2 (\outline sources -> { outline = outline, sources = sources })
+        (Decode.field "outline" Outline.pkgJsonDecoder)
+        (Decode.field "sources" (Decode.dict Decode.string))
