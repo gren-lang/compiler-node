@@ -33,6 +33,8 @@ module Cli.Parser exposing
     --
     , pathParser
     , grenFileParser
+    , semanticVersionParser
+    , packageNameParser
     )
 
 
@@ -72,6 +74,8 @@ Into a data structure.
 import Dict exposing (Dict)
 import FileSystem.Path as Path exposing (Path)
 import Cli.PrettyPrinter as PP
+import SemanticVersion exposing (SemanticVersion)
+import Compiler.PackageName as PackageName exposing (PackageName)
 
 
 {-| Defines a command line application.
@@ -1027,7 +1031,9 @@ flag key valueParserFn desc (FlagParser { knownFlags, parseFn = previousSteps })
 -- PARSERS
 
 
-{-| Parses a `String` into a `FileSystem.Path`.
+{-| For `FileSystem.Path`, like `/some/path/file.txt`.
+
+Note: expects posix paths.
 -}
 pathParser : ValueParser Path
 pathParser =
@@ -1060,5 +1066,34 @@ grenFileParser =
     , examples = 
         [ "MyModule.gren"
         , "src/Main.gren"
+        ]
+    }
+
+
+{-| For `SemanticVersion`, like `1.0.0`.
+-}
+semanticVersionParser : ValueParser SemanticVersion
+semanticVersionParser =
+    { singular = "version"
+    , plural = "versions"
+    , fn = SemanticVersion.fromString
+    , examples =
+        [ "1.0.0"
+        , "1.2.3"
+        , "5.1.0"
+        ]
+    }
+
+
+{-| For `PackageName`, like `gren-lang/core`.
+-}
+packageNameParser : ValueParser PackageName
+packageNameParser =
+    { singular = "package"
+    , plural = "packages"
+    , fn = PackageName.fromString
+    , examples =
+        [ "gren-lang/core"
+        , "robheghan/string-diff"
         ]
     }

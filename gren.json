@@ -6,37 +6,17 @@
     "license": "BSD-3-Clause",
     "version": "3.0.7",
     "exposed-modules": [
-        "Compiler.Ast.Source",
         "Cli.Parser",
         "Cli.PrettyPrinter",
         "Compiler.Backend",
-        "Compiler.Dependencies",
-        "Compiler.ModuleName",
         "Compiler.Outline",
-        "Compiler.PackageName",
-        "Compiler.Platform",
         "Compiler.Paths",
-        "Compiler.License",
-        "FileSystem.Lock",
-        "Compiler.Parse.Context",
-        "Compiler.Parse.Declaration",
-        "Compiler.Parse.Expression",
-        "Compiler.Parse.Module",
-        "Compiler.Parse.Number",
-        "Compiler.Parse.Operator",
-        "Compiler.Parse.String",
-        "Compiler.Parse.Space",
-        "Compiler.Parse.Pattern",
-        "Compiler.Parse.Variable",
-        "Compiler.Parse.Type",
-        "SemanticVersion",
-        "SemanticVersionRange",
-        "String.EditDistance",
-        "SourcePosition"
+        "FileSystem.Lock"
     ],
     "gren-version": "0.6.0 <= v < 0.7.0",
     "dependencies": {
         "gren-lang/core": "7.3.0 <= v < 8.0.0",
-        "gren-lang/node": "6.1.0 <= v < 7.0.0"
+        "gren-lang/node": "6.1.0 <= v < 7.0.0",
+        "gren-lang/compiler-common": "1.0.0 <= v < 2.0.0"
     }
 }
