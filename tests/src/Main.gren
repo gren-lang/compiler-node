@@ -9,7 +9,7 @@ import Test.Cli.PrettyPrinter
 main : TestRunner.Program
 main =
     TestRunner.run <|
-        Test.describe "Gren Compiler Node tests"
+        Test.describe "gren-lang/compiler-node tests"
             [ Test.Cli.Parser.tests
             , Test.Cli.PrettyPrinter.tests
             ]
