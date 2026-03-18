@@ -1,12 +1,33 @@
 module Compiler.Package exposing
     ( Package
+    --
     , LoadFromPathError (..)
     , loadFromPath
+    --
     , LoadFromStreamError (..)
     , loadFromStream
     , saveToStream
     )
 
+
+{-| A module for loading and saving the outline and source code of
+packages (projects with a package-formatted `gren.json`).
+
+@docs Package
+
+## Load from file system
+
+@docs loadFromPath, LoadFromPathError
+
+## Bundles
+
+The compiler will store entire projects in compressed form in a project's
+`gren_packages` directory. These functions will let you read and write such
+files, also known as package bundles.
+
+@docs loadFromStream, LoadFromStreamError, saveToStream
+
+-}
 
 import Bytes exposing (Bytes)
 import Dict exposing (Dict)
@@ -22,12 +43,17 @@ import Json.Encode as Json
 import Json.Decode as Decode exposing (Decoder)
 
 
+{-| The [outline](Compiler.Outline) and source files of a package.
+-}
 type alias Package =
     { outline : Outline.PkgOutline
     , sources : Dict String String
     }
 
 
+{-| The types of errors that can happen as you load a package from
+the file system.
+-}
 type LoadFromPathError
     = FromPathOutlineFileSystemError FileSystem.Error
     | FromPathOutlineInvalidString
@@ -36,6 +62,11 @@ type LoadFromPathError
     | FromPathFindSourcesError Outline.FindSourceFilesError
 
 
+{-| Loads an entire package from disk. The provided `Path` needs to point to the root
+directory of the package (the directory containing `gren.json`).
+
+For core packages, like `gren-lang/core`, the sources might include JavaScript files.
+-}
 loadFromPath : FileSystem.Permission -> Path -> Task LoadFromPathError Package
 loadFromPath fsPermission path =
     FileSystem.realPath fsPermission path
@@ -84,11 +115,18 @@ loadFromPath fsPermission path =
             )
 
 
+{-| The sort of errors that can occur when reading a bundle off a `Stream`.
+-}
 type LoadFromStreamError
     = FromStreamStreamError Stream.Error
     | FromStreamInvalidJson Decode.Error
 
 
+{-| This reads a package off a `Stream`.
+
+This gives you some flexibility as to how the package bundle is retrieved.
+You can get `Stream`s from `FileSystem` and `HttpClient`.
+-}
 loadFromStream : Stream.Readable Bytes -> Task LoadFromStreamError Package
 loadFromStream stream =
     stream
@@ -112,6 +150,13 @@ consumeString stream =
     Stream.readUntilClosed (\chunk result -> Ok (result ++ chunk)) "" stream
 
 
+{-| Save a package to a `Stream`.
+
+You'll have to create the `Stream` yourself using `FileSystem`, `HttpClient` or some
+other module.
+
+The package will be encoded to JSON and compressed with gzip.
+-}
 saveToStream : Package -> Stream.Writable Bytes -> Task Stream.Error {}
 saveToStream bundle stream =
     Stream.fromArray [ Json.encode 0 (toJson bundle) ]

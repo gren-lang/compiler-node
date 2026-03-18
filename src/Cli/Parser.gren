@@ -67,7 +67,7 @@ Into a data structure.
 
 ## Common parsers
 
-@docs pathParser, grenFileParser
+@docs pathParser, grenFileParser, packageNameParser, semanticVersionParser
 -}
 
 

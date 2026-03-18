@@ -4,7 +4,6 @@ module Compiler.Outline exposing
     , PkgOutline
     , VersionConstraint (..)
     , Exposed (..)
-    --
     , defaultSummary
     --
     , ReadFromPathError (..)
@@ -21,7 +20,11 @@ module Compiler.Outline exposing
 
 {-| Module for working with `gren.json` files.
 
-@docs Outline, AppOutline, PkgOutline, VersionConstraint, Exposed, defaultSummary, findSourceFiles
+@docs Outline, AppOutline, PkgOutline, VersionConstraint, Exposed, defaultSummary
+
+## Read from disk
+
+@docs readFromPath, ReadFromPathError, findSourceFiles, FindSourceFilesError
 
 ## JSON
 
@@ -43,7 +46,9 @@ import Dict exposing (Dict)
 import Task exposing (Task)
 
 
-{-|-}
+{-| Representation of a `gren.json` file. These files are different based on
+the project type: applications and packages.
+-}
 type Outline
     = App AppOutline
     | Pkg PkgOutline
@@ -74,7 +79,8 @@ type alias PkgOutline =
     }
 
 
-{-| Exposed modules in [PkgOutline](#PkgOutline).
+{-| Exposed modules in [PkgOutline](#PkgOutline). Modules that become available
+when you're importing the package as a dependency.
 -}
 type Exposed
     = ExposedArray (Array ModuleName)
@@ -88,19 +94,23 @@ type VersionConstraint a
     | LocalPath Path
 
 
-{-| The default summary created by `gren init`.
+{-| The default summary used when creating `gren.json` using `gren init`.
 -}
 defaultSummary : String
 defaultSummary =
     "helpful summary of your project, less than 80 characters"
 
 
+{-| The types of errors that can occur when reading an `Outline` from the filesystem.
+-}
 type ReadFromPathError
     = FromPathFileSystemError FileSystem.Error
     | FromPathInvalidString
     | FromPathInvalidJson Decode.Error
 
 
+{-| Read the `Outline` located at the given `Path`.
+-}
 readFromPath : FileSystem.Permission -> Path -> Task ReadFromPathError Outline
 readFromPath fsPerm path =
     FileSystem.readFile fsPerm path
@@ -121,7 +131,8 @@ readFromPath fsPerm path =
             )
 
 
-{-|-}
+{-| The types of errors  that can occur when retrieving the source code of a project.
+-}
 type FindSourceFilesError
     = FileSystemError FileSystem.Error
     | FilePathInvalidModuleName { path : Path, inferredModuleName : String }
@@ -129,6 +140,8 @@ type FindSourceFilesError
 
 
 {-| Find the source files of a given project.
+
+When used on core packages, like `gren-lang/core`, this function can return JavaScript files.
 -}
 findSourceFiles : FileSystem.Permission -> Outline -> Path -> Task FindSourceFilesError (Array { path : Path, moduleName : ModuleName, source : String })
 findSourceFiles fsPerm outline outlinePath =

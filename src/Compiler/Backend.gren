@@ -17,9 +17,14 @@ module Compiler.Backend exposing
     )
 
 
-{-| Functions for working with the Haskell-based Gren compiler.
+{-| Functions for working with the Haskell-based Gren compiler backend.
 
-@docs version
+The Gren compiler is currently split into two parts. One part written in Gren, and one
+written in Haskell.
+
+The end goal is to have everything written in Gren, and to have as
+much code as possible shared with the community through `gren-lang/compiler-node` and
+`gren-lang/compiler-common`.
 
 @docs UnsupportedPlatform, downloadUrl, download
 
