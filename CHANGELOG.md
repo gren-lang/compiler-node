@@ -10,11 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **CLI Enhancements**:
+
   - Added `packageNameParser` and `semanticVersionParser` to `Cli.Parser`
   - Support for `--flag value` argument format in addition to `--flag=value`
   - Improved error handling and help text generation
 
 - **Compiler.Outline improvements**:
+
   - Added `readFromPath` function with proper error handling for reading `gren.json` files
   - Enhanced `findSourceFiles` with validation for module names and file contents
   - Added comprehensive error types: `ReadFromPathError` and `FindSourceFilesError`
