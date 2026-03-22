@@ -4,7 +4,7 @@
     "name": "gren-lang/compiler-node",
     "summary": "Node specific functionality of the Gren compiler",
     "license": "BSD-3-Clause",
-    "version": "3.0.7",
+    "version": "4.0.0",
     "exposed-modules": [
         "Cli.Parser",
         "Cli.PrettyPrinter",
