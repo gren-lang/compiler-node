@@ -1,6 +1,6 @@
-# Re-usable Compiler Functionality on Node.JS
+# Re-usable Compiler Functionality on Node.js
 
-This package exposes functionality used by the Gren compiler which is Node.JS specific. This includes things
+This package exposes functionality used by the Gren compiler which is Node.js specific. This includes things
 like finding all the source files of a project.
 
 You will find additional functionality in [gren-lang/compiler-common](https://packages.gren-lang.org/package/gren-lang/compiler-common/latest/overview).
