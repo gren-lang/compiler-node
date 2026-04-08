@@ -77,6 +77,9 @@ downloadUrl version platform cpuArch =
                 { platform = Node.Linux, cpuArch = Node.X64 } ->
                     Just "gren_linux"
 
+                { platform = Node.Linux, cpuArch = Node.Arm64 } ->
+                    Just "gren_linux_aarch64"
+
                 _ ->
                     Nothing
     in
