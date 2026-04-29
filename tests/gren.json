@@ -13,7 +13,7 @@
       "gren-lang/parser": "6.2.0",
       "gren-lang/test-runner-node": "7.0.0",
       "gren-lang/compiler-node": "local:..",
-      "gren-lang/compiler-common": "1.0.0"
+      "gren-lang/compiler-common": "2.0.0"
     },
     "indirect": {
       "gren-lang/url": "6.0.0"
