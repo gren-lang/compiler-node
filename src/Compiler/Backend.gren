@@ -48,6 +48,7 @@ import Task exposing (Task)
 import Bytes exposing (Bytes)
 import HttpClient
 import Process
+import Stream
 
 
 {-| Type used to signal that the given platform isn't supported. Meaning that there doesn't exist
@@ -98,10 +99,10 @@ downloadUrl version platform cpuArch =
 
 {-| Downlod the compiler blob.
 -}
-download : HttpClient.Permission -> String -> Task HttpClient.Error (HttpClient.Response Bytes)
+download : HttpClient.Permission -> String -> Task HttpClient.Error (HttpClient.Response (Stream.Readable Bytes))
 download permission url =
     HttpClient.get url
-        |> HttpClient.expectBytes
+        |> HttpClient.expectStream
         |> HttpClient.send permission
 
 
