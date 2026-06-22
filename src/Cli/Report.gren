@@ -1,0 +1,155 @@
+module Cli.Report exposing
+    ( Report
+    --
+    , empty
+    , create
+    --
+    , OutputType (..)
+    , toString
+    , prettyPrint
+    )
+
+
+{-| This module is an abstraction on top of Cli.PrettyPrinter with
+a default layout and some standard options that we like to use in
+the Gren compiler.
+
+If you want your command line application to output messages in the
+same style as the Gren compiler, then this is the package to use.
+-}
+
+
+import FileSystem.Path as Path exposing (Path)
+import Cli.PrettyPrinter as PP
+import Json.Encode as Encode
+
+
+{- A message to the user. We tend to use `Report`s for
+error messages and warnings.
+-}
+type Report
+    = Empty
+    | Report
+        { title : String
+        , maybePath : Maybe Path
+        , message : PP.Document
+        }
+
+
+{-| The empty report. Equivalent to no output at all.
+-}
+empty : Report
+empty =
+    Empty
+
+
+{-| A report has a title, a message and (optionally) a file path
+to the file that is relevant to the report.
+-}
+create : String -> Maybe Path -> PP.Document -> Report
+create title maybePath message =
+    Report
+        { title = title
+        , maybePath = maybePath
+        , message = message
+        }
+
+
+{-| How do you want to format the report? Use `Json` when you
+expect your CLI to be read by a script.
+-}
+type OutputType
+    = Terminal { useColor : Bool }
+    | Json
+
+
+{-| Turn the report into a string that can be written to the
+stdout stream. If you target something other than stdout, make
+sure you've disabled colors or use the `Json` output type.
+-}
+toString : OutputType -> (Path -> String) -> Report -> String
+toString outputType pathToString report =
+    when outputType is
+        Json ->
+            when report is
+                Empty ->
+                    Encode.encode 0 (Encode.object [])
+
+                Report { title, maybePath, message } ->
+                    Encode.encode 4 <|
+                        Encode.object
+                            [ { key = "type", value = Encode.string "error" }
+                            , { key = "title", value = Encode.string title }
+                            , { key = "path"
+                              , value =
+                                  maybePath
+                                    |> Maybe.map pathToString
+                                    |> Maybe.withDefault ""
+                                    |> Encode.string
+                              }
+                            , { key = "message"
+                              , value =
+                                   message
+                                      |> prettyPrint { useColor = False }
+                                      |> Encode.string
+                              }
+                            ]
+
+        Terminal printOpts ->
+            prettyPrint printOpts <|
+                when report is
+                    Empty ->
+                        PP.empty
+
+                    Report { title, maybePath, message } ->
+                        let
+                            makeDashes n =
+                                String.repeat (max 1 (80 - n)) "-"
+
+                            errorBarEnd =
+                                when maybePath is
+                                    Nothing ->
+                                        makeDashes (4 + String.unitLength title)
+
+                                    Just path ->
+                                        let
+                                            pathStr =
+                                                pathToString path
+                                        in
+                                        " "
+                                            ++ makeDashes (5 + String.unitLength title + String.unitLength pathStr)
+                                            ++ " "
+                                            ++ pathStr
+
+                            errorBar =
+                                PP.block
+                                    [ PP.text "-- "
+                                    , PP.text title
+                                    , PP.text errorBarEnd
+                                    ]
+                                    |> PP.color PP.Cyan
+                        in
+                        PP.verticalBlock
+                            [ errorBar
+                            , PP.empty
+                            , message
+                            , PP.empty
+                            , PP.empty
+                            ]
+
+
+{-| An oppinionated `PrettyPrint.toString`.
+-}
+prettyPrint : { useColor : Bool } -> PP.Document -> String
+prettyPrint { useColor } doc =
+    PP.toStringWithOptions
+        { maxColumns = 80
+        , indentationSize = 4
+        , newlineSeparator = "\n"
+        }
+        (if useColor then
+            doc
+
+        else
+            PP.stripColor doc
+        )

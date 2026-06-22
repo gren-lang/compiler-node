@@ -8,6 +8,7 @@
     "exposed-modules": [
         "Cli.Parser",
         "Cli.PrettyPrinter",
+        "Cli.Report",
         "Compiler.Backend",
         "Compiler.Outline",
         "Compiler.Package",
