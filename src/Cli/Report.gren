@@ -16,6 +16,8 @@ the Gren compiler.
 
 If you want your command line application to output messages in the
 same style as the Gren compiler, then this is the package to use.
+
+@docs Report, empty, create, OutputType, toString, prettyPrint
 -}
 
 
@@ -24,7 +26,7 @@ import Cli.PrettyPrinter as PP
 import Json.Encode as Encode
 
 
-{- A message to the user. We tend to use `Report`s for
+{-| A message to the user. We tend to use `Report`s for
 error messages and warnings.
 -}
 type Report
