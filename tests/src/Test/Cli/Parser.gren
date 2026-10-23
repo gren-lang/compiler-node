@@ -446,7 +446,7 @@ runCommand cmd args =
                         |> Parser.withCommand cmd
             }
     in
-    Parser.run args parser
+    Parser.run parser args
 
 
 expectParseSuccess : Parser.Command args flags result -> Array String -> (result -> Expectation) -> Expectation

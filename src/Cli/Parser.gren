@@ -154,8 +154,8 @@ withPrefix prefix prefixedCommands (GroupParser { knownCommands, parseFn = nextC
 {-| Takes input from the user in the form of an `Array` of `String`, and parses it according
 to the given `App` definition.
 -}
-run : Array String -> App result -> CommandParseResult result
-run tokens appDef =
+run : App result -> Array String -> CommandParseResult result
+run appDef tokens =
     let
         (GroupParser { parseFn = parse }) =
             appDef.commands
