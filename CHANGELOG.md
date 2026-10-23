@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Cli.Parser.run` swapped argument order
 
+### Fixed
+
+- `FileSystem.Lock` fixed detection of lock removal when checking if the lock is stale
+
 ## [5.0.0] - 2026-06-22
 
 ### Added

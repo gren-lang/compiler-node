@@ -183,7 +183,7 @@ update fsPerm msg model =
                 Working Cmd.none
 
         LockMetaCheck { path, attempt, result = Err fsErr } ->
-            if FileSystem.errorIsFileExists fsErr then
+            if FileSystem.errorIsNoSuchFileOrDirectory fsErr then
                 -- Lock might have been removed while we asked for metadata
                 update fsPerm (Lock { path = fromLockPath path, attempt = attempt + 1 }) model
 
