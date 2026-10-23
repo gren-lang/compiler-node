@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `Cli.Parser.run` swapped argument order
+- `gren-lang/compiler-common` is bumped to `4.0.0`
 
 ### Fixed
 
 - `FileSystem.Lock` fixed detection of lock removal when checking if the lock is stale
+- `Cli.Report.toString` add space before dashed line when no `Path` is given
 
 ## [5.0.0] - 2026-06-22
 
