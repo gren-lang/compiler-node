@@ -10,12 +10,8 @@
       "build": [
         "gren make"
       ],
-      "format": [
-        "prettier . --write"
-      ],
-      "format:check": [
-        "prettier . --check"
-      ],
+      "format": "prettier -w \"**/*.{js,mjs}\"",
+      "format:check": "prettier -c \"**/*.{js,mjs}\"",
       "test": [
         "devbox run test:unit",
         "devbox run test:integration"

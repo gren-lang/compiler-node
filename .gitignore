@@ -1,4 +1,5 @@
 .DS_Store
+.envrc
+.devbox/
 .gren/
-node_modules/
 docs.json
