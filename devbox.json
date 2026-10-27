@@ -12,6 +12,7 @@
       ],
       "format": "prettier -w \"**/*.{js,mjs}\"",
       "format:check": "prettier -c \"**/*.{js,mjs}\"",
+      "doc:preview": "npx -y --package gren-packages gren-doc-preview",
       "test": [
         "devbox run test:unit",
         "devbox run test:integration"
