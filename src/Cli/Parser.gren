@@ -285,6 +285,13 @@ prefixHelpText appName prefixName (GroupParser { knownCommands }) =
 
 
 {-| Definition of a command.
+
+* `word` is the name of the command, like `make` in `gren make`.
+* `arguments` and `flags` parse the command's inputs, which will be passed to `builder`.
+* `commonDescription`, if set, will include the command along with this description in the list of "commonly used" commands shown in the program's usage help text.
+* `summary` is the short description of the command, shown at the top of the command's help text.
+* `example` is the longer description and/or example(s) of using the command. It comes after `summary` in the command help text.
+* `builder` combines the parsed arguments and flags into a `result`
 -}
 type alias Command args flags result =
     { word : String
